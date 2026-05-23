@@ -4917,6 +4917,8 @@ function resetForm() {
 /* ============== PDF GENERATION ============== */
 // Statyczny QR code (https://4climat.pl/realizacja/) wygenerowany server-side
 
+const FB_QR_B64 = 'data:image/png;base64,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';
+
 const STATIC_QR_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAACECAIAAADeJhTwAAADLElEQVR4nO2d0W3cMAxAmyJjdKjskjm6S4fKHtfPCgiIkCB5fm7e+7wotu8eKJmiJb88Ho8fwuDn1Rcg/1AGCGWAUAYIZYBQBghlgHiN/vDr7ff4yT7+vH/Zpnre6JhXHadzLiMDhDJAKANEOGacZPr6iKjPjT4/z9VpU+U8TvR9N36HEyMDhDJAKANEasw4yfR9mb610+9Xx5Lq551riK4ng5EBQhkglAGiPGZskOnTTzK5S3UerJNDTGFkgFAGCGWAuGzMyOQKUfupMYaGkQFCGSCUAaI8Zkzdj3f6905+EI031WNu5CVGBghlgFAGiNSYsXGfXq05d+oTU/WM7XzFyAChDBDKAPFCWNM31RdPPU91VW3DyAChDBDKAJFan7FxX9+hOr+0UfOoHjPz3Y0MEMoAoQwQ5Txj6hnT7TV3nVp65xo6bYwMEMoAoQwQY+vAN/r0znEy/5vhmWsMjQwQygChDBBj68Cj++hMfzp1n95Zy709b+bc1M1QBghlgBibm3rmPE+Gjbxkar7LuakboAwQygDRWp8R1Z+j9ieE/T8y19Ohem1GBghlgFAGiJV6RnWtXGf+qprTZObQovNmPq+2OTEyQCgDhDJAhGPG1POyU/WMqH3mXJ215dvr3k+MDBDKAKEMECv1jEz7iKnnlDbmsqxnfCOUAUIZIMp7h2zkGVex8ZxuZ3wyMkAoA4QyQIR5RmftdOdee2N99ca6io3nr4wMEMoAoQwQ5XpG1OZkarzpHHMqh5iqx1jPuBnKAKEMEGN5xtT6jCme+V7Yqe9iZIBQBghlgLhsX9tO3Xiq5jy17m9qvDQyQCgDhDJApPKMKar341e9g29qfLKecWOUAUIZIMb2m4rY3h+w2n4j55jCyAChDBDKAFHeO4S8F/pUzrHxDJU18JuhDBDKAFEeM6bYeOYqOn5nP5LO+1+rOYqRAUIZIJQB4rIxo7PvU3Vfk+33CfrOpf8QZYBQBojWvrYdOv31M2vjnVq378+4McoAoQwQ5b1Dpui8j6+z12y1fWffw+hc5hk3QBkglAHisvUZ8hkjA4QyQCgDhDJAKAOEMkAoA8Rfz/Q23MPUJIsAAAAASUVORK5CYII=';
 
 function generateQRCodeBase64(url) {
@@ -5666,24 +5668,61 @@ function generatePdf() {
   if (docsBlock) content.push(docsBlock);
 
   const qrCodeBase64 = window._generatedQRCode || null;
+  // Blok QR realizacji
   const qrBlock = qrCodeBase64 ? {
     unbreakable: true,
     margin: [0, 18, 0, 0],
     columns: [
-      {image: qrCodeBase64, width: 80, height: 80},
+      {image: qrCodeBase64, width: 76, height: 76},
       {width: '*', stack: [
-        {text: 'Galeria naszych realizacji', style: 'sectionLabel', margin: [12, 0, 0, 0]},
-        {text: 'Zeskanuj kod QR lub wejdź na naszą stronę, aby zobaczyć więcej projektów.', style: 'noteText', margin: [12, 4, 0, 0], fontSize: 10}
+        {text: 'Nasze realizacje', style: 'sectionLabel', margin: [12, 0, 0, 0]},
+        {text: 'Zeskanuj kod QR lub odwiedź www.4climat.pl, aby zobaczyć nasze projekty.', style: 'noteText', margin: [12, 4, 0, 0], fontSize: 10}
       ]}
     ]
   } : null;
-  if (qrBlock) content.push(qrBlock);
+  // QR i FB są teraz po podpisach
   
   content.push({ unbreakable: true, stack: [
     {margin:[0,16,0,0], canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:0.5,lineColor:'#D8E3EE'}]},
     signaturesContentBlock,
     paymentContentBlock,
   ]});
+
+  // QR realizacji + Facebook — po podpisach
+  const afterSignStack = [];
+
+  if (qrCodeBase64) {
+    afterSignStack.push({
+      columns: [
+        {image: qrCodeBase64, width: 76, height: 76},
+        {width: '*', margin: [12, 0, 0, 0], stack: [
+          {text: 'Nasze realizacje', style: 'sectionLabel'},
+          {text: 'Zeskanuj kod QR lub odwiedź www.4climat.pl, aby zobaczyć nasze projekty.', style: 'noteText', margin: [0, 4, 0, 0], fontSize: 10}
+        ]}
+      ],
+      margin: [0, 0, 0, 8]
+    });
+  }
+
+  afterSignStack.push({
+    table: { widths: ['*'], body: [[{
+      stack: [{
+        columns: [
+          {width: 76, stack: [{image: FB_QR_B64, width: 76, height: 76}]},
+          {width: '*', margin: [12, 0, 0, 0], stack: [
+            {text: 'Obserwuj nas na Facebooku! 👍', style: 'sectionLabel', color: '#1877F2'},
+            {text: 'Bądź na bieżąco z naszymi realizacjami, promocjami i poradami dotyczącymi klimatyzacji i pomp ciepła. Zajrzyj na nasz profil — dołącz do społeczności 4Climat!', style: 'noteText', margin: [0, 4, 0, 0], fontSize: 10},
+            {text: 'facebook.com/4climat', fontSize: 9, color: '#1877F2', margin: [0, 4, 0, 0]}
+          ]}
+        ]
+      }],
+      fillColor: '#F0F6FF',
+      border: [false, false, false, false],
+      margin: [10, 8, 10, 8]
+    }]]}
+  });
+
+  content.push({ unbreakable: true, margin: [0, 16, 0, 0], stack: afterSignStack });
 
   /* ---- Footer — tylko numer strony ---- */
   const footer = function(currentPage, pageCount) {
