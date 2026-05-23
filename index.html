@@ -1515,7 +1515,12 @@ function onLoginSuccess() {
     if (avatar) { avatar.textContent = initials; avatar.title = currentUser.email; }
   }
   // Załaduj produkty z Supabase, potem init
-  loadProductsFromSupabase().then(() => init());
+  loadProductsFromSupabase().then(async () => {
+    // Załaduj też własne produkty z Supabase
+    const customDb = await loadCustomDbFromSupabase();
+    if (customDb) localStorage.setItem(CUSTOM_DB_KEY, JSON.stringify(customDb));
+    init();
+  });
 }
 
 async function doLogout() {
@@ -3756,7 +3761,37 @@ function loadCustomDb() {
 }
 
 function saveCustomDb(db) {
+  // Zapisz lokalnie zawsze (fallback)
   localStorage.setItem(CUSTOM_DB_KEY, JSON.stringify(db));
+  // Zapisz do Supabase jako wspólny rekord
+  saveCustomDbToSupabase(db);
+}
+
+async function saveCustomDbToSupabase(db) {
+  if (!currentUser) return;
+  try {
+    // Własne produkty zapisujemy jako jeden rekord w tabeli drafts z kluczem 'custom_products'
+    const existing = await sbFetch('/rest/v1/drafts?user_id=eq.custom_products&select=user_id');
+    const payload = { user_id: 'custom_products', data: db, updated_at: new Date().toISOString() };
+    if (existing && existing.length > 0) {
+      await sbFetch('/rest/v1/drafts?user_id=eq.custom_products', 'PATCH', { data: db, updated_at: new Date().toISOString() });
+    } else {
+      await sbFetch('/rest/v1/drafts', 'POST', payload);
+    }
+  } catch(e) { console.warn('saveCustomDb Supabase error:', e); }
+}
+
+async function loadCustomDbFromSupabase() {
+  if (!currentUser) return null;
+  try {
+    const data = await sbFetch('/rest/v1/drafts?user_id=eq.custom_products&select=data');
+    if (data && data[0]) {
+      // Zaktualizuj też localStorage
+      localStorage.setItem(CUSTOM_DB_KEY, JSON.stringify(data[0].data));
+      return data[0].data;
+    }
+    return null;
+  } catch(e) { return null; }
 }
 
 // Zwraca połączoną bazę (wbudowana + niestandardowe)
