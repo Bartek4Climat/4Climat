@@ -1,11 +1,11 @@
 {
-  "name": "4Climat — Generator Ofert",
-  "short_name": "4Climat Oferty",
-  "description": "Generator profesjonalnych ofert handlowych dla firmy 4Climat",
-  "start_url": "/",
+  "name": "4Climat — System",
+  "short_name": "4Climat",
+  "description": "System zarządzania dla firmy 4Climat",
+  "start_url": "/app.html",
   "display": "standalone",
-  "background_color": "#F5F8FB",
-  "theme_color": "#1B4F8C",
+  "background_color": "#0A1929",
+  "theme_color": "#0F2744",
   "orientation": "landscape",
   "lang": "pl",
   "icons": [
