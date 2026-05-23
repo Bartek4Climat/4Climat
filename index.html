@@ -1514,6 +1514,9 @@ function onLoginSuccess() {
     const avatar = document.getElementById('userAvatar');
     if (avatar) { avatar.textContent = initials; avatar.title = currentUser.email; }
   }
+  // Wyczyść cache produktów żeby załadować świeże dane
+  _productsCache = null;
+  _productsCacheTime = 0;
   // Załaduj produkty z Supabase, potem init
   loadProductsFromSupabase().then(async () => {
     // Załaduj też własne produkty z Supabase
@@ -3812,7 +3815,7 @@ async function loadProductsFromSupabase() {
     return _productsCache;
   }
   try {
-    const data = await sbFetch('/rest/v1/products?select=*&active=eq.true&order=sort_order.asc');
+    const data = await sbFetch('/rest/v1/products?select=*&order=sort_order.asc,marka.asc,model.asc');
     if (!data || data.length === 0) return null;
     // Zorganizuj po kategoriach
     const byCategory = { split: [], multi_zew: [], multi_wew: [] };
