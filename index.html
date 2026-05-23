@@ -3829,11 +3829,11 @@ async function updateProductPrice(sbid, cena, cena_kat) {
 
 /* ---- Panel edycji cen ---- */
 function showPriceEditor() {
-  document.getElementById('priceEditorModal').style.display = 'flex';
+  document.getElementById('priceEditorModal').classList.add('modal-backdrop--open');
   renderPriceEditor('split');
 }
 function closePriceEditor() {
-  document.getElementById('priceEditorModal').style.display = 'none';
+  document.getElementById('priceEditorModal').classList.remove('modal-backdrop--open');
 }
 
 function renderPriceEditor(category) {
@@ -3895,34 +3895,78 @@ let pendingPriceChanges = {};
 async function savePriceChanges() {
   const changes = Object.values(pendingPriceChanges);
   if (changes.length === 0) { showToast('Brak zmian do zapisania'); return; }
-  
+
   const btn = document.getElementById('savePricesBtn');
   btn.textContent = '⏳ Zapisuję...'; btn.disabled = true;
-  
+
   let saved = 0, errors = 0;
   for (const ch of changes) {
     const product = (DB[ch.cat]||[])[ch.idx];
     if (!product) continue;
-    // Zaktualizuj lokalnie
+
+    // Zaktualizuj lokalnie od razu
     if (ch.cena !== undefined) product.cena = ch.cena;
     if (ch.cena_kat !== undefined) product.cena_kat = ch.cena_kat;
-    // Zapisz do Supabase jeśli ma _sbid
-    if (product._sbid) {
-      const ok = await updateProductPrice(product._sbid, product.cena, product.cena_kat);
-      if (ok) saved++; else errors++;
-    } else {
-      saved++;
+
+    try {
+      if (product._sbid) {
+        // Mamy ID — bezpośredni PATCH
+        await sbFetch('/rest/v1/products?id=eq.' + product._sbid, 'PATCH', {
+          cena: product.cena,
+          cena_kat: product.cena_kat,
+          updated_at: new Date().toISOString(),
+          updated_by: currentUser?.email || ''
+        });
+        saved++;
+      } else {
+        // Brak _sbid — szukaj po marce i modelu, jeśli nie ma to INSERT
+        const existing = await sbFetch(
+          '/rest/v1/products?category=eq.' + encodeURIComponent(ch.cat) +
+          '&marka=eq.' + encodeURIComponent(product.marka) +
+          '&model=eq.' + encodeURIComponent(product.model) +
+          '&select=id'
+        );
+        if (existing && existing.length > 0) {
+          // Istnieje — zaktualizuj
+          product._sbid = existing[0].id;
+          await sbFetch('/rest/v1/products?id=eq.' + product._sbid, 'PATCH', {
+            cena: product.cena,
+            cena_kat: product.cena_kat,
+            updated_at: new Date().toISOString(),
+            updated_by: currentUser?.email || ''
+          });
+        } else {
+          // Nie istnieje — dodaj nowy rekord
+          const res = await sbFetch('/rest/v1/products', 'POST', {
+            category: ch.cat,
+            marka: product.marka,
+            model: product.model,
+            cena: product.cena,
+            cena_kat: product.cena_kat,
+            link: product.link || '',
+            sort_order: ch.idx,
+            active: true,
+            updated_at: new Date().toISOString(),
+            updated_by: currentUser?.email || ''
+          });
+          if (res && res[0]) product._sbid = res[0].id;
+        }
+        saved++;
+      }
+    } catch(e) {
+      console.warn('Save price error:', e);
+      errors++;
     }
   }
-  
+
   pendingPriceChanges = {};
   _productsCache = null;
   btn.textContent = '💾 Zapisz zmiany'; btn.disabled = false;
-  
+
   if (errors > 0) {
     showToast(`⚠ Zapisano ${saved}, błędów: ${errors}`);
   } else {
-    showToast(`✓ Zapisano ${saved} zmian cen — widoczne dla wszystkich`);
+    showToast(`✓ Zapisano ${saved} zmian — widoczne dla wszystkich`);
   }
   recompute();
 }
@@ -4290,7 +4334,7 @@ function openClientsModal() {
 
 /* ---- Karta klienta z historią ofert ---- */
 function closeClientCard() {
-  document.getElementById('clientCardModal').style.display = 'none';
+  document.getElementById('clientCardModal').classList.remove('modal-backdrop--open');
 }
 
 async function showClientCard(clientId) {
@@ -4298,7 +4342,7 @@ async function showClientCard(clientId) {
   if (!c) return;
 
   document.getElementById('clientCardTitle').textContent = '📋 ' + c.name;
-  document.getElementById('clientCardModal').style.display = 'flex';
+  document.getElementById('clientCardModal').classList.add('modal-backdrop--open');
   const body = document.getElementById('clientCardBody');
   body.innerHTML = '<div style="text-align:center;padding:30px;color:#94A3B8;">⏳ Ładowanie historii ofert...</div>';
 
@@ -6272,11 +6316,11 @@ async function generatePdfWithAttachments() {
 
 
 function showStatsModal() {
-  document.getElementById('statsModal').style.display = 'flex';
+  document.getElementById('statsModal').classList.add('modal-backdrop--open');
   renderStatsModal();
 }
 function closeStatsModal() {
-  document.getElementById('statsModal').style.display = 'none';
+  document.getElementById('statsModal').classList.remove('modal-backdrop--open');
 }
 async function renderStatsModal() {
   const body = document.getElementById('statsModalBody');
@@ -6367,14 +6411,13 @@ checkAuth();
 </script>
 
 <!-- STATS MODAL -->
-<div id="statsModal" class="modal" style="display:none;">
-  <div class="modal__backdrop" onclick="closeStatsModal()"></div>
-  <div class="modal__box" style="max-width:700px; max-height:85vh; overflow-y:auto;">
-    <div class="modal__header">
-      <span class="modal__title">📊 Statystyki sprzedaży</span>
+<div id="statsModal" class="modal-backdrop">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal__head">
+      <div><div class="modal__title">📊 Statystyki sprzedaży</div></div>
       <button class="modal__close" onclick="closeStatsModal()">✕</button>
     </div>
-    <div class="modal__body" id="statsModalBody">
+    <div class="modal__body" id="statsModalBody" style="overflow-y:auto;max-height:70vh;">
       <div style="text-align:center;padding:40px;color:#94A3B8;">Ładowanie statystyk...</div>
     </div>
   </div>
@@ -6383,33 +6426,33 @@ checkAuth();
 
 
 <!-- CLIENT CARD MODAL -->
-<div id="clientCardModal" class="modal" style="display:none;">
-  <div class="modal__backdrop" onclick="closeClientCard()"></div>
-  <div class="modal__box" style="max-width:680px; max-height:90vh; overflow-y:auto;">
-    <div class="modal__header">
-      <span class="modal__title" id="clientCardTitle">Karta klienta</span>
+<div id="clientCardModal" class="modal-backdrop">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title" id="clientCardTitle">Karta klienta</div>
+      </div>
       <button class="modal__close" onclick="closeClientCard()">✕</button>
     </div>
-    <div class="modal__body" id="clientCardBody">
+    <div class="modal__body" id="clientCardBody" style="overflow-y:auto;">
       <div style="text-align:center;padding:40px;color:#94A3B8;">Ładowanie...</div>
     </div>
   </div>
 </div>
 
 <!-- PRICE EDITOR MODAL -->
-<div id="priceEditorModal" class="modal" style="display:none;">
-  <div class="modal__backdrop" onclick="closePriceEditor()"></div>
-  <div class="modal__box" style="max-width:800px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">
-    <div class="modal__header">
-      <span class="modal__title">💰 Edytor cen urządzeń</span>
+<div id="priceEditorModal" class="modal-backdrop">
+  <div class="modal modal--wide" style="max-width:800px;">
+    <div class="modal__head">
+      <div><div class="modal__title">💰 Edytor cen urządzeń</div></div>
       <button class="modal__close" onclick="closePriceEditor()">✕</button>
     </div>
-    <div class="modal__body" id="priceEditorBody" style="flex:1;overflow:hidden;">
+    <div class="modal__body" id="priceEditorBody" style="overflow-y:auto;max-height:60vh;">
       <div style="text-align:center;padding:40px;color:#94A3B8;">Ładowanie...</div>
     </div>
     <div style="padding:14px 20px;border-top:1px solid #D8E3EE;display:flex;justify-content:space-between;align-items:center;background:#F8FBFD;">
       <div style="font-size:12px;color:#64748B;">Zmiany są widoczne dla wszystkich użytkowników po zapisaniu</div>
-      <button id="savePricesBtn" onclick="savePriceChanges()" 
+      <button id="savePricesBtn" onclick="savePriceChanges()"
         style="background:#1B4F8C;color:white;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">
         💾 Zapisz zmiany
       </button>
