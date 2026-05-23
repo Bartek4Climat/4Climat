@@ -1,6 +1,6 @@
 // Service Worker — 4Climat Generator Ofert
 // Wersja cache — zmień żeby wymusić aktualizację
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v1779533061';
 const CACHE_NAME = `4climat-oferty-${CACHE_VERSION}`;
 
 // Zasoby do cache'owania przy instalacji
@@ -58,6 +58,14 @@ self.addEventListener('fetch', event => {
           return response;
         })
         .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // index.html — zawsze świeży z sieci
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
     );
     return;
   }
