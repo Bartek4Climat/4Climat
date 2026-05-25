@@ -5230,7 +5230,7 @@ function generatePdf() {
       const hasExtras = extrasNet > 0;
       const priceLineText = hasExtras
         ? 'CENA ZESTAWU Z MONTAŻEM I PRACAMI DODATKOWYMI\n'
-        : (state.offerType === 'final' ? 'CENA ZESTAWU Z MONTAŻEM KOŃCOWYM\n' : 'CENA ZESTAWU Z MONTAŻEM PODSTAWOWYM\n');
+        : (state.offerType === 'final' || state.offerType === 'variant_final' ? 'CENA ZESTAWU Z MONTAŻEM KOŃCOWYM\n' : 'CENA ZESTAWU Z MONTAŻEM PODSTAWOWYM\n');
 
       // Oblicz podział urządzenie/montaż dla split units
       let netDevice = 0, netInstall = 0;
@@ -5585,7 +5585,9 @@ function generatePdf() {
         const hasHpExtras = extrasNet > 0;
         const priceLine = hasHpExtras
           ? 'CENA POMPY Z MONTAŻEM I PRACAMI DODATKOWYMI\n'
-          : `CENA POMPY Z MONTAŻEM${v.includeInstall ? '' : ' (bez montażu)'}\n`;
+          : (state.hpOfferType === 'final' || state.hpOfferType === 'variant_final'
+            ? `CENA POMPY Z MONTAŻEM KOŃCOWYM${v.includeInstall ? '' : ' (bez montażu)'}\n`
+            : `CENA POMPY Z MONTAŻEM PODSTAWOWYM${v.includeInstall ? '' : ' (bez montażu)'}\n`);
         const netDeviceHp  = parseFloat(v.priceNet) || 0;
         const netInstallHp = v.includeInstall ? (parseFloat(v.installPrice) || 0) : 0;
         const priceBlock = buildPriceBlock(priceLine, totalWithExtrasNet, state.vatRate,
