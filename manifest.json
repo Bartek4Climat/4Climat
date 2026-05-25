@@ -1,25 +1,16 @@
 {
-  "name": "4Climat — System",
-  "short_name": "4Climat",
-  "description": "System zarządzania dla firmy 4Climat",
-  "start_url": "/app.html",
+  "name": "4Climat — Generator Ofert",
+  "short_name": "4Climat Oferty",
+  "description": "Generator profesjonalnych ofert handlowych dla firmy 4Climat",
+  "start_url": "/4Climat/index.html",
+  "scope": "/4Climat/",
   "display": "standalone",
-  "background_color": "#0A1929",
-  "theme_color": "#0F2744",
-  "orientation": "landscape",
+  "background_color": "#F5F8FB",
+  "theme_color": "#1B4F8C",
+  "orientation": "any",
   "lang": "pl",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/4Climat/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/4Climat/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
