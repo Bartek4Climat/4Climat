@@ -756,8 +756,9 @@ body {
     </div>
     <span class="controls-bar__label" style="margin-left:18px;">Typ oferty:</span>
     <div class="offer-type-switcher">
-      <button class="offer-type-switcher__btn offer-type-switcher__btn--active" data-otype="variants" onclick="setOfferType('variants')" title="Klient porównuje warianty — bez sumy końcowej">Warianty</button>
-      <button class="offer-type-switcher__btn" data-otype="final" onclick="setOfferType('final')" title="Klient zdecydował — z sumą całkowitą">Końcowa</button>
+      <button class="offer-type-switcher__btn offer-type-switcher__btn--active" data-otype="variants" onclick="setOfferType('variants')" title="Porównawcza z montażem podstawowym — bez sumy">Porównawcza podstawowa</button>
+      <button class="offer-type-switcher__btn" data-otype="variant_final" onclick="setOfferType('variant_final')" title="Porównawcza z ceną końcową montażu — bez sumy">Porównawcza końcowa</button>
+      <button class="offer-type-switcher__btn" data-otype="final" onclick="setOfferType('final')" title="Oferta końcowa — z sumą łączną">Końcowa</button>
     </div>
   </div>
 
@@ -936,8 +937,9 @@ body {
         <div class="hp-controls-inline">
           <span class="controls-bar__label">Typ oferty (pompa):</span>
           <div class="offer-type-switcher" style="margin-left:8px;">
-            <button class="offer-type-switcher__btn offer-type-switcher__btn--active" data-hp-otype="variants" onclick="setHpOfferType('variants')" title="Warianty pomp do porównania">Warianty</button>
-            <button class="offer-type-switcher__btn" data-hp-otype="final" onclick="setHpOfferType('final')" title="Wybrana pompa z sumą końcową">Końcowa</button>
+            <button class="offer-type-switcher__btn offer-type-switcher__btn--active" data-hp-otype="variants" onclick="setHpOfferType('variants')" title="Porównawcza z montażem podstawowym — bez sumy">Porównawcza podstawowa</button>
+            <button class="offer-type-switcher__btn" data-hp-otype="variant_final" onclick="setHpOfferType('variant_final')" title="Porównawcza z ceną końcową montażu — bez sumy">Porównawcza końcowa</button>
+            <button class="offer-type-switcher__btn" data-hp-otype="final" onclick="setHpOfferType('final')" title="Oferta końcowa — z sumą łączną">Końcowa</button>
           </div>
         </div>
 
@@ -1009,9 +1011,13 @@ body {
         <div class="field">
           <label class="field__label">Wybierz szablon warunków</label>
           <select class="field__select" id="owsSelect" onchange="setOws(this.value)" style="margin-bottom:10px;">
-            <option value="split_multi">Montaż Split / Multisplit</option>
+            <option value="split_multi">Klimatyzacja — montaż podstawowy</option>
+            <option value="split_cena_koncowa">Klimatyzacja — cena końcowa montażu</option>
+            <option value="serwis_klima">Serwis klimatyzacji</option>
             <option value="instalacja">Instalacja podtynkowa (tylko instalacja)</option>
-            <option value="pompa_ciepla">Pompa ciepła</option>
+            <option value="pompa_ciepla">Pompa ciepła — montaż podstawowy</option>
+            <option value="hp_cena_koncowa">Pompa ciepła — cena końcowa montażu</option>
+            <option value="serwis_hp">Serwis pompy ciepła</option>
             <option value="custom">Własny tekst (wpisz ręcznie)</option>
           </select>
         </div>
@@ -1390,6 +1396,56 @@ Stawki VAT: 8% dla klientów indywidualnych w budynkach mieszkalnych do 300 m²,
 Ważność oferty: 14 dni od daty wystawienia. Pełny cennik prac dodatkowych dostępny na www.4climat.pl.
 
 Niniejsza oferta podlega Ogólnym Warunkom Sprzedaży firmy 4Climat Tomasz Dobryniewski Consulting z dnia 1 stycznia 2025 roku, dostępnym w siedzibie firmy, na stronie www.4climat.pl oraz w załączniku do niniejszej oferty. Składając zamówienie Kupujący akceptuje warunki OWS w całości.`,
+
+  split_cena_koncowa: `WARUNKI OFERTY — 4Climat Tomasz Dobryniewski Consulting
+
+Zakres montazu: cena oferty obejmuje kompletny montaz zestawu klimatyzacyjnego w zakresie uzgodnionym podczas wizji lokalnej. Cena montazu jest cena koncowa i uwzglednia indywidualne warunki techniczne obiektu.
+
+Zamowienie i platnosci: realizacja po wplacie zaliczki 50% wartosci urzadzen na podstawie faktury proforma. Rachunek: Santander Bank Polska nr 88 1090 2402 0000 0001 5962 4054. Pozostala kwota platna w dniu odbioru. Zaliczka przepada przy rezygnacji (par.7 OWS).
+
+Gwarancja: wg karty gwarancyjnej producenta (par.8 OWS). Warunkiem zachowania gwarancji sa przeglady serwisowe 1-2 razy w roku.
+
+Stawki VAT: 8% dla klientow indywidualnych do 300 m2, 23% dla firm.
+
+Waznosc oferty: 14 dni. Pelne OWS na www.4climat.pl.`,
+
+  hp_cena_koncowa: `WARUNKI OFERTY — 4Climat Tomasz Dobryniewski Consulting
+
+Zakres montazu: cena obejmuje kompletny montaz systemu pompy ciepla w zakresie uzgodnionym podczas wizji lokalnej. Cena jest cenou koncowa uwzgledniajaca indywidualne warunki obiektu, stan instalacji CO/CWU i wymagania elektryczne.
+
+Zamowienie i platnosci: realizacja po wplacie zaliczki 50% wartosci urzadzen na podstawie faktury proforma. Rachunek: Santander Bank Polska nr 88 1090 2402 0000 0001 5962 4054. Pozostala kwota platna w dniu odbioru. Zaliczka przepada przy rezygnacji (par.7 OWS).
+
+Gwarancja: wg karty gwarancyjnej producenta (par.8 OWS). Przeglądy serwisowe 1-2 razy w roku.
+
+Stawki VAT: 8% do 300 m2, 23% dla firm. Waznosc: 14 dni. OWS na www.4climat.pl.`,
+
+  serwis_klima: `WARUNKI USLUGI SERWISOWEJ — 4Climat Tomasz Dobryniewski Consulting
+
+Zakres serwisu: usluga obejmuje czynnosci serwisowe klimatyzacji okreslone w ofercie. Pracownik poinformuje o dodatkowych pracach wymagajacych odrebnej akceptacji.
+
+Platnosci: naleznosc platna w dniu wykonania lub przelewem w ciagu 7 dni od faktury. Ceny materialow i czynnika chlodniczego wg cennika 4Climat (par.3 OWS).
+
+Gwarancja na usluge: 30 dni od daty serwisu w zakresie wykonanych czynnosci. Nie obejmuje usterek niezwiazanych z zakresem serwisu (par.6 OWS).
+
+Warunki gwarancji producenta: regularne przeglady wg karty gwarancyjnej urządzenia.
+
+Stawki VAT: 8% dla klientow indywidualnych, 23% dla firm.
+
+Usluga podlega OWS 4Climat z dnia 1.01.2025, dostepnym na www.4climat.pl.`,
+
+  serwis_hp: `WARUNKI USLUGI SERWISOWEJ POMPY CIEPLA — 4Climat Tomasz Dobryniewski Consulting
+
+Zakres serwisu: usluga obejmuje czynnosci serwisowe systemu pompy ciepla okreslone w ofercie. Pracownik poinformuje o dodatkowych pracach wymagajacych akceptacji.
+
+Platnosci: naleznosc platna w dniu wykonania lub przelewem w ciagu 7 dni od faktury. Ceny materialow wg cennika 4Climat.
+
+Gwarancja na usluge: 30 dni od daty serwisu w zakresie wykonanych czynnosci.
+
+Warunki gwarancji producenta: regularne przeglady 1-2 razy w roku wg karty gwarancyjnej pompy.
+
+Stawki VAT: 8% dla klientow indywidualnych, 23% dla firm.
+
+Usluga podlega OWS 4Climat z dnia 1.01.2025, dostepnym na www.4climat.pl.`
 };
 
 let state = {
@@ -3131,7 +3187,13 @@ function recompute() {
     if (includeAc && state.extras.length > 0) extrasInfo.push(`prace dod. klima: ${fmtPLN(acExtrasBr)}`);
     if (includeHp && state.hpExtras.length > 0) extrasInfo.push(`prace dod. pompa: ${fmtPLN(hpExtrasBr)}`);
     subtitle.innerHTML = extrasInfo.length ? `<span style="opacity:.85;">+ ${extrasInfo.join(' · ')}</span>` : '';
-    notice.innerHTML = '<strong>Tryb wariantów:</strong> klient porównuje opcje — każdy wariant ma własną cenę, brak sumy łącznej w PDF.';
+    const isVariantFinalAc = includeAc && state.offerType === 'variant_final';
+    const isVariantFinalHp = includeHp && state.hpOfferType === 'variant_final';
+    if (isVariantFinalAc || isVariantFinalHp) {
+      notice.innerHTML = '<strong>Tryb porównawczy — cena końcowa montażu:</strong> każdy wariant zawiera ustaloną cenę końcową montażu, brak sumy łącznej w PDF.';
+    } else {
+      notice.innerHTML = '<strong>Tryb porównawczy — montaż podstawowy:</strong> klient porównuje opcje, brak sumy łącznej w PDF.';
+    }
   }
 }
 
@@ -6601,29 +6663,21 @@ checkAuth();
 
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => {
-        reg.update(); // Sprawdź aktualizację przy każdym uruchomieniu
-      })
-      .catch(e => console.log('SW fail:', e));
-  }
-
-    let deferredPrompt;
-  window.addEventListener("beforeinstallprompt", e => {
-    e.preventDefault(); deferredPrompt = e;
-    const btn = document.getElementById("installPwaBtn");
-    if (btn) btn.style.display = "flex";
-  });
-  window.addEventListener("appinstalled", () => {
-    const btn = document.getElementById("installPwaBtn");
-    if (btn) btn.style.display = "none";
-    deferredPrompt = null;
-  });
-  function installPwa() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
-    }
+    navigator.serviceWorker.register('/4Climat/sw.js').then(reg => {
+      reg.update();
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            newSW.postMessage('skipWaiting');
+          }
+        });
+      });
+    });
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
   }
 </script>
 </body>
