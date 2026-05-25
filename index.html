@@ -5776,6 +5776,39 @@ function generatePdf() {
       margin: [30, 12, 30, 12]
     }]]}
   });
+  // Blok raty Santander
+  content.push({
+    margin: [0, 24, 0, 0],
+    table: {
+      widths: ['*'],
+      body: [[{
+        border: [true, true, true, true],
+        fillColor: '#FFFFFF',
+        stack: [
+          {
+            text: 'Oferta dostępna w finansowaniu ratalnym',
+            fontSize: 9,
+            color: '#64748B',
+            alignment: 'center',
+            margin: [0, 10, 0, 6]
+          },
+          {
+            image: SANTANDER_B64,
+            width: 180,
+            alignment: 'center',
+            margin: [0, 0, 0, 10]
+          }
+        ]
+      }]]
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => '#E2EAF2',
+      vLineColor: () => '#E2EAF2'
+    }
+  });
+
 
   /* ---- Footer — tylko numer strony ---- */
   const footer = function(currentPage, pageCount) {
