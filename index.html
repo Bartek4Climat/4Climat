@@ -4840,9 +4840,10 @@ function renderPicker() {
   const power = document.getElementById('pickerPower').value;
 
   // Mapuj do _idx (oryginalny indeks w bazie)
+  // Zachowaj oryginalny _idx z pool - NIE nadpisuj numerem pozycji
   let list = currentPickerCtx.pool.map((p,i) => ({
     ...p,
-    _idx: currentPickerCtx.useOrigIdx ? p._origIdx : i
+    _idx: p._idx !== undefined ? p._idx : i
   }));
   if (brand) list = list.filter(p => p.marka === brand);
   if (power) {
@@ -5853,8 +5854,9 @@ function generatePdf() {
       margin: [30, 12, 30, 12]
     }]]}
   });
-  // Blok raty Santander
+  // Blok raty Santander - zawsze niepodzielny
   content.push({
+    unbreakable: true,
     margin: [0, 24, 0, 0],
     table: {
       widths: ['*'],
