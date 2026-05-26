@@ -2690,7 +2690,7 @@ function buildPriceBlock(labelText, netTotal, vatRate, splitPrice, netDevice, ne
 
 function renderSplitUnits(container, variant, vIdx) {
   variant.units.forEach((u, uIdx) => {
-    const p = getProductFromPool('split', u.productIdx) || DB.split[u.productIdx] || {marka:'',model:'',cena:0,link:''};
+    const p = getMergedPool('split').find(q => q._idx === u.productIdx) || getProductFromPool('split', u.productIdx) || {marka:'',model:'',cena:0,link:''};
     const effectivePrice = (u.priceOverride != null) ? u.priceOverride : p.cena;
     const unitNet = (effectivePrice + (u.includeInstall ? u.installPrice : 0)) * u.qty;
     const unitBr = roundUp(unitNet * (1 + state.vatRate/100));
@@ -3881,18 +3881,33 @@ async function loadProductsFromSupabase() {
     if (!data || data.length === 0) return null;
     // Zorganizuj po kategoriach
     const byCategory = { split: [], multi_zew: [], multi_wew: [] };
-    data.forEach((p, i) => {
-      if (byCategory[p.category] !== undefined) {
-        byCategory[p.category].push({
-          marka: p.marka,
-          model: p.model,
-          cena: parseFloat(p.cena) || 0,
-          cena_kat: parseFloat(p.cena_kat) || 0,
-          link: p.link || '',
-          _sbid: p.id
-        });
-      }
+    // Najpierw zbierz wszystkie produkty żeby obliczyć globalne indeksy
+    const splitProds = [], multiZewProds = [], multiWewProds = [];
+    data.forEach(p => {
+      const obj = {
+        marka: p.marka,
+        model: p.model,
+        cena: parseFloat(p.cena) || 0,
+        cena_kat: parseFloat(p.cena_kat) || 0,
+        link: p.link || '',
+        _sbid: p.id,
+        category: p.category
+      };
+      if (p.category === 'split') splitProds.push(obj);
+      else if (p.category === 'multi_zew') multiZewProds.push(obj);
+      else if (p.category === 'multi_wew') multiWewProds.push(obj);
     });
+
+    // _idx = indeks w ramach danej kategorii (jak w getMergedPool)
+    splitProds.forEach((p, i) => { p._idx = i; p._origIdx = i; });
+    multiZewProds.forEach((p, i) => { p._idx = i; p._origIdx = i; });
+    multiWewProds.forEach((p, i) => { p._idx = i; p._origIdx = i; });
+
+    byCategory.split = splitProds;
+    byCategory.multi_zew = multiZewProds;
+    byCategory.multi_wew = multiWewProds;
+    // dummy forEach żeby nie powodować błędu
+    data.forEach(() => {});
     _productsCache = byCategory;
     _productsCacheTime = Date.now();
     // Nadpisz DB żeby reszta kodu działała bez zmian
@@ -4083,6 +4098,10 @@ function getProductFromPool(type, idx) {
     const customDb = loadCustomDb();
     return (customDb[type] || [])[idx - 10000] || null;
   }
+  // Szukaj najpierw po indeksie pozycyjnym, ale weryfikuj przez getMergedPool
+  const pool = getMergedPool(type);
+  const byIdx = pool.find(p => p._idx === idx);
+  if (byIdx) return byIdx;
   return (DB[type] || [])[idx] || null;
 }
 
@@ -4202,6 +4221,61 @@ function cancelAddProduct() {
   document.getElementById('pmForm').style.display = 'none';
 }
 
+
+async function saveProductToSupabase(entry, category, editIdx) {
+  if (!currentUser) {
+    showToast('✓ Produkt zapisany lokalnie');
+    applyPriceOverrides();
+    return;
+  }
+  try {
+    const customDb = loadCustomDb();
+    const customList = customDb[category] || [];
+    
+    if (editIdx !== null) {
+      // Edycja - znajdź _sbid
+      const existing = customList[parseInt(editIdx)];
+      if (existing && existing._sbid) {
+        await sbFetch('/rest/v1/products?id=eq.' + existing._sbid, 'PATCH', {
+          marka: entry.marka,
+          model: entry.model,
+          cena: entry.cena,
+          link: entry.link || '',
+          updated_at: new Date().toISOString()
+        });
+      }
+    } else {
+      // Nowy produkt - wstaw do tabeli products
+      const res = await sbFetch('/rest/v1/products', 'POST', {
+        marka: entry.marka,
+        model: entry.model,
+        cena: entry.cena,
+        cena_kat: 0,
+        category: category,
+        link: entry.link || '',
+        sort_order: 9999
+      });
+      // Zapisz _sbid lokalnie
+      if (res && res[0] && res[0].id) {
+        customDb[category] = customDb[category] || [];
+        const idx = customDb[category].length - 1;
+        customDb[category][idx]._sbid = res[0].id;
+        saveCustomDb(customDb);
+      }
+    }
+    // Wyczyść cache produktów żeby picker załadował nowe
+    _productsCache = null;
+    _productsCacheTime = 0;
+    await loadProductsFromSupabase();
+    applyPriceOverrides();
+    showToast('✓ Produkt zapisany — widoczny w pickerze');
+  } catch(e) {
+    console.warn('saveProductToSupabase error:', e);
+    showToast('✓ Produkt zapisany lokalnie');
+    applyPriceOverrides();
+  }
+}
+
 function saveProductForm() {
   const type     = document.getElementById('pmFormType').value;
   const editIdx  = document.getElementById('pmEditIdx').value;
@@ -4225,6 +4299,8 @@ function saveProductForm() {
     showToast('✓ Produkt dodany');
   }
   saveCustomDb(customDb);
+  // Zapisz bezpośrednio do tabeli products w Supabase
+  saveProductToSupabase(entry, type, editIdx !== '' ? editIdx : null);
   document.getElementById('pmForm').style.display = 'none';
   renderProductManagerTable(type);
 }
@@ -5776,6 +5852,39 @@ function generatePdf() {
       margin: [30, 12, 30, 12]
     }]]}
   });
+  // Blok raty Santander
+  content.push({
+    margin: [0, 24, 0, 0],
+    table: {
+      widths: ['*'],
+      body: [[{
+        border: [true, true, true, true],
+        fillColor: '#FFFFFF',
+        stack: [
+          {
+            text: 'Oferta dostępna w finansowaniu ratalnym',
+            fontSize: 9,
+            color: '#64748B',
+            alignment: 'center',
+            margin: [0, 10, 0, 6]
+          },
+          {
+            image: SANTANDER_B64,
+            width: 180,
+            alignment: 'center',
+            margin: [0, 0, 0, 10]
+          }
+        ]
+      }]]
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => '#E2EAF2',
+      vLineColor: () => '#E2EAF2'
+    }
+  });
+
 
   /* ---- Footer — tylko numer strony ---- */
   const footer = function(currentPage, pageCount) {
