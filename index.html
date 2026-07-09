@@ -687,6 +687,384 @@ body {
 }
 .info-footer a { color: var(--c-accent); text-decoration: none; }
 .info-footer a:hover { text-decoration: underline; }
+
+/* ============ LEJEK SPRZEDAŻOWY ============ */
+.funnel-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; background: #F8FBFD; border-bottom: 1px solid var(--c-border);
+}
+.funnel-toolbar__label { font-size: 12px; color: var(--c-text-muted); font-weight: 600; }
+.funnel-toolbar select, .funnel-toolbar input {
+  padding: 6px 10px; font-size: 12px; border: 1px solid var(--c-border);
+  border-radius: 6px; background: white; color: var(--c-text);
+}
+.funnel-toolbar input { min-width: 220px; }
+.funnel-stats {
+  display: flex; gap: 12px; padding: 10px 16px; background: white;
+  border-bottom: 1px solid var(--c-border); font-size: 11px;
+}
+.funnel-stats__item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; background: #F0F6FB; border-radius: 6px;
+}
+.funnel-stats__item strong { color: var(--c-primary); font-size: 13px; }
+.funnel-body-scroll {
+  overflow-x: auto; overflow-y: auto; max-height: 70vh; padding: 12px;
+}
+.funnel-kanban { display: flex; gap: 10px; min-width: 100%; padding-bottom: 10px; }
+.funnel-col {
+  min-width: 220px; max-width: 220px;
+  background: #F0F6FB; border-radius: 8px; padding: 8px;
+  display: flex; flex-direction: column;
+  transition: background 0.15s;
+}
+.funnel-col--drag-over { background: #DCE9F5; box-shadow: inset 0 0 0 2px #1B4F8C; }
+.funnel-col__header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 4px 8px; border-bottom: 2px solid #C7D8E8;
+  margin-bottom: 8px; font-size: 12px;
+}
+.funnel-col__num {
+  background: #1B4F8C; color: white; border-radius: 4px;
+  padding: 2px 6px; font-size: 10px; font-weight: 700; min-width: 18px; text-align: center;
+}
+.funnel-col__title { flex: 1; font-weight: 600; color: #1B4F8C; font-size: 12px; }
+.funnel-col__count {
+  background: white; color: #64748B; border-radius: 10px;
+  padding: 2px 8px; font-size: 10px; font-weight: 600;
+}
+.funnel-col--qualified { background: #ECFDF5; }
+.funnel-col--qualified .funnel-col__header { border-bottom-color: #10B981; }
+.funnel-col--qualified .funnel-col__num { background: #10B981; }
+.funnel-col--qualified .funnel-col__title { color: #065F46; }
+.funnel-col--rejected { background: #FEF2F2; }
+.funnel-col--rejected .funnel-col__header { border-bottom-color: #EF4444; }
+.funnel-col--rejected .funnel-col__num { background: #EF4444; }
+.funnel-col--rejected .funnel-col__title { color: #991B1B; }
+.funnel-col--none { background: #F5F5F5; }
+.funnel-col--none .funnel-col__header { border-bottom-color: #94A3B8; }
+.funnel-col--none .funnel-col__num { background: #94A3B8; }
+.funnel-col--none .funnel-col__title { color: #475569; }
+.funnel-col__cards {
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 80px; flex: 1;
+}
+.funnel-card {
+  background: white; border: 1px solid #D8E3EE; border-radius: 6px;
+  padding: 8px 10px; cursor: grab; transition: box-shadow 0.15s, transform 0.1s;
+  user-select: none;
+}
+.funnel-card:hover { box-shadow: 0 2px 6px rgba(27, 79, 140, 0.15); }
+.funnel-card:active { cursor: grabbing; transform: scale(0.98); }
+.funnel-card--dragging { opacity: 0.4; }
+.funnel-card__name { font-weight: 700; font-size: 12px; color: #1A2332; margin-bottom: 3px; }
+.funnel-card__meta { font-size: 10px; color: #64748B; margin-bottom: 3px; line-height: 1.4; }
+.funnel-card__value { font-size: 11px; color: #0F3461; font-weight: 600; }
+.funnel-card__note {
+  font-size: 10px; color: #64748B; font-style: italic;
+  margin-top: 3px; padding-top: 3px; border-top: 1px dashed #E2EAF2;
+}
+.funnel-card__handler {
+  font-size: 9px; color: #94A3B8; margin-top: 3px;
+  display: inline-block; padding: 1px 6px; background: #F0F6FB; border-radius: 8px;
+}
+.funnel-card__stage-time {
+  font-size: 9px; color: #94A3B8; margin-top: 2px;
+}
+.funnel-empty {
+  text-align: center; padding: 24px 12px; color: #94A3B8;
+  font-size: 11px; font-style: italic;
+}
+.funnel-detail {
+  padding: 16px; background: #F8FBFD; border-radius: 8px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.funnel-detail__row { display: flex; gap: 8px; align-items: center; }
+.funnel-detail__label { font-size: 11px; color: var(--c-text-muted); font-weight: 600; min-width: 130px; }
+.funnel-detail__input {
+  flex: 1; padding: 6px 10px; font-size: 12px;
+  border: 1px solid var(--c-border); border-radius: 6px;
+}
+
+/* Guzik "Lejek" w top bar */
+.topbar-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; background: white; color: #1B4F8C;
+  border: 1.5px solid #C7D8E8; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.topbar-nav-btn:hover { background: #F0F6FB; border-color: #1B4F8C; }
+
+/* ============ WIZUALIZACJA LEJKA ============ */
+.funnel-viz-wrap {
+  border-bottom: 1px solid var(--c-border);
+  background: white;
+}
+.funnel-viz-toggle {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; cursor: pointer; user-select: none;
+  font-size: 12px; font-weight: 600; color: var(--c-text-muted);
+  background: #F8FBFD;
+  border-bottom: 1px solid var(--c-border);
+  transition: background 0.15s;
+}
+.funnel-viz-toggle:hover { background: #F0F6FB; }
+.funnel-viz-toggle #funnelVizToggleIcon {
+  font-size: 10px; transition: transform 0.2s;
+}
+.funnel-viz-wrap.collapsed .funnel-viz { display: none; }
+.funnel-viz-wrap.collapsed #funnelVizToggleIcon { transform: rotate(-90deg); }
+.funnel-viz {
+  padding: 20px 24px 24px;
+  background: white;
+}
+.funnel-viz-svg { display: block; margin: 0 auto; }
+.funnel-viz-bar {
+  transition: fill 0.2s;
+}
+.funnel-viz-bar:hover { filter: brightness(0.95); }
+.funnel-viz-label {
+  font-size: 12px; font-weight: 600; fill: #1A2332;
+}
+.funnel-viz-count {
+  font-size: 12px; font-weight: 700; fill: white;
+}
+.funnel-viz-percent {
+  font-size: 11px; fill: #64748B;
+}
+
+/* ============ PANEL SPRZEDAŻY (Faza B) ============ */
+.sale-modal .modal { max-width: 780px; }
+.sale-body {
+  padding: 12px 16px 8px;
+  max-height: 65vh; overflow-y: auto;
+}
+.sale-client-info {
+  background: #F0F6FB; border-radius: 8px; padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px;
+}
+.sale-client-info__name { font-weight: 700; color: var(--c-primary); }
+.sale-client-info__meta { color: var(--c-text-muted); font-size: 11px; }
+.sale-devices-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  font-size: 12px; font-weight: 700; color: var(--c-primary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.sale-device {
+  background: white; border: 1.5px solid var(--c-border);
+  border-radius: 10px; padding: 12px; margin-bottom: 12px;
+  position: relative;
+}
+.sale-device__num {
+  position: absolute; top: 10px; right: 12px;
+  font-size: 10px; font-weight: 700; color: var(--c-text-muted);
+  background: #F0F6FB; padding: 2px 8px; border-radius: 10px;
+}
+.sale-device__remove {
+  position: absolute; top: 8px; right: 60px;
+  background: transparent; border: none;
+  color: #EF4444; cursor: pointer; font-size: 16px;
+  padding: 2px 6px; border-radius: 4px;
+}
+.sale-device__remove:hover { background: #FEE2E2; }
+.sale-device-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.sale-device-grid .full { grid-column: 1 / -1; }
+.sale-field { display: flex; flex-direction: column; gap: 4px; }
+.sale-field label {
+  font-size: 10px; font-weight: 600; color: var(--c-text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.sale-field input, .sale-field select, .sale-field textarea {
+  padding: 6px 10px; font-size: 12px;
+  border: 1px solid var(--c-border); border-radius: 6px;
+  background: white; color: var(--c-text);
+  font-family: inherit;
+}
+.sale-field textarea { resize: vertical; min-height: 60px; }
+.sale-add-device-btn {
+  width: 100%; padding: 10px; background: #F0F6FB;
+  border: 1.5px dashed #94A3B8; border-radius: 8px;
+  color: #64748B; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.sale-add-device-btn:hover { background: #E0EBF5; color: var(--c-primary); border-color: var(--c-primary); }
+
+.purchases-summary {
+  margin-top: 8px; padding: 10px 12px;
+  background: #ECFDF5; border-left: 3px solid #10B981;
+  border-radius: 4px; font-size: 11px;
+}
+.purchases-summary strong { color: #065F46; }
+
+/* Karta lejka z ikoną sprzedaży */
+.funnel-card__sale-badge {
+  display: inline-block; background: #10B981; color: white;
+  font-size: 9px; font-weight: 700; padding: 2px 6px;
+  border-radius: 8px; margin-top: 3px;
+}
+
+/* Follow-up badges na karcie lejka */
+.funnel-card__followup {
+  display: inline-block; font-size: 9px; font-weight: 700;
+  padding: 2px 6px; border-radius: 8px; margin-top: 3px;
+  margin-right: 4px;
+}
+.funnel-card__followup--overdue { background: #FEE2E2; color: #991B1B; }
+.funnel-card__followup--today { background: #FEF3C7; color: #92400E; }
+.funnel-card__followup--soon { background: #DBEAFE; color: #1E40AF; }
+.funnel-card__followup--future { background: #F0F6FB; color: #64748B; }
+
+.funnel-card__contact {
+  display: inline-block; font-size: 9px; color: var(--c-text-muted);
+  margin-top: 3px; font-style: italic;
+}
+
+/* Sekcja kontakt/follow-up w modalu detail */
+.funnel-detail-section {
+  padding: 12px 14px; background: white;
+  border: 1px solid var(--c-border); border-radius: 8px;
+  margin-top: 4px;
+}
+.funnel-detail-section__title {
+  font-size: 10px; font-weight: 700; color: var(--c-primary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.funnel-detail-section__grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+
+/* ============ KALENDARZ ============ */
+.calendar-modal .modal { max-width: 1200px; }
+.calendar-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px; background: #F8FBFD; border-bottom: 1px solid var(--c-border);
+}
+.calendar-nav-btn {
+  background: white; border: 1.5px solid var(--c-border);
+  border-radius: 6px; padding: 6px 10px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--c-primary);
+  transition: all 0.15s;
+}
+.calendar-nav-btn:hover { background: #F0F6FB; border-color: var(--c-primary); }
+.calendar-month-title {
+  font-size: 18px; font-weight: 700; color: var(--c-primary);
+  min-width: 180px; text-align: center;
+}
+.calendar-legend {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-left: auto;
+  font-size: 10px; color: var(--c-text-muted);
+}
+.calendar-legend-item { display: flex; align-items: center; gap: 4px; }
+.calendar-legend-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.cl-inst { background: #10B981; }
+.cl-serv { background: #F59E0B; }
+.cl-foll { background: #3B82F6; }
+.cl-cust { background: #A855F7; }
+
+.calendar-grid-wrap {
+  padding: 12px 16px 16px;
+  max-height: 70vh; overflow-y: auto;
+}
+.calendar-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  margin-bottom: 4px;
+}
+.calendar-weekday {
+  padding: 8px 4px; font-size: 10px; font-weight: 700;
+  color: var(--c-text-muted); text-transform: uppercase;
+  letter-spacing: 0.05em; text-align: center;
+}
+.calendar-weekday.weekend { color: #94A3B8; }
+.calendar-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.calendar-day {
+  min-height: 96px; background: white;
+  border: 1px solid var(--c-border); border-radius: 6px;
+  padding: 6px; cursor: pointer;
+  transition: all 0.15s; position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.calendar-day:hover { border-color: var(--c-primary); background: #F8FBFD; }
+.calendar-day--other-month { opacity: 0.35; background: #F5F5F5; }
+.calendar-day--today { border-color: var(--c-primary); border-width: 2px; background: #F0F6FB; }
+.calendar-day--weekend { background: #FBFBFB; }
+.calendar-day--weekend.calendar-day--today { background: #F0F6FB; }
+.calendar-day__num {
+  font-size: 12px; font-weight: 700; color: var(--c-text);
+  margin-bottom: 2px;
+}
+.calendar-day--today .calendar-day__num { color: var(--c-primary); }
+.calendar-day--other-month .calendar-day__num { color: #94A3B8; }
+.calendar-day__events {
+  display: flex; flex-direction: column; gap: 2px;
+  overflow: hidden;
+}
+.calendar-event {
+  font-size: 9px; padding: 2px 5px; border-radius: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: white; font-weight: 600;
+  border-left: 3px solid transparent;
+}
+.calendar-event--installation { background: #D1FAE5; color: #065F46; border-left-color: #10B981; }
+.calendar-event--service      { background: #FEF3C7; color: #92400E; border-left-color: #F59E0B; }
+.calendar-event--followup     { background: #DBEAFE; color: #1E40AF; border-left-color: #3B82F6; }
+.calendar-event--custom       { background: #F3E8FF; color: #6B21A8; border-left-color: #A855F7; }
+
+.calendar-day__more {
+  font-size: 9px; color: var(--c-text-muted); font-style: italic;
+  padding: 0 5px;
+}
+
+/* Modal dnia */
+.day-modal .modal { max-width: 560px; }
+.day-modal .modal__body { padding: 12px 16px; max-height: 60vh; overflow-y: auto; }
+.day-event-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 12px; border-radius: 6px; margin-bottom: 8px;
+  border-left: 4px solid transparent;
+}
+.day-event-item--installation { background: #ECFDF5; border-left-color: #10B981; }
+.day-event-item--service      { background: #FFFBEB; border-left-color: #F59E0B; }
+.day-event-item--followup     { background: #EFF6FF; border-left-color: #3B82F6; }
+.day-event-item--custom       { background: #FAF5FF; border-left-color: #A855F7; }
+.day-event-item__icon { font-size: 18px; }
+.day-event-item__content { flex: 1; min-width: 0; }
+.day-event-item__title { font-size: 13px; font-weight: 700; color: var(--c-text); margin-bottom: 3px; }
+.day-event-item__meta { font-size: 11px; color: var(--c-text-muted); }
+.day-event-item__actions { display: flex; gap: 4px; }
+.day-event-item__actions button {
+  background: transparent; border: none; padding: 4px;
+  cursor: pointer; color: var(--c-text-muted); font-size: 12px;
+  border-radius: 4px;
+}
+.day-event-item__actions button:hover { background: rgba(0,0,0,0.05); color: var(--c-text); }
+
+.day-add-event {
+  padding: 12px; background: #F0F6FB; border-radius: 8px; margin-top: 8px;
+}
+.day-add-event__title {
+  font-size: 11px; font-weight: 700; color: var(--c-primary);
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.day-add-event__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.day-add-event__grid .full { grid-column: 1 / -1; }
+.day-add-event__field { display: flex; flex-direction: column; gap: 4px; }
+.day-add-event__field label {
+  font-size: 10px; font-weight: 600; color: var(--c-text-muted);
+}
+.day-add-event__field input, .day-add-event__field textarea, .day-add-event__field select {
+  padding: 6px 8px; font-size: 12px; border: 1px solid var(--c-border);
+  border-radius: 4px; background: white;
+}
 </style>
 </head>
 <body>
@@ -729,6 +1107,12 @@ body {
       </div>
     </div>
     <div class="app-header__meta">
+      <button class="topbar-nav-btn" onclick="openFunnelModal()" style="margin-bottom:6px;">
+        🎯 Lejek sprzedażowy
+      </button>
+      <button class="topbar-nav-btn" onclick="openCalendarModal()" style="margin-bottom:8px; margin-left:6px;">
+        📅 Kalendarz
+      </button><br>
       <strong>4Climat</strong><br>
       ul. Braniborska 14, 53-680 Wrocław<br>
       NIP: 897-000-12-40 · kontakt@4climat.pl
@@ -803,6 +1187,7 @@ body {
           <button class="sales-person-btn" onclick="selectSalesPerson('bartosz')" data-person="bartosz">Bartosz Przybylski</button>
           <button class="sales-person-btn" onclick="selectSalesPerson('tomasz')" data-person="tomasz">Tomasz Dobryniewski</button>
           <button class="sales-person-btn" onclick="selectSalesPerson('agata')" data-person="agata">Agata Dobryniewska</button>
+          <button class="sales-person-btn" onclick="selectSalesPerson('adrian')" data-person="adrian">Adrian Mojka</button>
           <button class="btn btn--ghost btn--small" onclick="selectSalesPerson(null)" style="margin-left:auto;">✕ Wyczyść</button>
         </div>
         <div class="form-row form-row--2" style="margin-top:10px;">
@@ -838,6 +1223,9 @@ body {
           <button class="btn btn--accent btn--small" onclick="openClientsModal()">
             👥 Wybierz klienta z bazy
             <span id="clientsCount" class="client-picker-bar__count">0</span>
+          </button>
+          <button class="btn btn--ghost btn--small" onclick="openFunnelModal()" title="Otwórz lejek sprzedażowy">
+            🎯 Lejek
           </button>
           <span class="client-picker-bar__divider">lub</span>
           <button class="btn btn--ghost btn--small" onclick="clearClientFields()">+ Nowy klient (wpisz ręcznie)</button>
@@ -988,6 +1376,16 @@ body {
           <input class="field__input" id="realizationsUrl" type="url" placeholder="https://4climat.pl/realizacja/" 
             onchange="state.realizationsUrl=this.value.trim()||'https://www.4climat.pl'">
           <div style="font-size:10px;color:var(--c-text-muted);margin-top:4px;">Pojawi się jako skanowalna ikonka na ostatniej stronie oferty.</div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#F0F6FB; border-radius:8px; border:1px solid var(--c-border);">
+            <input type="checkbox" id="showFinancing" checked
+              onchange="state.showFinancing = this.checked">
+            <label for="showFinancing" style="font-size:12px; color:var(--c-text); cursor:pointer; font-weight:600;">
+              Pokaż finansowanie ratalne (Santander) w PDF
+            </label>
+            <span style="font-size:10px; color:var(--c-text-muted);">(baner na ostatniej stronie)</span>
+          </div>
         </div>
       </div>
 
@@ -1147,6 +1545,192 @@ body {
       <button class="btn btn--ghost btn--small" onclick="exportClientsCsv()">⬇ Eksport CSV</button>
     </div>
     <div class="modal__body" id="clientsBody"></div>
+  </div>
+</div>
+
+<!-- FUNNEL MODAL -->
+<div class="modal-backdrop" id="funnelModal">
+  <div class="modal modal--wide" style="max-width:1400px;">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title">🎯 Lejek sprzedażowy</div>
+        <div class="modal__subtitle" id="funnelSubtitle">Śledź postęp każdego klienta · przeciągnij kartę między kolumnami</div>
+      </div>
+      <button class="modal__close" onclick="closeFunnelModal()">✕</button>
+    </div>
+    <div class="funnel-toolbar">
+      <span class="funnel-toolbar__label">Handlowiec:</span>
+      <select id="funnelUserFilter" onchange="renderFunnel()">
+        <option value="all">Wszyscy</option>
+      </select>
+      <input id="funnelSearch" type="text" placeholder="🔍 Szukaj klienta (nazwisko, telefon, email...)" oninput="renderFunnel()">
+      <div style="flex:1;"></div>
+      <button class="btn btn--ghost btn--small" onclick="renderFunnel()">🔄 Odśwież</button>
+    </div>
+    <div class="funnel-stats" id="funnelStats"></div>
+    <div class="funnel-viz-wrap" id="funnelVizWrap">
+      <div class="funnel-viz-toggle" onclick="toggleFunnelViz()">
+        <span id="funnelVizToggleIcon">▼</span>
+        <span>Wizualizacja lejka</span>
+      </div>
+      <div class="funnel-viz" id="funnelViz"></div>
+    </div>
+    <div class="funnel-body-scroll">
+      <div class="funnel-kanban" id="funnelKanban"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT FUNNEL DETAIL MODAL -->
+<div class="modal-backdrop" id="funnelDetailModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title" id="funnelDetailTitle">Szczegóły klienta</div>
+        <div class="modal__subtitle" id="funnelDetailSubtitle"></div>
+      </div>
+      <button class="modal__close" onclick="closeFunnelDetail()">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="funnel-detail">
+        <div class="funnel-detail__row">
+          <span class="funnel-detail__label">Etap</span>
+          <select id="funnelDetailStage" class="funnel-detail__input"></select>
+        </div>
+        <div class="funnel-detail__row">
+          <span class="funnel-detail__label">Wartość potencjalna (zł)</span>
+          <input id="funnelDetailValue" type="number" step="0.01" class="funnel-detail__input" placeholder="np. 12500">
+        </div>
+        <div class="funnel-detail__row">
+          <span class="funnel-detail__label">Handlowiec</span>
+          <input id="funnelDetailHandler" type="text" class="funnel-detail__input" placeholder="np. Bartek">
+        </div>
+        <div class="funnel-detail__row" style="align-items:flex-start;">
+          <span class="funnel-detail__label" style="padding-top:6px;">Notatka</span>
+          <textarea id="funnelDetailNote" rows="3" class="funnel-detail__input" placeholder="Notatka o kliencie, ustalenia, następne kroki..."></textarea>
+        </div>
+
+        <div class="funnel-detail-section">
+          <div class="funnel-detail-section__title">📞 Pierwszy kontakt z klientem</div>
+          <div class="funnel-detail-section__grid">
+            <div class="sale-field">
+              <label>Data kontaktu</label>
+              <input id="funnelDetailContactDate" type="date">
+            </div>
+            <div class="sale-field">
+              <label>Sposób kontaktu</label>
+              <select id="funnelDetailContactMethod">
+                <option value="">— nie ustawiono —</option>
+                <option value="phone">📞 Telefon</option>
+                <option value="email">✉️ E-mail</option>
+                <option value="showroom">🏢 Wizyta w salonie</option>
+                <option value="form">🌐 Formularz WWW</option>
+                <option value="referral">👥 Polecenie</option>
+                <option value="facebook">💬 Facebook / social media</option>
+                <option value="other">➕ Inny</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="funnel-detail-section">
+          <div class="funnel-detail-section__title">⏰ Follow-up</div>
+          <div class="funnel-detail-section__grid">
+            <div class="sale-field">
+              <label>Data follow-upu</label>
+              <input id="funnelDetailFollowUpDate" type="date">
+            </div>
+            <div class="sale-field">
+              <label>Krótka notatka</label>
+              <input id="funnelDetailFollowUpNote" type="text" placeholder="np. Zadzwonić po wycenie">
+            </div>
+          </div>
+        </div>
+
+        <div id="funnelDetailHistory" style="font-size:11px; color:var(--c-text-muted); padding-top:8px; border-top:1px dashed var(--c-border);"></div>
+      </div>
+    </div>
+    <div class="modal__foot" style="display:flex; gap:8px; justify-content:space-between; align-items:center; padding:14px 16px; border-top:1px solid var(--c-border);">
+      <button id="funnelDetailSaleBtn" class="btn btn--ghost btn--small" onclick="openSaleModalFromDetail()" style="display:none;">
+        🔧 Panel sprzedaży
+      </button>
+      <div style="display:flex; gap:8px; margin-left:auto;">
+        <button class="btn btn--ghost btn--small" onclick="closeFunnelDetail()">Anuluj</button>
+        <button class="btn btn--primary" onclick="saveFunnelDetail()">💾 Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SALE COMPLETED MODAL (Faza B) -->
+<div class="modal-backdrop sale-modal" id="saleModal">
+  <div class="modal">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title">✅ Sprzedaż zakończona</div>
+        <div class="modal__subtitle">Dodaj urządzenia sprzedane klientowi</div>
+      </div>
+      <button class="modal__close" onclick="closeSaleModal()">✕</button>
+    </div>
+    <div class="sale-body" id="saleBody"></div>
+    <div class="modal__foot" style="display:flex; gap:8px; justify-content:space-between; align-items:center; padding:14px 16px; border-top:1px solid var(--c-border);">
+      <div class="purchases-summary" id="saleSummary" style="margin:0; flex:1;"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn--ghost btn--small" onclick="closeSaleModal()">Zamknij</button>
+        <button class="btn btn--primary" onclick="saveSaleData()">💾 Zapisz sprzedaż</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CALENDAR MODAL -->
+<div class="modal-backdrop calendar-modal" id="calendarModal">
+  <div class="modal modal--wide">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title">📅 Kalendarz 4Climat</div>
+        <div class="modal__subtitle">Instalacje · Serwisy · Follow-upy · Wydarzenia</div>
+      </div>
+      <button class="modal__close" onclick="closeCalendarModal()">✕</button>
+    </div>
+    <div class="calendar-toolbar">
+      <button class="calendar-nav-btn" onclick="calendarNavPrev()">‹ Poprzedni</button>
+      <div class="calendar-month-title" id="calendarMonthTitle"></div>
+      <button class="calendar-nav-btn" onclick="calendarNavNext()">Następny ›</button>
+      <button class="calendar-nav-btn" onclick="calendarNavToday()">📍 Dziś</button>
+      <div class="calendar-legend">
+        <div class="calendar-legend-item"><span class="calendar-legend-dot cl-inst"></span> Instalacja</div>
+        <div class="calendar-legend-item"><span class="calendar-legend-dot cl-serv"></span> Serwis</div>
+        <div class="calendar-legend-item"><span class="calendar-legend-dot cl-foll"></span> Follow-up</div>
+        <div class="calendar-legend-item"><span class="calendar-legend-dot cl-cust"></span> Własne wydarzenie</div>
+      </div>
+    </div>
+    <div class="calendar-grid-wrap">
+      <div class="calendar-weekdays">
+        <div class="calendar-weekday">Pon</div>
+        <div class="calendar-weekday">Wt</div>
+        <div class="calendar-weekday">Śr</div>
+        <div class="calendar-weekday">Czw</div>
+        <div class="calendar-weekday">Pt</div>
+        <div class="calendar-weekday weekend">Sob</div>
+        <div class="calendar-weekday weekend">Ndz</div>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DAY DETAIL MODAL -->
+<div class="modal-backdrop day-modal" id="dayModal">
+  <div class="modal">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title" id="dayModalTitle">Wydarzenia dnia</div>
+        <div class="modal__subtitle" id="dayModalSubtitle"></div>
+      </div>
+      <button class="modal__close" onclick="closeDayModal()">✕</button>
+    </div>
+    <div class="modal__body" id="dayModalBody"></div>
   </div>
 </div>
 
@@ -1363,6 +1947,7 @@ const SALES_PERSONS = {
   bartosz: { name: 'Bartosz Przybylski', role: 'Doradca techniczno-handlowy', phone: '668 695 755', email: 'b.przybylski@4climat.pl' },
   tomasz:  { name: 'Tomasz Dobryniewski', role: 'Właściciel', phone: '609 458 069', email: 't.dobryniewski@4climat.pl' },
   agata:   { name: 'Agata Dobryniewska', role: 'Doradca techniczno-handlowy', phone: '500 191 918', email: 'a.dobryniewska@4climat.pl' },
+  adrian:  { name: 'Adrian Mojka', role: 'Doradca techniczno-handlowy ds. klimatyzacji', phone: '500 191 918', email: 'a.mojka@4climat.pl' },
 };
 
 /* ----- SZABLONY OWS ----- */
@@ -1458,6 +2043,7 @@ let state = {
   variants: [],
   extras: [],
   extrasShowPrice: true,
+  showFinancing: true,
   hpVariants: [],
   hpExtras: [],
   customServices: [],    // dowolna wycena usług
@@ -1598,7 +2184,8 @@ async function loadClientsDb() {
   }
   try {
     const data = await sbFetch('/rest/v1/clients?select=*&order=updated_at.desc');
-    clientsDb = (data||[]).map(r => ({ ...r.data, id: r.id, _sbid: r.id }));
+    // Zachowujemy user_id z bazy jako _userId — potrzebne do filtra „Handlowiec" w lejku
+    clientsDb = (data||[]).map(r => ({ ...r.data, id: r.id, _sbid: r.id, _userId: r.user_id }));
     updateClientsCount();
   } catch(e) {
     console.warn('Supabase load clients error:', e);
@@ -2344,7 +2931,7 @@ function renderVariants() {
       imgSection.style.cssText = 'margin-top:14px; padding-top:14px; border-top:1px dashed var(--c-border);';
       imgSection.innerHTML = `
         <div style="font-size:11px; font-weight:700; color:var(--c-primary); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">
-          📷 Zdjęcia &amp; specyfikacja — karta produktu w PDF
+          📷 Zdjęcia i opcje ceny w PDF
         </div>
         <div style="display:flex; gap:14px; align-items:flex-start;">
           <!-- Lewa: galeria zdjęć wariantu -->
@@ -2352,24 +2939,16 @@ function renderVariants() {
             <div id="acVariantGallery_${vIdx}"></div>
             <span style="font-size:9px; color:var(--c-text-muted);">Max 5 MB · JPG/PNG/WEBP<br>Można dodać wiele zdjęć</span>
           </div>
-          <!-- Prawa: opis / cechy -->
+          <!-- Prawa: opcje ceny -->
           <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
-            <div>
-              <label class="field__label">Kluczowe cechy / specyfikacja techniczna</label>
-              <textarea class="field__textarea" rows="5"
-                placeholder="np. • Czynnik chłodniczy: R32&#10;• COP/EER: 4,65 / 7,60 (A++/A++)&#10;• Zakres pracy (grzanie): -15°C do +18°C&#10;• Poziom hałasu: 19 dB(A)&#10;• Wbudowany WiFi — sterowanie przez apkę Daikin Online Controller"
-                style="min-height:110px; font-size:12px; line-height:1.55;"
-                onchange="updateAcVariantField(${vIdx}, 'description', this.value)">${escapeHtml(v.description || '')}</textarea>
-            </div>
             <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#F0F6FB; border-radius:8px; border:1px solid var(--c-border);">
               <input type="checkbox" id="acSplitPrice_${vIdx}" ${v.splitPrice ? 'checked' : ''}
                 onchange="updateAcVariantField(${vIdx}, 'splitPrice', this.checked)">
               <label for="acSplitPrice_${vIdx}" style="font-size:12px; color:var(--c-text); cursor:pointer; font-weight:600;">
                 Rozdziel cenę urządzenia i montażu w PDF
               </label>
-              <span style="font-size:10px; color:var(--c-text-muted);">(dwie osobne linie zamiast łącznej kwoty)</span>
+              <span style="font-size:10px; color:var(--c-text-muted);">(osobne wiersze w tabeli pozycji)</span>
             </div>
-            <div style="font-size:10px; color:var(--c-text-muted);">Wypunktowania znakiem <strong>•</strong> wyglądają najlepiej w PDF.</div>
           </div>
         </div>
       `;
@@ -4503,11 +5082,1046 @@ function updateClientInBase() {
   showToast('↻ Dane klienta zaktualizowane w bazie');
 }
 
+/* ============================================================
+   LEJEK SPRZEDAŻOWY — kanban, drag&drop, filtry
+   ============================================================ */
+
+const FUNNEL_STAGES = [
+  { id: 1, name: 'Przyjęty',            type: 'active' },
+  { id: 2, name: 'Kontakt',             type: 'active' },
+  { id: 3, name: 'Ponowić kontakt',     type: 'active' },
+  { id: 4, name: 'Przygotowanie oferty',type: 'active' },
+  { id: 5, name: 'Oferta wysłana',      type: 'active' },
+  { id: 6, name: 'Negocjacje',          type: 'active' },
+  { id: 8, name: 'Zakwalifikowany',     type: 'qualified' },
+  { id: 7, name: 'Rezygnacja',          type: 'rejected' },
+  { id: 9, name: 'Niezakwalifikowany',  type: 'none' },
+];
+
+let _draggedClientId = null;
+let _detailClientId = null;
+
+async function openFunnelModal() {
+  // Odśwież bazę klientów z Supabase
+  await loadClientsDb();
+  refreshFunnelUsersFilter();
+  renderFunnel();
+  document.getElementById('funnelModal').classList.add('modal-backdrop--open');
+}
+
+function closeFunnelModal() {
+  document.getElementById('funnelModal').classList.remove('modal-backdrop--open');
+}
+
+function getClientHandler(c) {
+  // Priorytet: pole handlerName z data, potem sales z draftu, potem email z user_id
+  return c.handlerName || c.salesName || '';
+}
+
+function refreshFunnelUsersFilter() {
+  const sel = document.getElementById('funnelUserFilter');
+  if (!sel) return;
+  const currentVal = sel.value;
+  const handlers = new Set();
+  clientsDb.forEach(c => {
+    const h = getClientHandler(c);
+    if (h) handlers.add(h);
+  });
+  const sortedHandlers = [...handlers].sort();
+  const opts = ['<option value="all">Wszyscy</option>'];
+  if (currentUser) {
+    const myName = currentUser.email ? currentUser.email.split('@')[0] : 'Ja';
+    opts.push(`<option value="_me">Moi klienci (${escapeHtml(myName)})</option>`);
+  }
+  sortedHandlers.forEach(h => {
+    opts.push(`<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`);
+  });
+  opts.push('<option value="_unassigned">Nieprzypisani</option>');
+  sel.innerHTML = opts.join('');
+  // Przywróć poprzedni wybór jeśli nadal istnieje
+  if ([...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
+}
+
+function funnelClientMatchesFilter(c, filterUser) {
+  if (filterUser === 'all') return true;
+  const handler = getClientHandler(c);
+  if (filterUser === '_me') {
+    if (!currentUser) return false;
+    if (c._userId && c._userId === currentUser.id) return true;
+    return handler === (currentUser.email ? currentUser.email.split('@')[0] : '');
+  }
+  if (filterUser === '_unassigned') return !handler;
+  return handler === filterUser;
+}
+
+function renderFunnel() {
+  const filterUser = (document.getElementById('funnelUserFilter') || {}).value || 'all';
+  const searchTxt = ((document.getElementById('funnelSearch') || {}).value || '').trim().toLowerCase();
+  const kanban = document.getElementById('funnelKanban');
+  const stats = document.getElementById('funnelStats');
+  if (!kanban) return;
+  kanban.innerHTML = '';
+
+  // Filtruj klientów
+  const filtered = clientsDb.filter(c => {
+    if (!funnelClientMatchesFilter(c, filterUser)) return false;
+    if (searchTxt) {
+      const hay = ((c.name||'') + ' ' + (c.nip||'') + ' ' + (c.phone||'') + ' ' + (c.email||'') + ' ' + (c.address||'')).toLowerCase();
+      if (!hay.includes(searchTxt)) return false;
+    }
+    return true;
+  });
+
+  // Statystyki
+  const total = filtered.length;
+  const qualified = filtered.filter(c => (c.stage||1) === 8).length;
+  const rejected = filtered.filter(c => (c.stage||1) === 7).length;
+  const noneQ = filtered.filter(c => (c.stage||1) === 9).length;
+  const closed = qualified + rejected + noneQ;
+  const successRate = closed > 0 ? Math.round((qualified / closed) * 100 * 10) / 10 : 0;
+  stats.innerHTML = `
+    <div class="funnel-stats__item">📋 Łącznie: <strong>${total}</strong></div>
+    <div class="funnel-stats__item">✅ Zakwalifikowani: <strong>${qualified}</strong></div>
+    <div class="funnel-stats__item">❌ Rezygnacje: <strong>${rejected}</strong></div>
+    <div class="funnel-stats__item">➖ Niezakwalifikowani: <strong>${noneQ}</strong></div>
+    <div class="funnel-stats__item">📊 Skuteczność: <strong>${successRate}%</strong></div>
+  `;
+
+  // Wizualizacja lejka (SVG)
+  renderFunnelViz(filtered);
+
+  // Buduj kolumny
+  FUNNEL_STAGES.forEach(stage => {
+    const stageClients = filtered.filter(c => (c.stage||1) === stage.id);
+    const col = document.createElement('div');
+    col.className = 'funnel-col funnel-col--' + stage.type;
+    col.dataset.stage = stage.id;
+    col.ondragover = allowFunnelDrop;
+    col.ondragleave = () => col.classList.remove('funnel-col--drag-over');
+    col.ondrop = (e) => dropFunnelClient(e, stage.id);
+    col.innerHTML = `
+      <div class="funnel-col__header">
+        <span class="funnel-col__num">${stage.id}</span>
+        <span class="funnel-col__title">${stage.name}</span>
+        <span class="funnel-col__count">${stageClients.length}</span>
+      </div>
+      <div class="funnel-col__cards" id="funnelCol_${stage.id}"></div>
+    `;
+    const cardsWrap = col.querySelector('.funnel-col__cards');
+    if (stageClients.length === 0) {
+      cardsWrap.innerHTML = '<div class="funnel-empty">Brak klientów</div>';
+    } else {
+      stageClients.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'funnel-card';
+        card.draggable = true;
+        card.dataset.clientId = c.id;
+        card.ondragstart = (e) => dragFunnelStart(e, c.id, card);
+        card.ondragend = () => card.classList.remove('funnel-card--dragging');
+        card.onclick = () => openFunnelDetail(c.id);
+        const cityShort = c.address ? c.address.split(',')[0].trim().substring(0, 30) : '';
+        const stageTime = c.stageUpdatedAt ? funnelTimeSince(c.stageUpdatedAt) : '';
+        const handlerName = getClientHandler(c);
+        const purchaseCount = (c.purchases && c.purchases.length) ? c.purchases.length : 0;
+
+        // Badge follow-up
+        let followUpBadge = '';
+        if (c.followUpDate) {
+          const fu = new Date(c.followUpDate);
+          fu.setHours(0,0,0,0);
+          const today = new Date(); today.setHours(0,0,0,0);
+          const diffDays = Math.round((fu - today) / (1000*60*60*24));
+          let cls = 'future', label = '';
+          if (diffDays < 0) { cls = 'overdue'; label = `⚠ Follow-up (${-diffDays} dni po)`; }
+          else if (diffDays === 0) { cls = 'today'; label = '📞 Follow-up dziś'; }
+          else if (diffDays <= 3) { cls = 'soon'; label = `📞 Follow-up za ${diffDays} ${diffDays===1?'dzień':'dni'}`; }
+          else if (diffDays <= 14) { cls = 'future'; label = `📞 Follow-up ${fu.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})}`; }
+          if (label) followUpBadge = `<div class="funnel-card__followup funnel-card__followup--${cls}">${label}</div>`;
+        }
+
+        // Sposób kontaktu
+        const contactIcons = { phone: '📞', email: '✉️', showroom: '🏢', form: '🌐', referral: '👥', facebook: '💬', other: '➕' };
+        const contactBadge = c.firstContactMethod
+          ? `<div class="funnel-card__contact">${contactIcons[c.firstContactMethod] || '•'} ${c.firstContactDate ? new Date(c.firstContactDate).toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'}) : ''}</div>`
+          : '';
+
+        card.innerHTML = `
+          <div class="funnel-card__name">${escapeHtml(c.name || '(brak nazwy)')}</div>
+          ${c.phone || cityShort ? `<div class="funnel-card__meta">${c.phone ? '📞 ' + escapeHtml(c.phone) : ''}${c.phone && cityShort ? ' · ' : ''}${cityShort ? escapeHtml(cityShort) : ''}</div>` : ''}
+          ${c.funnelValue ? `<div class="funnel-card__value">💰 ${fmtPLN(c.funnelValue)}</div>` : ''}
+          ${c.funnelNote ? `<div class="funnel-card__note">${escapeHtml(c.funnelNote.substring(0, 80))}${c.funnelNote.length > 80 ? '...' : ''}</div>` : ''}
+          ${followUpBadge}
+          ${purchaseCount > 0 ? `<div class="funnel-card__sale-badge">🔧 ${purchaseCount} ${purchaseCount === 1 ? 'urządzenie' : purchaseCount < 5 ? 'urządzenia' : 'urządzeń'}</div>` : ''}
+          ${contactBadge}
+          ${handlerName ? `<span class="funnel-card__handler">👤 ${escapeHtml(handlerName)}</span>` : ''}
+          ${stageTime ? `<div class="funnel-card__stage-time">⏱ ${stageTime}</div>` : ''}
+        `;
+        cardsWrap.appendChild(card);
+      });
+    }
+    kanban.appendChild(col);
+  });
+}
+
+function toggleFunnelViz() {
+  const wrap = document.getElementById('funnelVizWrap');
+  if (!wrap) return;
+  wrap.classList.toggle('collapsed');
+  try { localStorage.setItem('funnelVizCollapsed', wrap.classList.contains('collapsed') ? '1' : '0'); } catch(e) {}
+}
+
+function renderFunnelViz(clients) {
+  const wrap = document.getElementById('funnelVizWrap');
+  const container = document.getElementById('funnelViz');
+  if (!container) return;
+
+  // Przywróć stan collapsed
+  try {
+    if (localStorage.getItem('funnelVizCollapsed') === '1' && !wrap.classList.contains('collapsed')) {
+      wrap.classList.add('collapsed');
+    }
+  } catch(e) {}
+
+  // Zbierz liczby per etap
+  const stagesToShow = FUNNEL_STAGES.filter(s => s.type === 'active');
+  const total = clients.length;
+  if (total === 0) {
+    container.innerHTML = '<div style="text-align:center; color:var(--c-text-muted); padding:20px; font-size:12px;">Brak klientów do wyświetlenia w lejku.</div>';
+    return;
+  }
+
+  const counts = stagesToShow.map(s => ({
+    stage: s,
+    count: clients.filter(c => (c.stage||1) === s.id).length
+  }));
+
+  // Wyniki końcowe
+  const qualified = clients.filter(c => (c.stage||1) === 8).length;
+  const rejected  = clients.filter(c => (c.stage||1) === 7).length;
+  const noneQ     = clients.filter(c => (c.stage||1) === 9).length;
+
+  // SVG lejek: 6 poziomych pasków, każdy węższy o stały krok
+  // Rezerwujemy 160px po lewej na etykiety (np. "3. Ponowić kontakt")
+  const svgW = 840;
+  const svgH = 6 * 44 + 20;
+  const labelW = 160;
+  const areaW = svgW - labelW - 20; // obszar na paski
+  const barMaxW = areaW;
+  const barMinW = Math.floor(areaW * 0.4);
+  const barH = 32;
+  const barGap = 12;
+  const barCenterX = labelW + areaW / 2;
+
+  let svg = `<svg class="funnel-viz-svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" style="max-width:${svgW}px;">`;
+
+  counts.forEach((c, i) => {
+    const t = i / (counts.length - 1 || 1);
+    const w = barMaxW - (barMaxW - barMinW) * t;
+    const x = barCenterX - w / 2;
+    const y = 10 + i * (barH + barGap);
+    // Kolor gradient: od jasnego niebieskiego do ciemniejszego
+    const shade = Math.floor(220 - t * 90);
+    const fill = `rgb(${Math.floor(shade*0.75)}, ${Math.floor(shade*0.85)}, ${shade})`;
+    const pct = total > 0 ? Math.round((c.count / total) * 100) : 0;
+
+    // Etykieta po lewej stronie (dostosowana do labelW)
+    svg += `<text class="funnel-viz-label" x="${labelW - 8}" y="${y + barH/2 + 4}" text-anchor="end">${c.stage.id}. ${escapeSvg(c.stage.name)}</text>`;
+    // Pasek
+    svg += `<rect class="funnel-viz-bar" x="${x}" y="${y}" width="${w}" height="${barH}" fill="${fill}" rx="4"/>`;
+    // Liczba w środku paska
+    svg += `<text class="funnel-viz-count" x="${barCenterX}" y="${y + barH/2 + 4}" text-anchor="middle">${c.count}${c.count > 0 ? ' (' + pct + '%)' : ''}</text>`;
+  });
+
+  svg += '</svg>';
+
+  // Kafle wyników końcowych
+  const outcomesHtml = `
+    <div style="display:flex; gap:10px; margin-top:16px; justify-content:center; flex-wrap:wrap;">
+      <div style="padding:10px 16px; background:#ECFDF5; border-radius:8px; border-left:3px solid #10B981;">
+        <div style="font-size:10px; color:#065F46; font-weight:700; text-transform:uppercase;">Zakwalifikowani</div>
+        <div style="font-size:22px; font-weight:800; color:#065F46;">${qualified}${total > 0 ? ' <span style="font-size:11px; color:#059669;">(' + Math.round(qualified/total*100) + '%)</span>' : ''}</div>
+      </div>
+      <div style="padding:10px 16px; background:#FEF2F2; border-radius:8px; border-left:3px solid #EF4444;">
+        <div style="font-size:10px; color:#991B1B; font-weight:700; text-transform:uppercase;">Rezygnacje</div>
+        <div style="font-size:22px; font-weight:800; color:#991B1B;">${rejected}${total > 0 ? ' <span style="font-size:11px; color:#DC2626;">(' + Math.round(rejected/total*100) + '%)</span>' : ''}</div>
+      </div>
+      <div style="padding:10px 16px; background:#F5F5F5; border-radius:8px; border-left:3px solid #94A3B8;">
+        <div style="font-size:10px; color:#475569; font-weight:700; text-transform:uppercase;">Niezakwalifikowani</div>
+        <div style="font-size:22px; font-weight:800; color:#475569;">${noneQ}${total > 0 ? ' <span style="font-size:11px; color:#64748B;">(' + Math.round(noneQ/total*100) + '%)</span>' : ''}</div>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = svg + outcomesHtml;
+}
+
+function escapeSvg(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function funnelTimeSince(iso) {
+  const now = new Date();
+  const then = new Date(iso);
+  const diffMs = now - then;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'dzisiaj';
+  if (diffDays === 1) return '1 dzień';
+  if (diffDays < 7) return `${diffDays} dni`;
+  if (diffDays < 30) return `${Math.floor(diffDays/7)} tyg.`;
+  return `${Math.floor(diffDays/30)} mies.`;
+}
+
+function dragFunnelStart(e, clientId, cardEl) {
+  _draggedClientId = clientId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', clientId);
+  cardEl.classList.add('funnel-card--dragging');
+}
+
+function allowFunnelDrop(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const col = e.currentTarget;
+  if (col && col.classList) col.classList.add('funnel-col--drag-over');
+}
+
+async function dropFunnelClient(e, newStage) {
+  e.preventDefault();
+  const col = e.currentTarget;
+  if (col && col.classList) col.classList.remove('funnel-col--drag-over');
+  if (!_draggedClientId) return;
+  const client = clientsDb.find(c => c.id === _draggedClientId);
+  if (!client) return;
+  const oldStage = client.stage || 1;
+  if (oldStage === newStage) { _draggedClientId = null; return; }
+  await moveClientToStage(client, newStage);
+  _draggedClientId = null;
+}
+
+async function moveClientToStage(client, newStage) {
+  const oldStage = client.stage || 1;
+  const nowIso = new Date().toISOString();
+  client.stage = newStage;
+  client.stageUpdatedAt = nowIso;
+  client.updatedAt = nowIso;
+  if (!client.stageHistory) client.stageHistory = [];
+  client.stageHistory.push({
+    from: oldStage,
+    to: newStage,
+    at: nowIso,
+    by: currentUser?.email || 'system'
+  });
+  // Ustaw handlerName jeśli brak
+  if (!client.handlerName && currentUser?.email) {
+    client.handlerName = currentUser.email.split('@')[0];
+  }
+  try {
+    await saveClientToSupabase(client);
+    await saveClientsDb();
+  } catch(e) {
+    console.warn('Move client stage error:', e);
+    showToast('⚠ Błąd zapisu — sprawdź połączenie');
+    return;
+  }
+  refreshFunnelUsersFilter();
+  renderFunnel();
+  const stageName = FUNNEL_STAGES.find(s => s.id === newStage)?.name || newStage;
+  showToast(`✓ „${client.name}" → ${stageName}`);
+
+  // Gdy Zakwalifikowany (etap 8) → automatycznie otwórz panel sprzedaży
+  if (newStage === 8) {
+    setTimeout(() => openSaleModal(client.id), 200);
+  }
+}
+
+/* ============================================================
+   PANEL SPRZEDAŻY (Faza B) — urządzenia sprzedane klientowi
+   ============================================================ */
+
+let _saleClientId = null;
+let _saleDevices = []; // roboczy stan przed zapisem
+
+function openSaleModal(clientId) {
+  const client = clientsDb.find(c => c.id === clientId);
+  if (!client) return;
+  _saleClientId = clientId;
+  // Kopia głęboka z istniejących zakupów (albo pusta lista)
+  _saleDevices = client.purchases ? JSON.parse(JSON.stringify(client.purchases)) : [];
+  if (_saleDevices.length === 0) _saleDevices.push(newSaleDevice());
+  renderSaleModal(client);
+  document.getElementById('saleModal').classList.add('modal-backdrop--open');
+}
+
+function closeSaleModal() {
+  document.getElementById('saleModal').classList.remove('modal-backdrop--open');
+  _saleClientId = null;
+  _saleDevices = [];
+}
+
+function newSaleDevice() {
+  const today = ymdLocal(new Date());
+  const nextYear = new Date();
+  nextYear.setFullYear(nextYear.getFullYear() + 1);
+  return {
+    marka: '',
+    model: '',
+    serialNumber: '',
+    salesPrice: '',
+    installedBy: currentUser?.email ? currentUser.email.split('@')[0] : '',
+    installDate: today,
+    nextServiceDate: ymdLocal(nextYear),
+    notes: ''
+  };
+}
+
+function renderSaleModal(client) {
+  const body = document.getElementById('saleBody');
+  const summary = document.getElementById('saleSummary');
+
+  const infoHtml = `
+    <div class="sale-client-info">
+      <span>👤</span>
+      <div>
+        <div class="sale-client-info__name">${escapeHtml(client.name || '(brak nazwy)')}</div>
+        <div class="sale-client-info__meta">${[client.phone, client.email, client.address].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+      </div>
+    </div>
+    <div class="sale-devices-header">
+      <span>🔧</span>
+      <span>Sprzedane urządzenia (${_saleDevices.length})</span>
+    </div>
+  `;
+
+  const devicesHtml = _saleDevices.map((d, i) => `
+    <div class="sale-device">
+      <span class="sale-device__num">${i + 1}</span>
+      ${_saleDevices.length > 1 ? `<button class="sale-device__remove" onclick="removeSaleDevice(${i})" title="Usuń urządzenie">✕</button>` : ''}
+      <div class="sale-device-grid">
+        <div class="sale-field">
+          <label>Marka</label>
+          <input type="text" value="${escapeHtml(d.marka || '')}" oninput="updateSaleDevice(${i}, 'marka', this.value)" placeholder="np. Daikin">
+        </div>
+        <div class="sale-field">
+          <label>Model</label>
+          <input type="text" value="${escapeHtml(d.model || '')}" oninput="updateSaleDevice(${i}, 'model', this.value)" placeholder="np. Perfera FTXM35A">
+        </div>
+        <div class="sale-field">
+          <label>Numer seryjny</label>
+          <input type="text" value="${escapeHtml(d.serialNumber || '')}" oninput="updateSaleDevice(${i}, 'serialNumber', this.value)" placeholder="np. Q123456789">
+        </div>
+        <div class="sale-field">
+          <label>Cena sprzedaży (zł brutto)</label>
+          <input type="number" step="0.01" value="${d.salesPrice || ''}" oninput="updateSaleDevice(${i}, 'salesPrice', this.value)" placeholder="np. 4900">
+        </div>
+        <div class="sale-field">
+          <label>Kto zamontował</label>
+          <input type="text" value="${escapeHtml(d.installedBy || '')}" oninput="updateSaleDevice(${i}, 'installedBy', this.value)" placeholder="np. Bartek">
+        </div>
+        <div class="sale-field">
+          <label>Data montażu</label>
+          <input type="date" value="${escapeHtml(d.installDate || '')}" oninput="updateSaleDevice(${i}, 'installDate', this.value); autoUpdateNextService(${i})">
+        </div>
+        <div class="sale-field full">
+          <label>Data następnego przeglądu (auto: montaż + 12 mies., edytowalna)</label>
+          <input type="date" value="${escapeHtml(d.nextServiceDate || '')}" oninput="updateSaleDevice(${i}, 'nextServiceDate', this.value)">
+        </div>
+        <div class="sale-field full">
+          <label>Notatki (opcjonalne)</label>
+          <textarea oninput="updateSaleDevice(${i}, 'notes', this.value)" placeholder="np. Warto zabrać zapasowy filtr...">${escapeHtml(d.notes || '')}</textarea>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  const addBtnHtml = `<button class="sale-add-device-btn" onclick="addSaleDevice()">➕ Dodaj kolejne urządzenie</button>`;
+  body.innerHTML = infoHtml + devicesHtml + addBtnHtml;
+
+  // Suma cen
+  const total = _saleDevices.reduce((s, d) => s + (parseFloat(d.salesPrice) || 0), 0);
+  summary.innerHTML = total > 0
+    ? `💰 Łączna wartość sprzedaży: <strong>${fmtPLN(total)}</strong>`
+    : '<span style="color:var(--c-text-muted);">Uzupełnij ceny, aby zobaczyć sumę.</span>';
+}
+
+function updateSaleDevice(idx, field, value) {
+  if (!_saleDevices[idx]) return;
+  _saleDevices[idx][field] = value;
+  // Aktualizuj tylko summary bez pełnego rerenderu (żeby fokus nie zniknął)
+  if (field === 'salesPrice') {
+    const total = _saleDevices.reduce((s, d) => s + (parseFloat(d.salesPrice) || 0), 0);
+    const summary = document.getElementById('saleSummary');
+    if (summary) summary.innerHTML = total > 0
+      ? `💰 Łączna wartość sprzedaży: <strong>${fmtPLN(total)}</strong>`
+      : '<span style="color:var(--c-text-muted);">Uzupełnij ceny, aby zobaczyć sumę.</span>';
+  }
+}
+
+function autoUpdateNextService(idx) {
+  const d = _saleDevices[idx];
+  if (!d || !d.installDate) return;
+  const dt = new Date(d.installDate);
+  if (isNaN(dt.getTime())) return;
+  dt.setFullYear(dt.getFullYear() + 1);
+  d.nextServiceDate = ymdLocal(dt);
+  // Zaktualizuj input daty w DOM
+  const inputs = document.querySelectorAll('#saleBody .sale-device');
+  if (inputs[idx]) {
+    const dateInput = inputs[idx].querySelectorAll('input[type="date"]')[1];
+    if (dateInput) dateInput.value = d.nextServiceDate;
+  }
+}
+
+function addSaleDevice() {
+  _saleDevices.push(newSaleDevice());
+  const client = clientsDb.find(c => c.id === _saleClientId);
+  if (client) renderSaleModal(client);
+}
+
+function removeSaleDevice(idx) {
+  if (!confirm('Usunąć to urządzenie z listy?')) return;
+  _saleDevices.splice(idx, 1);
+  const client = clientsDb.find(c => c.id === _saleClientId);
+  if (client) renderSaleModal(client);
+}
+
+async function saveSaleData() {
+  const client = clientsDb.find(c => c.id === _saleClientId);
+  if (!client) return;
+
+  // Walidacja podstawowa
+  const invalidDevice = _saleDevices.find(d => !d.marka && !d.model);
+  if (invalidDevice) {
+    showToast('⚠ Uzupełnij markę lub model wszystkich urządzeń');
+    return;
+  }
+
+  // Zapisz do klienta (parsuj ceny do liczb)
+  client.purchases = _saleDevices.map(d => ({
+    ...d,
+    salesPrice: d.salesPrice ? parseFloat(d.salesPrice) : null
+  }));
+  client.updatedAt = new Date().toISOString();
+
+  try {
+    await saveClientToSupabase(client);
+    await saveClientsDb();
+    renderFunnel();
+    showToast(`✓ Zapisano ${_saleDevices.length} urządzeń dla „${client.name}"`);
+    closeSaleModal();
+  } catch (e) {
+    console.warn('Save sale error:', e);
+    showToast('⚠ Błąd zapisu — sprawdź połączenie');
+  }
+}
+
+/* ============================================================
+   KALENDARZ 4Climat — instalacje, serwisy, follow-upy, wydarzenia
+   ============================================================ */
+
+let _calendarCurrentMonth = new Date();
+_calendarCurrentMonth.setDate(1);
+let _calendarCustomEvents = []; // wydarzenia własne z Supabase
+let _calendarSelectedDate = null;
+
+// YYYY-MM-DD w strefie lokalnej (bez konwersji do UTC, żeby nie przesuwać dat)
+function ymdLocal(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+async function openCalendarModal() {
+  await loadClientsDb();
+  await loadCustomCalendarEvents();
+  renderCalendar();
+  document.getElementById('calendarModal').classList.add('modal-backdrop--open');
+}
+
+function closeCalendarModal() {
+  document.getElementById('calendarModal').classList.remove('modal-backdrop--open');
+}
+
+function calendarNavPrev() {
+  _calendarCurrentMonth.setMonth(_calendarCurrentMonth.getMonth() - 1);
+  renderCalendar();
+}
+function calendarNavNext() {
+  _calendarCurrentMonth.setMonth(_calendarCurrentMonth.getMonth() + 1);
+  renderCalendar();
+}
+function calendarNavToday() {
+  _calendarCurrentMonth = new Date();
+  _calendarCurrentMonth.setDate(1);
+  renderCalendar();
+}
+
+async function loadCustomCalendarEvents() {
+  if (!currentUser) {
+    // localStorage fallback
+    try {
+      const raw = localStorage.getItem('calendarCustomEvents');
+      _calendarCustomEvents = raw ? JSON.parse(raw) : [];
+    } catch(e) { _calendarCustomEvents = []; }
+    return;
+  }
+  try {
+    const data = await sbFetch('/rest/v1/calendar_events?select=*&order=event_date.asc');
+    _calendarCustomEvents = (data || []).map(r => ({
+      id: r.id, title: r.title, description: r.description,
+      eventDate: r.event_date, eventTime: r.event_time,
+      color: r.color || '#A855F7',
+      createdBy: r.created_by_name || null,
+      _userId: r.user_id
+    }));
+  } catch (e) {
+    // Tabela może nie istnieć (migracja SQL nie wykonana) — fallback do localStorage
+    console.info('Calendar events table not available, using localStorage:', e.message);
+    try {
+      const raw = localStorage.getItem('calendarCustomEvents');
+      _calendarCustomEvents = raw ? JSON.parse(raw) : [];
+    } catch(e2) { _calendarCustomEvents = []; }
+  }
+}
+
+async function saveCustomCalendarEvent(event) {
+  if (!currentUser) {
+    // localStorage save
+    try {
+      const raw = localStorage.getItem('calendarCustomEvents');
+      const list = raw ? JSON.parse(raw) : [];
+      if (event.id) {
+        const idx = list.findIndex(e => e.id === event.id);
+        if (idx >= 0) list[idx] = event; else list.push(event);
+      } else {
+        event.id = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        list.push(event);
+      }
+      localStorage.setItem('calendarCustomEvents', JSON.stringify(list));
+      _calendarCustomEvents = list;
+      return true;
+    } catch(e) { return false; }
+  }
+  try {
+    const payload = {
+      title: event.title, description: event.description || null,
+      event_date: event.eventDate, event_time: event.eventTime || null,
+      color: event.color || '#A855F7',
+      created_by_name: event.createdBy || (currentUser.email ? currentUser.email.split('@')[0] : null)
+    };
+    if (event.id && !event.id.startsWith('local_')) {
+      await sbFetch('/rest/v1/calendar_events?id=eq.' + encodeURIComponent(event.id), {
+        method: 'PATCH', body: JSON.stringify(payload)
+      });
+    } else {
+      payload.user_id = currentUser.id;
+      const res = await sbFetch('/rest/v1/calendar_events', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (res && res[0]) event.id = res[0].id;
+    }
+    await loadCustomCalendarEvents();
+    return true;
+  } catch (e) {
+    console.warn('Save calendar event failed, falling back to localStorage:', e.message);
+    showToast('⚠ Zapisano lokalnie — wykonaj migrację SQL kalendarza');
+    try {
+      const raw = localStorage.getItem('calendarCustomEvents');
+      const list = raw ? JSON.parse(raw) : [];
+      if (event.id) {
+        const idx = list.findIndex(e => e.id === event.id);
+        if (idx >= 0) list[idx] = event; else list.push(event);
+      } else {
+        event.id = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        list.push(event);
+      }
+      localStorage.setItem('calendarCustomEvents', JSON.stringify(list));
+      _calendarCustomEvents = list;
+      return true;
+    } catch(e2) { return false; }
+  }
+}
+
+async function deleteCustomCalendarEvent(eventId) {
+  if (!eventId) return;
+  if (eventId.startsWith('local_') || !currentUser) {
+    try {
+      const raw = localStorage.getItem('calendarCustomEvents');
+      const list = raw ? JSON.parse(raw) : [];
+      const filtered = list.filter(e => e.id !== eventId);
+      localStorage.setItem('calendarCustomEvents', JSON.stringify(filtered));
+      _calendarCustomEvents = filtered;
+      return;
+    } catch(e) {}
+  }
+  try {
+    await sbFetch('/rest/v1/calendar_events?id=eq.' + encodeURIComponent(eventId), { method: 'DELETE' });
+    _calendarCustomEvents = _calendarCustomEvents.filter(e => e.id !== eventId);
+  } catch(e) {
+    console.warn('Delete calendar event failed:', e);
+    showToast('⚠ Nie udało się usunąć');
+  }
+}
+
+/* Zbierz wszystkie wydarzenia dla danego miesiąca */
+function getAllCalendarEvents() {
+  const events = [];
+
+  // Z klientów: instalacje, serwisy, follow-upy
+  clientsDb.forEach(c => {
+    // Follow-up
+    if (c.followUpDate) {
+      events.push({
+        type: 'followup',
+        date: c.followUpDate,
+        title: 'Follow-up: ' + (c.name || 'klient'),
+        description: c.followUpNote || '',
+        clientId: c.id, clientName: c.name,
+        icon: '📞', color: '#3B82F6'
+      });
+    }
+    // Instalacje i serwisy z zakupów
+    if (c.purchases && Array.isArray(c.purchases)) {
+      c.purchases.forEach((p, idx) => {
+        if (p.installDate) {
+          events.push({
+            type: 'installation',
+            date: p.installDate,
+            title: 'Montaż: ' + (c.name || 'klient'),
+            description: [p.marka, p.model].filter(Boolean).join(' ') + (p.serialNumber ? ' (SN: ' + p.serialNumber + ')' : ''),
+            clientId: c.id, clientName: c.name, purchaseIdx: idx,
+            icon: '🔧', color: '#10B981'
+          });
+        }
+        if (p.nextServiceDate) {
+          events.push({
+            type: 'service',
+            date: p.nextServiceDate,
+            title: 'Serwis: ' + (c.name || 'klient'),
+            description: [p.marka, p.model].filter(Boolean).join(' ') + (p.serialNumber ? ' (SN: ' + p.serialNumber + ')' : ''),
+            clientId: c.id, clientName: c.name, purchaseIdx: idx,
+            icon: '🛠', color: '#F59E0B'
+          });
+        }
+      });
+    }
+  });
+
+  // Własne
+  _calendarCustomEvents.forEach(e => {
+    events.push({
+      type: 'custom',
+      date: e.eventDate,
+      time: e.eventTime,
+      title: e.title,
+      description: e.description || '',
+      createdBy: e.createdBy,
+      customEventId: e.id,
+      icon: '📌', color: e.color || '#A855F7'
+    });
+  });
+
+  return events;
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  const titleEl = document.getElementById('calendarMonthTitle');
+  if (!grid || !titleEl) return;
+
+  const year = _calendarCurrentMonth.getFullYear();
+  const month = _calendarCurrentMonth.getMonth();
+  const monthNames = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+  titleEl.textContent = monthNames[month] + ' ' + year;
+
+  // Pierwszy dzień miesiąca + jego dzień tygodnia (0=nd, przesuwamy na 0=pon)
+  const firstDay = new Date(year, month, 1);
+  let firstDow = firstDay.getDay(); firstDow = firstDow === 0 ? 6 : firstDow - 1; // 0=pon
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  // Wydarzenia zaindeksowane po dacie YYYY-MM-DD
+  const allEvents = getAllCalendarEvents();
+  const eventsByDate = {};
+  allEvents.forEach(e => {
+    if (!eventsByDate[e.date]) eventsByDate[e.date] = [];
+    eventsByDate[e.date].push(e);
+  });
+
+  const today = new Date();
+  const todayStr = ymdLocal(today);
+
+  grid.innerHTML = '';
+
+  // Dni z poprzedniego miesiąca (padding)
+  for (let i = firstDow; i > 0; i--) {
+    const d = daysInPrevMonth - i + 1;
+    const prev = new Date(year, month - 1, d);
+    grid.appendChild(buildCalendarDay(prev, true, eventsByDate, todayStr));
+  }
+  // Dni bieżącego miesiąca
+  for (let d = 1; d <= daysInMonth; d++) {
+    grid.appendChild(buildCalendarDay(new Date(year, month, d), false, eventsByDate, todayStr));
+  }
+  // Dni następnego miesiąca (padding do pełnego rzędu)
+  const totalCells = firstDow + daysInMonth;
+  const trailing = (7 - (totalCells % 7)) % 7;
+  for (let d = 1; d <= trailing; d++) {
+    grid.appendChild(buildCalendarDay(new Date(year, month + 1, d), true, eventsByDate, todayStr));
+  }
+}
+
+function buildCalendarDay(date, isOther, eventsByDate, todayStr) {
+  const dateStr = ymdLocal(date);
+  const dow = date.getDay(); // 0=nd, 6=sob
+  const isWeekend = (dow === 0 || dow === 6);
+  const isToday = (dateStr === todayStr);
+  const dayEvents = eventsByDate[dateStr] || [];
+
+  const cell = document.createElement('div');
+  let cls = 'calendar-day';
+  if (isOther) cls += ' calendar-day--other-month';
+  if (isToday) cls += ' calendar-day--today';
+  if (isWeekend) cls += ' calendar-day--weekend';
+  cell.className = cls;
+  cell.onclick = () => openDayModal(dateStr);
+
+  const evHtml = dayEvents.slice(0, 3).map(e =>
+    `<div class="calendar-event calendar-event--${e.type}" title="${escapeHtml(e.title)}">${e.icon} ${escapeHtml(e.title)}</div>`
+  ).join('');
+  const moreHtml = dayEvents.length > 3
+    ? `<div class="calendar-day__more">+${dayEvents.length - 3} więcej...</div>`
+    : '';
+
+  cell.innerHTML = `
+    <div class="calendar-day__num">${date.getDate()}</div>
+    <div class="calendar-day__events">${evHtml}${moreHtml}</div>
+  `;
+  return cell;
+}
+
+function openDayModal(dateStr) {
+  _calendarSelectedDate = dateStr;
+  const date = new Date(dateStr);
+  const dayNames = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
+  const monthNames = ['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+  const title = `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+  document.getElementById('dayModalTitle').textContent = title;
+  document.getElementById('dayModalSubtitle').textContent = dayNames[date.getDay()];
+
+  const allEvents = getAllCalendarEvents().filter(e => e.date === dateStr);
+  allEvents.sort((a, b) => (a.time || '') < (b.time || '') ? -1 : 1);
+
+  const body = document.getElementById('dayModalBody');
+  let html = '';
+  if (allEvents.length === 0) {
+    html += '<div style="text-align:center; padding:20px; color:var(--c-text-muted); font-size:13px;">Brak wydarzeń na ten dzień.</div>';
+  } else {
+    allEvents.forEach(e => {
+      const timeStr = e.time ? `🕐 ${e.time.substring(0,5)}` : '';
+      const clientLink = e.clientId
+        ? `<button style="background:transparent; border:none; color:var(--c-primary); font-size:11px; cursor:pointer; padding:0; text-decoration:underline;" onclick="closeDayModal(); openFunnelDetail('${e.clientId}')">👤 ${escapeHtml(e.clientName || '')}</button>`
+        : '';
+      const deleteBtn = e.type === 'custom' && e.customEventId
+        ? `<div class="day-event-item__actions"><button onclick="handleDeleteCustomEvent('${e.customEventId}')" title="Usuń">🗑</button></div>`
+        : '';
+      html += `
+        <div class="day-event-item day-event-item--${e.type}">
+          <span class="day-event-item__icon">${e.icon}</span>
+          <div class="day-event-item__content">
+            <div class="day-event-item__title">${escapeHtml(e.title)}</div>
+            <div class="day-event-item__meta">
+              ${e.description ? escapeHtml(e.description) + '<br>' : ''}
+              ${timeStr}${timeStr && clientLink ? ' · ' : ''}${clientLink}
+              ${e.createdBy ? ' · dodał: ' + escapeHtml(e.createdBy) : ''}
+            </div>
+          </div>
+          ${deleteBtn}
+        </div>
+      `;
+    });
+  }
+
+  // Formularz dodania własnego wydarzenia
+  html += `
+    <div class="day-add-event">
+      <div class="day-add-event__title">➕ Dodaj wydarzenie na ten dzień</div>
+      <div class="day-add-event__grid">
+        <div class="day-add-event__field full">
+          <label>Tytuł *</label>
+          <input id="newEventTitle" type="text" placeholder="np. Spotkanie z klientem, przegląd, wizja lokalna...">
+        </div>
+        <div class="day-add-event__field">
+          <label>Godzina (opcjonalnie)</label>
+          <input id="newEventTime" type="time">
+        </div>
+        <div class="day-add-event__field">
+          <label>Kolor</label>
+          <select id="newEventColor">
+            <option value="#A855F7">🟣 Fioletowy (własne)</option>
+            <option value="#10B981">🟢 Zielony (montaż)</option>
+            <option value="#F59E0B">🟡 Żółty (serwis)</option>
+            <option value="#3B82F6">🔵 Niebieski (spotkanie)</option>
+            <option value="#EF4444">🔴 Czerwony (pilne)</option>
+          </select>
+        </div>
+        <div class="day-add-event__field full">
+          <label>Opis (opcjonalnie)</label>
+          <textarea id="newEventDesc" rows="2" placeholder="Szczegóły wydarzenia..."></textarea>
+        </div>
+        <div class="day-add-event__field full" style="flex-direction:row; justify-content:flex-end; gap:8px;">
+          <button class="btn btn--primary btn--small" onclick="handleAddCustomEvent()">💾 Dodaj wydarzenie</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  body.innerHTML = html;
+  document.getElementById('dayModal').classList.add('modal-backdrop--open');
+}
+
+function closeDayModal() {
+  document.getElementById('dayModal').classList.remove('modal-backdrop--open');
+  _calendarSelectedDate = null;
+}
+
+async function handleAddCustomEvent() {
+  const title = document.getElementById('newEventTitle').value.trim();
+  if (!title) { showToast('⚠ Wpisz tytuł wydarzenia'); return; }
+  const event = {
+    title: title,
+    description: document.getElementById('newEventDesc').value.trim() || null,
+    eventDate: _calendarSelectedDate,
+    eventTime: document.getElementById('newEventTime').value || null,
+    color: document.getElementById('newEventColor').value || '#A855F7',
+    createdBy: currentUser?.email ? currentUser.email.split('@')[0] : null
+  };
+  const ok = await saveCustomCalendarEvent(event);
+  if (ok) {
+    showToast('✓ Wydarzenie dodane');
+    renderCalendar();
+    openDayModal(_calendarSelectedDate); // przeładuj widok dnia
+  }
+}
+
+async function handleDeleteCustomEvent(eventId) {
+  if (!confirm('Usunąć to wydarzenie?')) return;
+  await deleteCustomCalendarEvent(eventId);
+  renderCalendar();
+  if (_calendarSelectedDate) openDayModal(_calendarSelectedDate);
+  else showToast('✓ Usunięto');
+}
+
+
+function openSaleModalFromDetail() {
+  if (!_detailClientId) return;
+  const cid = _detailClientId;
+  closeFunnelDetail();
+  setTimeout(() => openSaleModal(cid), 150);
+}
+
+/* ---- Modal szczegółów klienta w lejku ---- */
+function openFunnelDetail(clientId) {
+  const client = clientsDb.find(c => c.id === clientId);
+  if (!client) return;
+  _detailClientId = clientId;
+  document.getElementById('funnelDetailTitle').textContent = client.name || '(brak nazwy)';
+  document.getElementById('funnelDetailSubtitle').textContent =
+    [client.phone, client.email, client.address].filter(Boolean).join(' · ');
+
+  // Etap dropdown
+  const stageSel = document.getElementById('funnelDetailStage');
+  stageSel.innerHTML = FUNNEL_STAGES.map(s =>
+    `<option value="${s.id}" ${(client.stage||1)===s.id ? 'selected' : ''}>${s.id}. ${s.name}</option>`
+  ).join('');
+
+  document.getElementById('funnelDetailValue').value = client.funnelValue || '';
+  document.getElementById('funnelDetailHandler').value = getClientHandler(client);
+  document.getElementById('funnelDetailNote').value = client.funnelNote || '';
+  document.getElementById('funnelDetailContactDate').value = client.firstContactDate || '';
+  document.getElementById('funnelDetailContactMethod').value = client.firstContactMethod || '';
+  document.getElementById('funnelDetailFollowUpDate').value = client.followUpDate || '';
+  document.getElementById('funnelDetailFollowUpNote').value = client.followUpNote || '';
+
+  // Historia przejść
+  const histWrap = document.getElementById('funnelDetailHistory');
+  if (client.stageHistory && client.stageHistory.length > 0) {
+    const last5 = client.stageHistory.slice(-5).reverse();
+    let html = '<strong style="color:var(--c-text);">📜 Historia (ostatnie 5):</strong><br>';
+    last5.forEach(h => {
+      const fromName = FUNNEL_STAGES.find(s => s.id === h.from)?.name || h.from;
+      const toName = FUNNEL_STAGES.find(s => s.id === h.to)?.name || h.to;
+      const when = new Date(h.at).toLocaleDateString('pl-PL', { day:'2-digit', month:'2-digit', year:'numeric' });
+      html += `<div style="padding:2px 0;">• ${when}: <em>${fromName}</em> → <strong>${toName}</strong>${h.by ? ' (' + escapeHtml(h.by.split('@')[0]) + ')' : ''}</div>`;
+    });
+    histWrap.innerHTML = html;
+  } else {
+    histWrap.innerHTML = '<em>Brak historii przejść.</em>';
+  }
+
+  // Przycisk "Panel sprzedaży" widoczny tylko gdy klient jest w etapie 8 (Zakwalifikowany)
+  const saleBtn = document.getElementById('funnelDetailSaleBtn');
+  if (saleBtn) {
+    const cStage = client.stage || 1;
+    if (cStage === 8 || (client.purchases && client.purchases.length > 0)) {
+      const cnt = (client.purchases || []).length;
+      saleBtn.style.display = 'inline-flex';
+      saleBtn.innerHTML = cnt > 0 ? `🔧 Panel sprzedaży (${cnt})` : '🔧 Panel sprzedaży';
+    } else {
+      saleBtn.style.display = 'none';
+    }
+  }
+
+  document.getElementById('funnelDetailModal').classList.add('modal-backdrop--open');
+}
+
+function closeFunnelDetail() {
+  document.getElementById('funnelDetailModal').classList.remove('modal-backdrop--open');
+  _detailClientId = null;
+}
+
+async function saveFunnelDetail() {
+  if (!_detailClientId) return;
+  const client = clientsDb.find(c => c.id === _detailClientId);
+  if (!client) return;
+  const newStage = parseInt(document.getElementById('funnelDetailStage').value) || 1;
+  const oldStage = client.stage || 1;
+  const rawVal = document.getElementById('funnelDetailValue').value.trim();
+  client.funnelValue = rawVal ? parseFloat(rawVal.replace(',','.')) : null;
+  client.handlerName = document.getElementById('funnelDetailHandler').value.trim() || null;
+  client.funnelNote = document.getElementById('funnelDetailNote').value.trim() || null;
+  client.firstContactDate = document.getElementById('funnelDetailContactDate').value || null;
+  client.firstContactMethod = document.getElementById('funnelDetailContactMethod').value || null;
+  client.followUpDate = document.getElementById('funnelDetailFollowUpDate').value || null;
+  client.followUpNote = document.getElementById('funnelDetailFollowUpNote').value.trim() || null;
+  client.updatedAt = new Date().toISOString();
+
+  // Jeśli etap się zmienił, dopisz do historii
+  if (newStage !== oldStage) {
+    await moveClientToStage(client, newStage);
+  } else {
+    try {
+      await saveClientToSupabase(client);
+      await saveClientsDb();
+      refreshFunnelUsersFilter();
+      renderFunnel();
+      showToast('✓ Zapisano zmiany');
+    } catch(e) {
+      console.warn(e);
+      showToast('⚠ Błąd zapisu');
+    }
+  }
+  closeFunnelDetail();
+}
+
 function openClientsModal() {
   document.getElementById('clientsSearch').value = '';
   renderClientsList();
   document.getElementById('clientsModal').classList.add('modal-backdrop--open');
 }
+
 
 /* ---- Karta klienta z historią ofert ---- */
 function closeClientCard() {
@@ -5202,147 +6816,312 @@ function generatePdf() {
     paddingTop:()=>5, paddingBottom:()=>5, paddingLeft:()=>6, paddingRight:()=>6
   };
 
-  /* ---- Jeden wariant klimy (unbreakable) ---- */
+  /* ---- Jeden wariant klimy (styl Projekt A: L.p./Marka/Nazwa/Kolor/Ilość/Link) ---- */
+  /* ---- Jeden wariant klimy (styl Projekt A: L.p./Marka/Nazwa/Kolor/Ilość/Link + opcj. Cena) ---- */
   function buildAcVariant(v, vIdx) {
     const variantNet = variantNetTotal(v);
     const variantBr  = variantBrTotal(v);
-    const stack = [];
+    const hasSplit   = !!v.splitPrice;
 
-    // Nagłówek wariantu
-    stack.push({
-      table:{ widths:['*'], body:[[
-        {text: v.name || `Wariant ${vIdx+1}`, style:'variantHeader',
-         fillColor:'#1B4F8C', color:'white', margin:[10,7,10,7], border:[false,false,false,false]}
-      ]]},
-      margin:[0, vIdx>0 ? 14 : 0, 0, 0]
-    });
+    // Nagłówek wariantu — lekki niebieski tekst (nie granatowy pasek)
+    const headerBlock = {
+      text: v.name || `Konfiguracja ${vIdx + 1}`,
+      fontSize: 14, bold: true, color: '#1B4F8C', characterSpacing: 0.3,
+      margin: [0, 0, 0, 10]
+    };
 
+    // Wariant install — bez tabeli produktów
     if (v.type === 'install') {
-      stack.push({
-        table:{ widths:['*'], body:[[
-          {stack:[
-            {text:'ZAKRES PRAC', style:'sectionLabel', margin:[0,0,0,4]},
-            {text: v.description || '(brak opisu)', style:'noteText'},
-          ], fillColor:'#F8FBFD', border:[false,false,false,false], margin:[10,8,10,10]}
-        ]]}
-      });
-      stack.push({
-        table:{ widths:['*',145], body:[[
-          {text:[
-            {text:'CENA ZA WYKONANIE PRAC\n', style:'priceLabel'},
-            {text:'(VAT '+state.vatRate+'% · netto: '+fmtPLN(variantNet)+')', style:'priceLabelSmall'},
-          ], fillColor:'#F0F6FB', border:[false,false,false,false], margin:[10,8,10,8]},
-          {text: fmtPLN(variantBr), style:'priceValue', fillColor:'#F0F6FB',
-           border:[false,false,false,false], margin:[10,8,10,8], alignment:'right'},
-        ]]}
-      });
-    } else {
-      // Tabela urządzeń — NAJPIERW (nagłówek wariantu + tabela + cena są razem na górze)
-      const tBody = [[
-        {text:'MARKA',              style:'thBlue'},
-        {text:'NAZWA TOWARU / USŁUGI', style:'thBlue'},
-        {text:'LINK',  style:'thBlue', alignment:'center'},
-        {text:'ILOŚĆ', style:'thBlue', alignment:'center'},
-      ]];
-      if (v.type === 'split') {
-        v.units.forEach(u => {
-          const p = getProductFromPool('split', u.productIdx) || DB.split[u.productIdx] || {marka:'',model:'',cena:0,link:''};
-          if (u.label && u.label.trim()) {
-            tBody.push([{text:`— ${u.label.trim()} —`,style:'cellBrand',colSpan:4,fillColor:'#e0f2fe',color:'#0369a1',margin:[4,3,4,3]},{},{},{}]);
-          }
-          // Kolumna LINK/ZDJĘCIE: miniatury zdjęć lub link
-          const unitImgs = u.images || (u.imageBase64 ? [u.imageBase64] : []);
-          const imgCell = unitImgs.length > 0
-            ? { stack: unitImgs.slice(0,2).map(img => ({image:img,fit:[40,40],margin:[0,1,0,1]})), alignment:'center' }
-            : (p.link ? {text:'Zobacz',link:p.link,style:'cellLink',alignment:'center'} : {text:'—',alignment:'center',style:'cellMuted'});
-          tBody.push([
-            {text: p.marka, style:'cellBrand'},
-            {text: p.model + (u.includeInstall ? '' : '\n(bez montażu)'), style:'cellModel'},
-            imgCell,
-            {text: String(u.qty), alignment:'center', style:'cellNum'},
-          ]);
-        });
-      } else {
-        const out = getProductFromPool('multi_zew', v.outdoor.productIdx) || DB.multi_zew[v.outdoor.productIdx] || {marka:'',model:'',cena:0,link:''};
-        const outImgs = (v.outdoor && v.outdoor.images) || [];
-        const outImgCell = outImgs.length > 0
-          ? { stack: outImgs.slice(0,1).map(img => ({image:img,fit:[40,40],margin:[0,1,0,1]})), alignment:'center' }
-          : (out.link ? {text:'Zobacz',link:out.link,style:'cellLink',alignment:'center'} : {text:'—',alignment:'center',style:'cellMuted'});
-        tBody.push([
-          {text: out.marka, style:'cellBrand'},
-          {text: out.model + '\n(agregat zewn.)', style:'cellModel'},
-          outImgCell,
-          {text:'1', alignment:'center', style:'cellNum'},
-        ]);
-        v.indoor.forEach(u => {
-          const p = getProductFromPool('multi_wew', u.productIdx) || DB.multi_wew[u.productIdx] || {marka:'',model:'',cena:0,link:''};
-          const indImgs = u.images || (u.imageBase64 ? [u.imageBase64] : []);
-          const indImgCell = indImgs.length > 0
-            ? { stack: indImgs.slice(0,1).map(img => ({image:img,fit:[40,40],margin:[0,1,0,1]})), alignment:'center' }
-            : (p.link ? {text:'Zobacz',link:p.link,style:'cellLink',alignment:'center'} : {text:'—',alignment:'center',style:'cellMuted'});
-          tBody.push([
-            {text: p.marka, style:'cellBrand'},
-            {text: p.model, style:'cellModel'},
-            indImgCell,
-            {text: String(u.qty), alignment:'center', style:'cellNum'},
-          ]);
-        });
-      }
-      // Systemy multisplit w wariancie mixed
-      if (v.multiSystems && v.multiSystems.length > 0) {
-        v.multiSystems.forEach((ms, msIdx) => {
-          tBody.push([{text:`— ${ms.name||`System Multisplit ${msIdx+1}`} —`,style:'cellBrand',colSpan:4,fillColor:'#e0f2fe',color:'#0369a1',margin:[4,3,4,3]},{},{},{}]);
-          const out = getProductFromPool('multi_zew', ms.outdoor.productIdx) || {marka:'',model:'',cena:0,link:''};
-          tBody.push([{text:out.marka+' (ZEW)',style:'cellBrand'},{text:out.model+'\n(agregat zewn.)',style:'cellModel'},out.link?{text:'Zobacz',link:out.link,style:'cellLink',alignment:'center'}:{text:'—',alignment:'center',style:'cellMuted'},{text:'1',alignment:'center',style:'cellNum'}]);
-          ms.indoor.forEach(u => {
-            const p2 = getProductFromPool('multi_wew', u.productIdx) || {marka:'',model:'',cena:0,link:''};
-            tBody.push([{text:p2.marka+' (WEW)',style:'cellBrand'},{text:p2.model,style:'cellModel'},p2.link?{text:'Zobacz',link:p2.link,style:'cellLink',alignment:'center'}:{text:'—',alignment:'center',style:'cellMuted'},{text:String(u.qty),alignment:'center',style:'cellNum'}]);
-          });
-        });
-      }
-      stack.push({ table:{ headerRows:1, widths:[65,'*',50,38], body:tBody }, layout:blueLayout });
-
-      // Blok ceny (z opcjonalnym podziałem)
-      const extrasNet = state.extras.reduce((s,e) => s+getExtraTotalNet(e), 0);
-      const totalWithExtrasNet = variantNet + extrasNet;
-      const hasExtras = extrasNet > 0;
-      const priceLineText = hasExtras
-        ? 'CENA ZESTAWU Z MONTAŻEM I PRACAMI DODATKOWYMI\n'
-        : (state.offerType === 'final' || state.offerType === 'variant_final' ? 'CENA ZESTAWU Z MONTAŻEM KOŃCOWYM\n' : 'CENA ZESTAWU Z MONTAŻEM PODSTAWOWYM\n');
-
-      // Oblicz podział urządzenie/montaż dla split units
-      let netDevice = 0, netInstall = 0;
-      if (v.type === 'split') {
-        v.units.forEach(u => {
-          const p = getProductFromPool('split', u.productIdx) || DB.split[u.productIdx] || {cena:0};
-          const ep = (u.priceOverride != null) ? u.priceOverride : p.cena;
-          netDevice  += ep * u.qty;
-          netInstall += (u.includeInstall ? u.installPrice : 0) * u.qty;
-        });
-      } else if (v.type === 'multi') {
-        const out = getProductFromPool('multi_zew', v.outdoor.productIdx) || {cena:0};
-        netDevice += (v.outdoorPriceOverride != null) ? v.outdoorPriceOverride : out.cena;
-        v.indoor.forEach(u => {
-          const p = getProductFromPool('multi_wew', u.productIdx) || {cena:0};
-          netDevice += ((u.priceOverride != null) ? u.priceOverride : p.cena) * u.qty;
-        });
-        netInstall = v.includeInstall ? v.installPrice : 0;
-      }
-      netDevice += extrasNet; // prace dodatkowe do ceny urządzenia
-
-      // Karta produktu (zdjęcia + spec) — pod tabelą, przed ceną
-      const acImages = v.images || (v.imageBase64 ? [v.imageBase64] : []);
-      const productCard = buildProductCard(acImages, v.description || '');
-      if (productCard) stack.push(productCard);
-
-      // Cena — zawsze na samym dole
-      stack.push(buildPriceBlock(priceLineText, totalWithExtrasNet, state.vatRate,
-        v.splitPrice, netDevice, netInstall));
+      return {
+        margin: [0, vIdx > 0 ? 18 : 0, 0, 0],
+        stack: [{
+          unbreakable: true,
+          stack: [
+            headerBlock,
+            {
+              table: { widths: ['*'], body: [[
+                { stack: [
+                    { text: 'ZAKRES PRAC', style: 'sectionLabel', margin: [0, 0, 0, 4] },
+                    { text: v.description || '(brak opisu)', style: 'noteText' }
+                  ],
+                  fillColor: '#F8FBFD', border: [false, false, false, false], margin: [10, 8, 10, 10]
+                }
+              ]] }
+            },
+            buildPriceLineBlock(variantNet, variantBr, v.name)
+          ]
+        }]
+      };
     }
 
-    // Każdy wariant to niepodzielny blok
-    return { unbreakable: true, stack };
+    // Nagłówki tabeli
+    const th = (t, align) => ({
+      text: t, fontSize: 8.5, bold: true, color: '#1B4F8C', fillColor: '#DCE9F5',
+      border: [false, false, false, false], margin: [6, 6, 6, 6], alignment: align || 'left'
+    });
+    const headerRow = hasSplit
+      ? [ th('L.p.'), th('Marka'), th('Nazwa produktu'), th('Kolor'),
+          th('Liczba szt.', 'center'), th('Link', 'center'), th('Cena brutto', 'right') ]
+      : [ th('L.p.'), th('Marka'), th('Nazwa produktu'), th('Kolor'),
+          th('Liczba szt.', 'center'), th('Link', 'center') ];
+
+    // Helpery wierszy z opcjonalną komórką ceny na końcu
+    const prow = (lp, marka, nazwa, color, qty, link, priceBr) => {
+      const base = [
+        { text: lp + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
+        { text: marka || '—', fontSize: 9.5, bold: true, color: '#1B4F8C', margin: [6, 5, 6, 5] },
+        { text: nazwa || '(brak nazwy)', fontSize: 10, color: '#1A2332', margin: [6, 5, 6, 5] },
+        { text: color || 'Biały', fontSize: 9.5, color: '#1A2332', margin: [6, 5, 6, 5] },
+        { text: String(qty), fontSize: 10, color: '#1A2332', alignment: 'center', margin: [6, 5, 6, 5] },
+        link
+          ? { text: 'Link', link: link, fontSize: 10, color: '#1B4F8C', decoration: 'underline', alignment: 'center', margin: [6, 5, 6, 5] }
+          : { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
+      ];
+      if (hasSplit) {
+        base.push({
+          text: priceBr != null ? fmtPLN(priceBr) : '—',
+          fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5]
+        });
+      }
+      return base;
+    };
+    const srow = (lp, qty, priceBr) => {
+      const base = [
+        { text: lp + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
+        { text: '—', fontSize: 10, color: '#94A3B8', margin: [6, 5, 6, 5] },
+        { text: 'Montaż i uruchomienie', fontSize: 10, color: '#1A2332', margin: [6, 5, 6, 5] },
+        { text: '—', fontSize: 10, color: '#94A3B8', margin: [6, 5, 6, 5] },
+        { text: String(qty), fontSize: 10, color: '#1A2332', alignment: 'center', margin: [6, 5, 6, 5] },
+        { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
+      ];
+      if (hasSplit) {
+        base.push({
+          text: priceBr != null ? fmtPLN(priceBr) : '—',
+          fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5]
+        });
+      }
+      return base;
+    };
+    const plabel = (txt) => {
+      const cs = hasSplit ? 7 : 6;
+      const cells = [{ text: txt, fontSize: 8.5, color: '#1B4F8C', bold: true, colSpan: cs, fillColor: '#DCE9F5', margin: [6, 4, 6, 4] }];
+      for (let i = 1; i < cs; i++) cells.push({});
+      return cells;
+    };
+
+    const COLS = hasSplit
+      ? [24, 78, '*', 46, 56, 34, 68]   // 306 stała → nazwa ~209
+      : [26, 90, '*', 48, 60, 38];       // 262 stała → nazwa ~253
+
+    const vatMultLocal = 1 + (state.vatRate || 8) / 100;
+
+    // Kolor wykrywany z nazwy modelu (fallback: "Biały")
+    const detectColor = (m) => {
+      if (!m) return 'Biały';
+      const mu = m.toUpperCase();
+      if (mu.includes('BIAŁY BŁYSZCZĄCY')) return 'Biały błyszczący';
+      if (mu.includes('BIAŁY POŁYSK')) return 'Biały połysk';
+      if (mu.includes('BIAŁY MAT')) return 'Biały mat';
+      if (mu.includes('CZARNY POŁYSK')) return 'Czarny połysk';
+      if (mu.includes('CZARNY MAT')) return 'Czarny mat';
+      if (mu.includes('NAVY BLUE')) return 'Navy blue';
+      if (mu.includes('CZARN')) return 'Czarny';
+      if (mu.includes('SREBRN')) return 'Srebrny';
+      if (mu.includes('GRAFIT')) return 'Grafit';
+      if (mu.includes('ZŁOTY')) return 'Złoty';
+      if (mu.includes('PERŁOWY')) return 'Perłowy';
+      if (mu.includes('CZERWONY')) return 'Czerwony';
+      if (mu.includes('BEŻOWY')) return 'Beżowy';
+      if (mu.includes('DREWNO')) return 'Drewno';
+      if (mu.includes('BIAŁ')) return 'Biały';
+      return 'Biały';
+    };
+
+    // Wyczyszczenie nazwy produktu: usuwa kolor (jest w osobnej kolumnie),
+    // zamienia prefiksy typu "SPLIT", "j.wew", "J.WEW" na "Klimatyzator".
+    // Dla multi_zew pomijamy przy wywołaniu — zewnętrzna zachowuje swój format.
+    const cleanProductName = (rawModel, opts) => {
+      opts = opts || {};
+      if (!rawModel) return '';
+      let m = String(rawModel);
+      // Kolory (długie warianty najpierw!)
+      const colorPatterns = [
+        'BIAŁY BŁYSZCZĄCY', 'BIAŁY POŁYSK', 'BIAŁY MAT',
+        'CZARNY POŁYSK', 'CZARNY MAT',
+        'NAVY BLUE',
+        'BIAŁY', 'CZARNY', 'SREBRNY', 'GRAFIT',
+        'ZŁOTY', 'PERŁOWY', 'CZERWONY', 'BEŻOWY', 'DREWNO'
+      ];
+      colorPatterns.forEach(c => {
+        const re = new RegExp('\\s+' + c.replace(/\s+/g, '\\s+'), 'gi');
+        m = m.replace(re, '');
+      });
+      // Sprzątanie białych znaków i myślników
+      m = m.replace(/\s+/g, ' ').trim();
+      m = m.replace(/\s*-\s*/g, ' - ');
+      m = m.replace(/\s+-\s+(kW)/gi, ' $1');
+
+      // Zamiana prefiksów na "Klimatyzator" (dla split i multi_wew)
+      if (opts.type !== 'multi_zew') {
+        m = m.replace(/^SPLIT\s+/i, 'Klimatyzator ');
+        m = m.replace(/^J\.?WEW\.?\s+/i, 'Klimatyzator ');
+        m = m.replace(/^Jednostka\s+wewnętrzna\s+/i, 'Klimatyzator ');
+        // Jeśli nie ma prefiksu "Klimatyzator" ani żadnego innego rozpoznanego, dodaj
+        if (!/^Klimatyzator/i.test(m)) {
+          m = 'Klimatyzator ' + m;
+        }
+      }
+      return m;
+    };
+
+    const tBody = [ headerRow ];
+    let lp = 1;
+
+    if (v.type === 'split') {
+      v.units.forEach(u => {
+        const p = getProductFromPool('split', u.productIdx) || DB.split[u.productIdx] || { marka: '', model: '', cena: 0, link: '' };
+        if (u.label && u.label.trim()) tBody.push(plabel(u.label.trim()));
+        const priceUnit = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
+        const priceBrUnit = roundUp(priceUnit * vatMultLocal);
+        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? priceBrUnit : null));
+        if (u.includeInstall) {
+          const priceInst = (u.installPrice || 0) * (u.qty || 1);
+          const priceBrInst = roundUp(priceInst * vatMultLocal);
+          tBody.push(srow(lp++, u.qty, hasSplit ? priceBrInst : null));
+        }
+      });
+    } else if (v.type === 'multi') {
+      const out = getProductFromPool('multi_zew', v.outdoor.productIdx) || DB.multi_zew[v.outdoor.productIdx] || { marka: '', model: '', cena: 0, link: '' };
+      const outNet = (v.outdoorPriceOverride != null ? v.outdoorPriceOverride : out.cena);
+      const outBr = roundUp(outNet * vatMultLocal);
+      const outRow = [
+        { text: (lp++) + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
+        { text: out.marka || '—', fontSize: 9.5, bold: true, color: '#1B4F8C', margin: [6, 5, 6, 5] },
+        { text: out.model || '(brak nazwy)', fontSize: 10, color: '#1A2332', margin: [6, 5, 6, 5] },
+        { text: '—', fontSize: 9.5, color: '#94A3B8', margin: [6, 5, 6, 5] },
+        { text: '1', fontSize: 10, color: '#1A2332', alignment: 'center', margin: [6, 5, 6, 5] },
+        out.link
+          ? { text: 'Link', link: out.link, fontSize: 10, color: '#1B4F8C', decoration: 'underline', alignment: 'center', margin: [6, 5, 6, 5] }
+          : { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
+      ];
+      if (hasSplit) outRow.push({ text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
+      tBody.push(outRow);
+
+      v.indoor.forEach(u => {
+        const p = getProductFromPool('multi_wew', u.productIdx) || DB.multi_wew[u.productIdx] || { marka: '', model: '', cena: 0, link: '' };
+        const inNet = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
+        const inBr  = roundUp(inNet * vatMultLocal);
+        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? inBr : null));
+      });
+      if (v.includeInstall !== false) {
+        const instNet = v.installPrice || 0;
+        const instBr = roundUp(instNet * vatMultLocal);
+        tBody.push(srow(lp++, 1, hasSplit ? instBr : null));
+      }
+    } else {
+      // mixed: units (split) + multiSystems
+      v.units && v.units.forEach(u => {
+        const p = getProductFromPool('split', u.productIdx) || { marka: '', model: '', cena: 0, link: '' };
+        const priceUnit = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
+        const priceBrUnit = roundUp(priceUnit * vatMultLocal);
+        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? priceBrUnit : null));
+        if (u.includeInstall) {
+          const priceInst = (u.installPrice || 0) * (u.qty || 1);
+          const priceBrInst = roundUp(priceInst * vatMultLocal);
+          tBody.push(srow(lp++, u.qty, hasSplit ? priceBrInst : null));
+        }
+      });
+      v.multiSystems && v.multiSystems.forEach((ms, msIdx) => {
+        tBody.push(plabel(ms.name || `System Multisplit ${msIdx + 1}`));
+        const out = getProductFromPool('multi_zew', ms.outdoor.productIdx) || { marka: '', model: '', cena: 0, link: '' };
+        const outNet = (ms.outdoorPriceOverride != null ? ms.outdoorPriceOverride : out.cena);
+        const outBr = roundUp(outNet * vatMultLocal);
+        const outRow = [
+          { text: (lp++) + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
+          { text: out.marka || '—', fontSize: 9.5, bold: true, color: '#1B4F8C', margin: [6, 5, 6, 5] },
+          { text: out.model || '(brak nazwy)', fontSize: 10, color: '#1A2332', margin: [6, 5, 6, 5] },
+          { text: '—', fontSize: 9.5, color: '#94A3B8', margin: [6, 5, 6, 5] },
+          { text: '1', fontSize: 10, color: '#1A2332', alignment: 'center', margin: [6, 5, 6, 5] },
+          out.link
+            ? { text: 'Link', link: out.link, fontSize: 10, color: '#1B4F8C', decoration: 'underline', alignment: 'center', margin: [6, 5, 6, 5] }
+            : { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
+        ];
+        if (hasSplit) outRow.push({ text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
+        tBody.push(outRow);
+
+        ms.indoor.forEach(u => {
+          const p = getProductFromPool('multi_wew', u.productIdx) || { marka: '', model: '', cena: 0, link: '' };
+          const inNet = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
+          const inBr  = roundUp(inNet * vatMultLocal);
+          tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? inBr : null));
+        });
+        if (v.includeInstall !== false) {
+          const instNet = ms.installPrice || 0;
+          const instBr = roundUp(instNet * vatMultLocal);
+          tBody.push(srow(lp++, 1, hasSplit ? instBr : null));
+        }
+      });
+    }
+
+    // Prace dodatkowe AC — jako kolejne wiersze
+    if (v.extras && v.extras.length > 0) {
+      v.extras.forEach(e => {
+        const eRow = [
+          { text: (lp++) + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
+          { text: '—', fontSize: 10, color: '#94A3B8', margin: [6, 5, 6, 5] },
+          { text: e.name || 'Praca dodatkowa', fontSize: 10, color: '#1A2332', margin: [6, 5, 6, 5] },
+          { text: '—', fontSize: 10, color: '#94A3B8', margin: [6, 5, 6, 5] },
+          { text: String(e.qty || 1), fontSize: 10, color: '#1A2332', alignment: 'center', margin: [6, 5, 6, 5] },
+          { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
+        ];
+        if (hasSplit) {
+          const extraTotalNet = getExtraTotalNet(e);
+          const extraTotalBr = roundUp(extraTotalNet * vatMultLocal);
+          eRow.push({ text: fmtPLN(extraTotalBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
+        }
+        tBody.push(eRow);
+      });
+    }
+
+    const tableBlock = { table: { headerRows: 1, widths: COLS, body: tBody }, layout: acLayout };
+    const priceBlock = buildPriceLineBlock(variantNet, variantBr, v.name);
+
+    return {
+      margin: [0, vIdx > 0 ? 18 : 0, 0, 0],
+      stack: [{ unbreakable: true, stack: [headerBlock, tableBlock, priceBlock] }]
+    };
   }
+  /* ---- Blok ceny „Koszt urządzeń wraz z materiałami i montażem" ---- */
+  function buildPriceLineBlock(netVal, brVal, variantName) {
+    const nm = (variantName || '').trim();
+    return {
+      unbreakable: true,
+      margin: [0, 12, 0, 0],
+      stack: [
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#C7D8E8' }] },
+        { text: 'Koszt urządzeń wraz z materiałami i montażem' + (nm ? ' „' + nm + '"' : ''),
+          fontSize: 10, bold: true, color: '#1B4F8C', margin: [0, 8, 0, 0] },
+        { text: [
+            { text: fmtPLN(netVal) + ' netto', fontSize: 11, color: '#1A2332' },
+            { text: '  +  ' + state.vatRate + '% VAT  =  ', fontSize: 9, color: '#64748B' },
+            { text: fmtPLN(brVal) + ' brutto', fontSize: 13, bold: true, color: '#0F3461' }
+          ], margin: [0, 3, 0, 0] }
+      ]
+    };
+  }
+
+  /* ---- Layout tabeli AC (poziome linie, jasny nagłówek, zebra) ---- */
+  const acLayout = {
+    fillColor: (r) => r === 0 ? null : (r % 2 === 0 ? '#EEF5FB' : null),
+    hLineColor: () => '#C7D8E8',
+    vLineColor: () => '#C7D8E8',
+    hLineWidth: () => 0.75,
+    vLineWidth: () => 0,
+    paddingTop: () => 0,
+    paddingBottom: () => 0,
+    paddingLeft: () => 0,
+    paddingRight: () => 0
+  };
 
   /* ---- Sekcja prac dodatkowych (unbreakable) ---- */
   function buildExtrasBlock(extras, vatMult, sectionTitle) {
@@ -5518,6 +7297,24 @@ function generatePdf() {
   // Nagłówek (wspólny start)
   buildHeader().forEach(b => content.push(b));
 
+  // Wstęp powitalny — zawsze na początku oferty, dobierany do zakresu
+  const introSubject = includeCustom
+    ? 'przygotowaną specjalnie dla Państwa ofertę'
+    : (includeAc && includeHp
+        ? 'rozwiązania klimatyzacyjne oraz pompy ciepła dopasowane do Państwa potrzeb i specyfiki obiektu'
+        : (includeHp
+            ? 'rozwiązania w zakresie pomp ciepła dopasowane do Państwa potrzeb i specyfiki obiektu'
+            : 'rozwiązania klimatyzacyjne dopasowane do Państwa potrzeb i specyfiki obiektu'));
+  content.push({
+    margin: [0, 0, 0, 18],
+    stack: [
+      { text: 'Dzień dobry,', fontSize: 11, bold: true, color: '#0F3461', margin: [0, 0, 0, 5] },
+      { text: 'dziękujemy za zainteresowanie usługami firmy 4Climat. Poniżej przedstawiamy ' + introSubject +
+              '. Każdy z zaproponowanych zestawów obejmuje urządzenia renomowanych producentów wraz z profesjonalnym montażem i uruchomieniem przez nasz zespół. W razie pytań lub chęci omówienia szczegółów pozostajemy do Państwa dyspozycji.',
+        fontSize: 10, color: '#1A2332', lineHeight: 1.45, alignment: 'justify' }
+    ]
+  });
+
   // Uwagi - unbreakable, przed OWS (wstawiane przed buildOwsBlock w każdej sekcji)
   // Załączniki do pobrania (mode=link) — jako data URI w PDF
   const noteBlock = customNote ? {
@@ -5581,7 +7378,10 @@ function generatePdf() {
     if (includeHp) {
       content.push({text:'OFERTA KLIMATYZACJA', style:'sectionHeader', color:'#1B4F8C', fontSize:13, margin:[0,0,0,12]});
     }
-    state.variants.forEach((v, vIdx) => {
+    // Sortowanie po cenie brutto MALEJĄCO — od najdroższej opcji do najtańszej
+    // Kopia array, nie modyfikujemy oryginalnego state.variants
+    const sortedVariants = [...state.variants].sort((a, b) => variantBrTotal(b) - variantBrTotal(a));
+    sortedVariants.forEach((v, vIdx) => {
       content.push(buildAcVariant(v, vIdx));
     });
     const extrasBlock = buildExtrasBlock(state.extras, vatMult, includeHp ? 'PRACE DODATKOWE (KLIMATYZACJA)' : 'PRACE DODATKOWE');
@@ -5766,14 +7566,7 @@ function generatePdf() {
         {canvas:[{type:'line',x1:0,y1:0,x2:160,y2:0,lineWidth:0.5,lineColor:'#1B4F8C'}]},
         {text:'Pieczęć i podpis', style:'signLabel', margin:[0,3,0,0]},
       ]},
-      {width:20, text:''},
-      { width:'*', stack:[
-        {text:'AKCEPTACJA KLIENTA', style:'sectionLabel'},
-        {text:clientName, style:'partyName', margin:[0,4,0,0]},
-        {text:'', margin:[0,42,0,0]},
-        {canvas:[{type:'line',x1:0,y1:0,x2:160,y2:0,lineWidth:0.5,lineColor:'#1B4F8C'}]},
-        {text:'Data i podpis', style:'signLabel', margin:[0,3,0,0]},
-      ]}
+      {width:'*', text:''}
     ]
   };
   const paymentContentBlock = {
@@ -5829,63 +7622,55 @@ function generatePdf() {
     paymentContentBlock,
   ]});
 
-  // QR realizacji + Facebook — obok siebie po podpisach
-  content.push({
-    unbreakable: true,
-    margin: [0, 18, 0, 0],
-    table: { widths: ['*'], body: [[{
+  // QR realizacji + Facebook + (opcjonalnie) finansowanie ratalne — jeden nierozdzielny blok
+  const showFinancing = state.showFinancing !== false; // domyślnie true; wyłączane przez checkbox
+  const qrRatyStack = [
+    // Kody QR (kompaktowe)
+    { table: { widths: ['*'], body: [[{
       stack: [{
         columns: [
           { width: '*', stack: [
-            { image: STATIC_QR_B64, width: 80, height: 80, alignment: 'center' },
-            { text: 'Nasze realizacje', fontSize: 9, bold: true, color: '#1B4F8C', alignment: 'center', margin: [0, 5, 0, 0] },
-            { text: '4climat.pl/realizacja', fontSize: 8, color: '#64748B', alignment: 'center', margin: [0, 2, 0, 0] }
+            { image: STATIC_QR_B64, width: 58, height: 58, alignment: 'center' },
+            { text: 'Nasze realizacje', fontSize: 8, bold: true, color: '#1B4F8C', alignment: 'center', margin: [0, 4, 0, 0] },
+            { text: '4climat.pl/realizacja', fontSize: 7, color: '#64748B', alignment: 'center', margin: [0, 1, 0, 0] }
           ]},
-          { width: 1, canvas: [{type:'line', x1:0, y1:0, x2:0, y2:110, lineWidth:0.5, lineColor:'#D8E3EE'}], margin: [12, 0, 12, 0] },
+          { width: 1, canvas: [{type:'line', x1:0, y1:0, x2:0, y2:82, lineWidth:0.5, lineColor:'#D8E3EE'}], margin: [10, 0, 10, 0] },
           { width: '*', stack: [
-            { image: FB_QR_B64, width: 80, height: 80, alignment: 'center' },
-            { text: 'Obserwuj nas na Facebooku', fontSize: 9, bold: true, color: '#1877F2', alignment: 'center', margin: [0, 5, 0, 0] },
-            { text: 'facebook.com/4climat', fontSize: 8, color: '#64748B', alignment: 'center', margin: [0, 2, 0, 0] }
+            { image: FB_QR_B64, width: 58, height: 58, alignment: 'center' },
+            { text: 'Obserwuj nas na Facebooku', fontSize: 8, bold: true, color: '#1877F2', alignment: 'center', margin: [0, 4, 0, 0] },
+            { text: 'facebook.com/4climat', fontSize: 7, color: '#64748B', alignment: 'center', margin: [0, 1, 0, 0] }
           ]}
         ]
       }],
       fillColor: '#F8FBFD',
       border: [false, false, false, false],
-      margin: [30, 12, 30, 12]
-    }]]}
-  });
-  // Blok raty Santander - zawsze niepodzielny
-  content.push({
-    unbreakable: true,
-    margin: [0, 24, 0, 0],
-    table: {
-      widths: ['*'],
-      body: [[{
+      margin: [30, 10, 30, 10]
+    }]]} }
+  ];
+
+  if (showFinancing) {
+    qrRatyStack.push({
+      margin: [0, 8, 0, 0],
+      table: { widths: ['*'], body: [[{
+        stack: [
+          { text: 'Oferta dostępna w finansowaniu ratalnym', fontSize: 9, color: '#64748B', alignment: 'center', margin: [0, 8, 0, 4] },
+          { image: SANTANDER_B64, width: 150, alignment: 'center', margin: [0, 0, 0, 8] }
+        ],
         border: [true, true, true, true],
         fillColor: '#FFFFFF',
-        stack: [
-          {
-            text: 'Oferta dostępna w finansowaniu ratalnym',
-            fontSize: 9,
-            color: '#64748B',
-            alignment: 'center',
-            margin: [0, 10, 0, 6]
-          },
-          {
-            image: SANTANDER_B64,
-            width: 180,
-            alignment: 'center',
-            margin: [0, 0, 0, 10]
-          }
-        ]
-      }]]
-    },
-    layout: {
-      hLineWidth: () => 0.5,
-      vLineWidth: () => 0.5,
-      hLineColor: () => '#E2EAF2',
-      vLineColor: () => '#E2EAF2'
-    }
+        margin: [0, 0, 0, 0]
+      }]]},
+      layout: {
+        hLineWidth: () => 0.5, vLineWidth: () => 0.5,
+        hLineColor: () => '#E2EAF2', vLineColor: () => '#E2EAF2'
+      }
+    });
+  }
+
+  content.push({
+    unbreakable: true,
+    margin: [0, 14, 0, 0],
+    stack: qrRatyStack
   });
 
 
