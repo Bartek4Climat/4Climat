@@ -5831,16 +5831,10 @@ async function saveCustomCalendarEvent(event) {
       created_by_name: event.createdBy || (currentUser.email ? currentUser.email.split('@')[0] : null)
     };
     if (event.id && !event.id.startsWith('local_')) {
-      await sbFetch('/rest/v1/calendar_events?id=eq.' + encodeURIComponent(event.id), {
-        method: 'PATCH', body: JSON.stringify(payload)
-      });
+      await sbFetch('/rest/v1/calendar_events?id=eq.' + encodeURIComponent(event.id), 'PATCH', payload);
     } else {
       payload.user_id = currentUser.id;
-      const res = await sbFetch('/rest/v1/calendar_events', {
-        method: 'POST',
-        headers: { 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
+      const res = await sbFetch('/rest/v1/calendar_events', 'POST', payload);
       if (res && res[0]) event.id = res[0].id;
     }
     await loadCustomCalendarEvents();
@@ -5878,7 +5872,7 @@ async function deleteCustomCalendarEvent(eventId) {
     } catch(e) {}
   }
   try {
-    await sbFetch('/rest/v1/calendar_events?id=eq.' + encodeURIComponent(eventId), { method: 'DELETE' });
+    await sbFetch('/rest/v1/calendar_events?id=eq.' + encodeURIComponent(eventId), 'DELETE');
     _calendarCustomEvents = _calendarCustomEvents.filter(e => e.id !== eventId);
   } catch(e) {
     console.warn('Delete calendar event failed:', e);
@@ -6257,11 +6251,7 @@ async function saveTemplate(template) {
       created_by_name: template.createdBy,
       user_id: currentUser.id
     };
-    await sbFetch('/rest/v1/offer_templates', {
-      method: 'POST',
-      headers: { 'Prefer': 'return=minimal' },
-      body: JSON.stringify(payload)
-    });
+    await sbFetch('/rest/v1/offer_templates', 'POST', payload);
     return true;
   } catch(e) {
     console.warn('Save template Supabase failed, using localStorage:', e.message);
@@ -6341,7 +6331,7 @@ async function handleDeleteTemplate(templateId) {
     } catch(e) {}
   } else {
     try {
-      await sbFetch('/rest/v1/offer_templates?id=eq.' + encodeURIComponent(templateId), { method: 'DELETE' });
+      await sbFetch('/rest/v1/offer_templates?id=eq.' + encodeURIComponent(templateId), 'DELETE');
       _templatesCache = _templatesCache.filter(t => t.id !== templateId);
     } catch(e) {
       showToast('⚠ Nie udało się usunąć');
