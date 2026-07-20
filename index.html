@@ -1065,6 +1065,92 @@ body {
   padding: 6px 8px; font-size: 12px; border: 1px solid var(--c-border);
   border-radius: 4px; background: white;
 }
+
+/* ============ SZABLONY OFERT ============ */
+.templates-modal .modal { max-width: 900px; }
+.templates-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; background: #F8FBFD;
+  border-bottom: 1px solid var(--c-border);
+}
+.templates-toolbar input {
+  flex: 1; padding: 6px 10px; font-size: 12px;
+  border: 1px solid var(--c-border); border-radius: 6px;
+}
+.templates-list {
+  padding: 12px 16px 16px;
+  max-height: 65vh; overflow-y: auto;
+}
+.template-empty {
+  text-align: center; padding: 40px 20px; color: var(--c-text-muted);
+  font-size: 13px;
+}
+.template-card {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 14px; background: white;
+  border: 1px solid var(--c-border); border-radius: 8px;
+  margin-bottom: 10px; transition: all 0.15s;
+}
+.template-card:hover { border-color: var(--c-primary); box-shadow: 0 2px 6px rgba(27, 79, 140, 0.1); }
+.template-card__content { flex: 1; min-width: 0; }
+.template-card__title {
+  font-size: 14px; font-weight: 700; color: var(--c-primary);
+  margin-bottom: 4px;
+}
+.template-card__desc {
+  font-size: 12px; color: var(--c-text-muted);
+  margin-bottom: 6px; line-height: 1.4;
+}
+.template-card__stats {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  font-size: 10px;
+}
+.template-card__stats span {
+  background: #F0F6FB; padding: 2px 8px; border-radius: 10px;
+  color: var(--c-primary); font-weight: 600;
+}
+.template-card__meta {
+  font-size: 10px; color: var(--c-text-muted); margin-top: 6px;
+}
+.template-card__actions {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.template-card__actions button {
+  padding: 6px 12px; font-size: 11px; font-weight: 600;
+  border-radius: 6px; border: none; cursor: pointer;
+  white-space: nowrap;
+}
+.template-card__actions .btn-load {
+  background: var(--c-primary); color: white;
+}
+.template-card__actions .btn-load:hover { background: #0F3461; }
+.template-card__actions .btn-delete {
+  background: #FEE2E2; color: #991B1B;
+}
+.template-card__actions .btn-delete:hover { background: #FCA5A5; }
+
+.template-save-form {
+  padding: 14px 16px; background: #F0F6FB;
+  border-bottom: 1px solid var(--c-border);
+}
+.template-save-form__title {
+  font-size: 11px; font-weight: 700; color: var(--c-primary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.template-save-form__grid {
+  display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px;
+  align-items: end;
+}
+.template-save-form__field { display: flex; flex-direction: column; gap: 3px; }
+.template-save-form__field label {
+  font-size: 10px; color: var(--c-text-muted); font-weight: 600;
+}
+.template-save-form__field input {
+  padding: 7px 10px; font-size: 12px;
+  border: 1px solid var(--c-border); border-radius: 6px;
+  background: white;
+}
 </style>
 </head>
 <body>
@@ -1110,8 +1196,11 @@ body {
       <button class="topbar-nav-btn" onclick="openFunnelModal()" style="margin-bottom:6px;">
         🎯 Lejek sprzedażowy
       </button>
-      <button class="topbar-nav-btn" onclick="openCalendarModal()" style="margin-bottom:8px; margin-left:6px;">
+      <button class="topbar-nav-btn" onclick="openCalendarModal()" style="margin-bottom:6px; margin-left:6px;">
         📅 Kalendarz
+      </button>
+      <button class="topbar-nav-btn" onclick="openTemplatesModal()" style="margin-bottom:8px; margin-left:6px;">
+        📋 Szablony
       </button><br>
       <strong>4Climat</strong><br>
       ul. Braniborska 14, 53-680 Wrocław<br>
@@ -1731,6 +1820,38 @@ body {
       <button class="modal__close" onclick="closeDayModal()">✕</button>
     </div>
     <div class="modal__body" id="dayModalBody"></div>
+  </div>
+</div>
+
+<!-- OFFER TEMPLATES MODAL -->
+<div class="modal-backdrop templates-modal" id="templatesModal">
+  <div class="modal modal--wide">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title">📋 Szablony ofert</div>
+        <div class="modal__subtitle">Zapisz raz przekrojową ofertę i używaj jej dla wielu klientów</div>
+      </div>
+      <button class="modal__close" onclick="closeTemplatesModal()">✕</button>
+    </div>
+    <div class="template-save-form">
+      <div class="template-save-form__title">💾 Zapisz obecną ofertę jako szablon</div>
+      <div class="template-save-form__grid">
+        <div class="template-save-form__field">
+          <label>Nazwa szablonu *</label>
+          <input id="newTemplateName" type="text" placeholder="np. Mieszkanie 2 pokoje">
+        </div>
+        <div class="template-save-form__field">
+          <label>Opis (opcjonalnie)</label>
+          <input id="newTemplateDesc" type="text" placeholder="np. 3 warianty: Haier / Toshiba / Daikin">
+        </div>
+        <button class="btn btn--primary btn--small" onclick="handleSaveTemplate()">💾 Zapisz szablon</button>
+      </div>
+    </div>
+    <div class="templates-toolbar">
+      <input id="templatesSearch" type="text" placeholder="🔍 Szukaj szablonu (nazwa lub opis)..." oninput="renderTemplatesList()">
+      <button class="btn btn--ghost btn--small" onclick="renderTemplatesList()">🔄 Odśwież</button>
+    </div>
+    <div class="templates-list" id="templatesList"></div>
   </div>
 </div>
 
@@ -6014,6 +6135,271 @@ async function handleDeleteCustomEvent(eventId) {
   else showToast('✓ Usunięto');
 }
 
+/* ============================================================
+   SZABLONY OFERT — zapisz raz, używaj wielokrotnie
+   ============================================================ */
+
+let _templatesCache = [];
+
+async function openTemplatesModal() {
+  document.getElementById('newTemplateName').value = '';
+  document.getElementById('newTemplateDesc').value = '';
+  document.getElementById('templatesSearch').value = '';
+  await loadTemplates();
+  renderTemplatesList();
+  document.getElementById('templatesModal').classList.add('modal-backdrop--open');
+}
+
+function closeTemplatesModal() {
+  document.getElementById('templatesModal').classList.remove('modal-backdrop--open');
+}
+
+async function loadTemplates() {
+  if (!currentUser) {
+    try {
+      const raw = localStorage.getItem('offerTemplates');
+      _templatesCache = raw ? JSON.parse(raw) : [];
+    } catch(e) { _templatesCache = []; }
+    return;
+  }
+  try {
+    const data = await sbFetch('/rest/v1/offer_templates?select=*&order=updated_at.desc');
+    _templatesCache = (data || []).map(r => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      data: r.data,
+      createdBy: r.created_by_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      _userId: r.user_id
+    }));
+  } catch(e) {
+    console.info('Templates table not available, using localStorage:', e.message);
+    try {
+      const raw = localStorage.getItem('offerTemplates');
+      _templatesCache = raw ? JSON.parse(raw) : [];
+    } catch(e2) { _templatesCache = []; }
+  }
+}
+
+/* Zbuduj snapshot obecnej oferty (BEZ danych klienta i numeru oferty) */
+function buildTemplateSnapshot() {
+  return {
+    variants: JSON.parse(JSON.stringify(state.variants || [])),
+    extras: JSON.parse(JSON.stringify(state.extras || [])),
+    extrasShowPrice: state.extrasShowPrice !== false,
+    hpVariants: JSON.parse(JSON.stringify(state.hpVariants || [])),
+    hpExtras: JSON.parse(JSON.stringify(state.hpExtras || [])),
+    hpExtrasShowPrice: state.hpExtrasShowPrice !== false,
+    customServices: JSON.parse(JSON.stringify(state.customServices || [])),
+    customOfferTitle: state.customOfferTitle || '',
+    customServicesOws: state.customServicesOws || '',
+    customNote: state.customNote || '',
+    vatRate: state.vatRate,
+    offerType: state.offerType,
+    showFinancing: state.showFinancing !== false,
+    realizationsUrl: state.realizationsUrl || ''
+  };
+}
+
+async function handleSaveTemplate() {
+  const name = document.getElementById('newTemplateName').value.trim();
+  if (!name) { showToast('⚠ Wpisz nazwę szablonu'); return; }
+  const description = document.getElementById('newTemplateDesc').value.trim();
+  const snapshot = buildTemplateSnapshot();
+
+  // Walidacja: musi być co zapisać
+  const hasContent = (snapshot.variants && snapshot.variants.length > 0)
+    || (snapshot.hpVariants && snapshot.hpVariants.length > 0)
+    || (snapshot.customServices && snapshot.customServices.length > 0);
+  if (!hasContent) {
+    showToast('⚠ Oferta jest pusta — dodaj przynajmniej jeden wariant');
+    return;
+  }
+
+  const template = {
+    name: name,
+    description: description || null,
+    data: snapshot,
+    createdBy: currentUser?.email ? currentUser.email.split('@')[0] : null
+  };
+
+  const ok = await saveTemplate(template);
+  if (ok) {
+    showToast(`✓ Szablon „${name}" zapisany`);
+    document.getElementById('newTemplateName').value = '';
+    document.getElementById('newTemplateDesc').value = '';
+    await loadTemplates();
+    renderTemplatesList();
+  }
+}
+
+async function saveTemplate(template) {
+  if (!currentUser) {
+    // localStorage fallback
+    try {
+      const raw = localStorage.getItem('offerTemplates');
+      const list = raw ? JSON.parse(raw) : [];
+      template.id = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      template.createdAt = new Date().toISOString();
+      template.updatedAt = template.createdAt;
+      list.unshift(template);
+      localStorage.setItem('offerTemplates', JSON.stringify(list));
+      return true;
+    } catch(e) { showToast('⚠ Błąd zapisu'); return false; }
+  }
+  try {
+    const payload = {
+      name: template.name,
+      description: template.description,
+      data: template.data,
+      created_by_name: template.createdBy,
+      user_id: currentUser.id
+    };
+    await sbFetch('/rest/v1/offer_templates', {
+      method: 'POST',
+      headers: { 'Prefer': 'return=minimal' },
+      body: JSON.stringify(payload)
+    });
+    return true;
+  } catch(e) {
+    console.warn('Save template Supabase failed, using localStorage:', e.message);
+    showToast('⚠ Zapisano lokalnie — wykonaj migrację SQL szablonów');
+    try {
+      const raw = localStorage.getItem('offerTemplates');
+      const list = raw ? JSON.parse(raw) : [];
+      template.id = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      template.createdAt = new Date().toISOString();
+      template.updatedAt = template.createdAt;
+      list.unshift(template);
+      localStorage.setItem('offerTemplates', JSON.stringify(list));
+      return true;
+    } catch(e2) { return false; }
+  }
+}
+
+async function handleLoadTemplate(templateId) {
+  const tpl = _templatesCache.find(t => t.id === templateId);
+  if (!tpl) return;
+  const acCount  = (tpl.data.variants || []).length;
+  const hpCount  = (tpl.data.hpVariants || []).length;
+  const csCount  = (tpl.data.customServices || []).length;
+  const msg = `Wczytać szablon „${tpl.name}"?\n\n`
+    + `• Wariantów klimatyzacji: ${acCount}\n`
+    + `• Wariantów pomp ciepła: ${hpCount}\n`
+    + `• Usług dowolnych: ${csCount}\n\n`
+    + `UWAGA: Bieżąca oferta zostanie NADPISANA (klient i numer oferty zostają nietknięte).`;
+  if (!confirm(msg)) return;
+
+  // Nadpisz state (poza danymi klienta i numerem oferty)
+  const s = tpl.data;
+  state.variants = JSON.parse(JSON.stringify(s.variants || []));
+  state.extras = JSON.parse(JSON.stringify(s.extras || []));
+  state.extrasShowPrice = s.extrasShowPrice !== false;
+  state.hpVariants = JSON.parse(JSON.stringify(s.hpVariants || []));
+  state.hpExtras = JSON.parse(JSON.stringify(s.hpExtras || []));
+  state.hpExtrasShowPrice = s.hpExtrasShowPrice !== false;
+  state.customServices = JSON.parse(JSON.stringify(s.customServices || []));
+  state.customOfferTitle = s.customOfferTitle || '';
+  state.customServicesOws = s.customServicesOws || '';
+  state.customNote = s.customNote || '';
+  if (s.vatRate) state.vatRate = s.vatRate;
+  if (s.offerType) state.offerType = s.offerType;
+  state.showFinancing = s.showFinancing !== false;
+  if (s.realizationsUrl) state.realizationsUrl = s.realizationsUrl;
+
+  // Odśwież całe UI (renderujemy warianty, prace dodatkowe, itd.)
+  if (typeof renderAll === 'function') renderAll();
+  else if (typeof renderVariants === 'function') renderVariants();
+
+  // Dodatkowe odświeżenie pól tekstowych i checkboxów
+  const cn = document.getElementById('customNote');
+  if (cn) cn.value = state.customNote || '';
+  const sf = document.getElementById('showFinancing');
+  if (sf) sf.checked = state.showFinancing !== false;
+  const esp = document.getElementById('extrasShowPrice');
+  if (esp) esp.checked = state.extrasShowPrice !== false;
+
+  saveDraft();
+  closeTemplatesModal();
+  showToast(`✓ Wczytano szablon „${tpl.name}"`);
+}
+
+async function handleDeleteTemplate(templateId) {
+  const tpl = _templatesCache.find(t => t.id === templateId);
+  if (!tpl) return;
+  if (!confirm(`Usunąć szablon „${tpl.name}"? Tej operacji nie da się cofnąć.`)) return;
+
+  if (templateId.startsWith('local_') || !currentUser) {
+    try {
+      const raw = localStorage.getItem('offerTemplates');
+      const list = raw ? JSON.parse(raw) : [];
+      const filtered = list.filter(t => t.id !== templateId);
+      localStorage.setItem('offerTemplates', JSON.stringify(filtered));
+      _templatesCache = _templatesCache.filter(t => t.id !== templateId);
+    } catch(e) {}
+  } else {
+    try {
+      await sbFetch('/rest/v1/offer_templates?id=eq.' + encodeURIComponent(templateId), { method: 'DELETE' });
+      _templatesCache = _templatesCache.filter(t => t.id !== templateId);
+    } catch(e) {
+      showToast('⚠ Nie udało się usunąć');
+      return;
+    }
+  }
+  renderTemplatesList();
+  showToast('✓ Szablon usunięty');
+}
+
+function renderTemplatesList() {
+  const container = document.getElementById('templatesList');
+  if (!container) return;
+  const searchTxt = (document.getElementById('templatesSearch').value || '').trim().toLowerCase();
+
+  const filtered = _templatesCache.filter(t => {
+    if (!searchTxt) return true;
+    const hay = ((t.name || '') + ' ' + (t.description || '') + ' ' + (t.createdBy || '')).toLowerCase();
+    return hay.includes(searchTxt);
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = _templatesCache.length === 0
+      ? '<div class="template-empty">📭 Brak szablonów.<br><br>Wypełnij ofertę (warianty klimatyzacji, prace dodatkowe, itd.) i kliknij <strong>💾 Zapisz szablon</strong>.</div>'
+      : '<div class="template-empty">Brak wyników wyszukiwania.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(t => {
+    const acCount = (t.data.variants || []).length;
+    const hpCount = (t.data.hpVariants || []).length;
+    const csCount = (t.data.customServices || []).length;
+    const extrasCount = (t.data.extras || []).length;
+    const stats = [];
+    if (acCount > 0) stats.push(`❄ ${acCount} klimat.`);
+    if (hpCount > 0) stats.push(`🔥 ${hpCount} pompa`);
+    if (csCount > 0) stats.push(`🛠 ${csCount} usług`);
+    if (extrasCount > 0) stats.push(`+ ${extrasCount} prac dodatkowych`);
+    const created = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pl-PL', { day:'2-digit', month:'2-digit', year:'numeric' }) : '';
+    return `
+      <div class="template-card">
+        <div class="template-card__content">
+          <div class="template-card__title">${escapeHtml(t.name)}</div>
+          ${t.description ? `<div class="template-card__desc">${escapeHtml(t.description)}</div>` : ''}
+          ${stats.length > 0 ? `<div class="template-card__stats">${stats.map(s => `<span>${s}</span>`).join('')}</div>` : ''}
+          <div class="template-card__meta">
+            ${t.createdBy ? '👤 ' + escapeHtml(t.createdBy) + ' · ' : ''}${created ? '📅 ' + created : ''}
+          </div>
+        </div>
+        <div class="template-card__actions">
+          <button class="btn-load" onclick="handleLoadTemplate('${escapeHtml(t.id)}')">📥 Wczytaj</button>
+          <button class="btn-delete" onclick="handleDeleteTemplate('${escapeHtml(t.id)}')">🗑 Usuń</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 
 function openSaleModalFromDetail() {
   if (!_detailClientId) return;
@@ -6823,9 +7209,18 @@ function generatePdf() {
     const variantBr  = variantBrTotal(v);
     const hasSplit   = !!v.splitPrice;
 
-    // Nagłówek wariantu — lekki niebieski tekst (nie granatowy pasek)
+    // Nagłówek wariantu — z automatycznym prefixem „Wariant N — " po sortowaniu ceny.
+    // Jeśli oryginalna nazwa zaczyna się od "Wariant X — " lub "Wariant X - " lub "Opcja X — ",
+    // wycinamy stary prefix i wstawiamy aktualny.
+    const cleanVariantName = (raw) => {
+      if (!raw) return '';
+      return String(raw).replace(/^\s*(?:Wariant|Opcja|Konfiguracja)\s*\d+\s*[—\-–:]\s*/i, '').trim();
+    };
+    const baseName = cleanVariantName(v.name) || `Konfiguracja ${vIdx + 1}`;
+    const variantHeaderText = `Wariant ${vIdx + 1} — ${baseName}`;
+
     const headerBlock = {
-      text: v.name || `Konfiguracja ${vIdx + 1}`,
+      text: variantHeaderText,
       fontSize: 14, bold: true, color: '#1B4F8C', characterSpacing: 0.3,
       margin: [0, 0, 0, 10]
     };
@@ -6848,7 +7243,7 @@ function generatePdf() {
                 }
               ]] }
             },
-            buildPriceLineBlock(variantNet, variantBr, v.name)
+            buildPriceLineBlock(variantNet, variantBr, variantHeaderText)
           ]
         }]
       };
@@ -7084,7 +7479,7 @@ function generatePdf() {
     }
 
     const tableBlock = { table: { headerRows: 1, widths: COLS, body: tBody }, layout: acLayout };
-    const priceBlock = buildPriceLineBlock(variantNet, variantBr, v.name);
+    const priceBlock = buildPriceLineBlock(variantNet, variantBr, variantHeaderText);
 
     return {
       margin: [0, vIdx > 0 ? 18 : 0, 0, 0],
