@@ -2360,16 +2360,69 @@ async function loadDraftFromSupabase() {
 }
 
 /* ---- Historia ofert ---- */
-async function recordOfferToSupabase(offerNo, clientName, clientId, totalBr, fileName, scope) {
-  if (!currentUser) return;
+/* Zapisuje ofertę do Supabase.
+   - Jeśli state._editingOfferId jest ustawione: PATCH (aktualizacja edytowanej oferty)
+   - W przeciwnym razie: POST (nowa oferta)
+   Zwraca id oferty w Supabase (lub null przy błędzie). */
+async function recordOfferToSupabase(offerNo, clientName, clientId, totalBr, fileName, scope, offerData) {
+  if (!currentUser) return null;
   try {
-    await sbFetch('/rest/v1/offers', 'POST', {
-      offer_no: offerNo, client_name: clientName, client_id: clientId||null,
-      total_br: totalBr, file_name: fileName, scope: scope,
-      user_id: currentUser.id, user_email: currentUser.email,
-      created_at: new Date().toISOString()
-    });
-  } catch(e) { console.warn('Record offer error:', e); }
+    const payload = {
+      offer_no: offerNo,
+      client_name: clientName,
+      client_id: clientId || null,
+      total_br: totalBr,
+      file_name: fileName,
+      scope: scope,
+      user_id: currentUser.id,
+      user_email: currentUser.email,
+      offer_data: offerData || null,
+      updated_at: new Date().toISOString()
+    };
+    if (state._editingOfferId) {
+      // Aktualizacja istniejącej oferty
+      const upd = await sbFetch('/rest/v1/offers?id=eq.' + encodeURIComponent(state._editingOfferId), 'PATCH', payload);
+      return state._editingOfferId;
+    }
+    // Nowa oferta
+    payload.created_at = new Date().toISOString();
+    const rows = await sbFetch('/rest/v1/offers', 'POST', payload);
+    if (Array.isArray(rows) && rows.length && rows[0].id) {
+      state._editingOfferId = rows[0].id;
+      return rows[0].id;
+    }
+    return null;
+  } catch(e) {
+    console.warn('Record offer error:', e);
+    return null;
+  }
+}
+
+/* Pobiera pojedynczą ofertę po ID (z pełnym offer_data). */
+async function fetchOfferById(offerId) {
+  if (!currentUser) return null;
+  try {
+    const data = await sbFetch('/rest/v1/offers?id=eq.' + encodeURIComponent(offerId) + '&select=*');
+    return (Array.isArray(data) && data.length) ? data[0] : null;
+  } catch(e) { console.warn('Fetch offer error:', e); return null; }
+}
+
+/* Lista wszystkich ofert bieżącego użytkownika. */
+async function listMyOffers(limit) {
+  if (!currentUser) return [];
+  try {
+    const q = '/rest/v1/offers?user_id=eq.' + encodeURIComponent(currentUser.id) + '&order=created_at.desc&select=id,offer_no,client_name,client_id,total_br,scope,created_at,updated_at,file_name' + (limit ? '&limit=' + limit : '');
+    return (await sbFetch(q)) || [];
+  } catch(e) { console.warn('List offers error:', e); return []; }
+}
+
+/* Usuwa ofertę z Supabase. */
+async function deleteOfferFromSupabase(offerId) {
+  if (!currentUser) return false;
+  try {
+    await sbFetch('/rest/v1/offers?id=eq.' + encodeURIComponent(offerId), 'DELETE');
+    return true;
+  } catch(e) { console.warn('Delete offer error:', e); return false; }
 }
 
 /* ---- Statystyki ---- */
@@ -3418,8 +3471,32 @@ function renderSplitUnits(container, variant, vIdx) {
         </div>
         <button class="btn btn--danger" onclick="removeSplitUnit(${vIdx},${uIdx})">Usuń</button>
       </div>
-      <div style="display:grid; grid-template-columns: 150px 140px 140px 1fr 80px; gap:8px; align-items:end; margin-top:12px;">
-        <div class="field">
+      ${p.cena_kat ? `
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:10px; padding:10px; background:#F0F6FB; border:1px solid #DCE9F5; border-radius:6px;">
+        <div>
+          <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">Cena katalogowa</div>
+          <div style="font-size:14px; font-weight:600; color:#1A2332; font-family:Inter;">${fmtPLN(p.cena_kat)}</div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:4px; font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">
+            Rabat %
+            ${hasOverride ? `<button onclick="resetSplitPrice(${vIdx},${uIdx})" style="font-size:9px;padding:1px 5px;background:#fee2e2;color:#991b1b;border:none;border-radius:4px;cursor:pointer;" title="Przywróć domyślny rabat marki">✕ reset</button>` : `<span style="font-size:9px;color:#64748b;font-weight:500;">(dom.)</span>`}
+          </div>
+          <input class="field__input" type="number" min="0" max="100" step="0.5"
+            value="${getCurrentDiscountPct(u, p)}"
+            style="padding:4px 8px; font-size:13px; ${hasOverride ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
+            onchange="updateSplitDiscount(${vIdx},${uIdx},this.value)">
+        </div>
+        <div>
+          <div style="font-size:10px; font-weight:700; color:#0F3461; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">Cena po rabacie</div>
+          <input class="field__input" type="number" min="0" step="1"
+            value="${effectivePrice}"
+            style="padding:4px 8px; font-size:13px; font-weight:600; color:#0F3461; ${hasOverride ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
+            onchange="updateSplitPrice(${vIdx},${uIdx},this.value)">
+        </div>
+      </div>` : ''}
+      <div style="display:grid; grid-template-columns: ${p.cena_kat ? '' : '150px '} 140px 140px 1fr 80px; gap:8px; align-items:end; margin-top:12px;">
+        ${p.cena_kat ? '' : `<div class="field">
           <label class="field__label" style="display:flex;align-items:center;gap:4px;">
             Cena urządzenia (netto)
             ${hasOverride ? `<button onclick="resetSplitPrice(${vIdx},${uIdx})" style="font-size:9px;padding:1px 5px;background:#fee2e2;color:#991b1b;border:none;border-radius:4px;cursor:pointer;">✕ reset</button>` : ''}
@@ -3428,7 +3505,7 @@ function renderSplitUnits(container, variant, vIdx) {
             value="${effectivePrice}"
             style="${hasOverride ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
             onchange="updateSplitPrice(${vIdx},${uIdx},this.value)">
-        </div>
+        </div>`}
         <div class="field">
           <label class="field__label">Montaż ${installLabel()} (netto/szt)</label>
           <input class="field__input" type="number" min="0" step="50" value="${u.installPrice}"
@@ -3544,6 +3621,30 @@ function renderMultiVariantBody(container, variant, vIdx) {
       </div>
       <button class="btn btn--small btn--ghost" onclick="changeMultiOutdoor(${vIdx})">Zmień</button>
     </div>
+    ${outdoor.cena_kat ? `
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:10px; padding:10px; background:#F0F6FB; border:1px solid #DCE9F5; border-radius:6px;">
+      <div>
+        <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">Cena katalogowa</div>
+        <div style="font-size:14px; font-weight:600; color:#1A2332; font-family:Inter;">${fmtPLN(outdoor.cena_kat)}</div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:4px; font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">
+          Rabat %
+          ${outHasOverride ? `<button onclick="resetMultiOutdoorPrice(${vIdx})" style="font-size:9px;padding:1px 5px;background:#fee2e2;color:#991b1b;border:none;border-radius:4px;cursor:pointer;">✕ reset</button>` : `<span style="font-size:9px;color:#64748b;font-weight:500;">(dom.)</span>`}
+        </div>
+        <input class="field__input" type="number" min="0" max="100" step="0.5"
+          value="${getCurrentDiscountPct({priceOverride: variant.outdoorPriceOverride}, outdoor)}"
+          style="padding:4px 8px; font-size:13px; ${outHasOverride ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
+          onchange="updateMultiOutdoorDiscount(${vIdx}, this.value)">
+      </div>
+      <div>
+        <div style="font-size:10px; font-weight:700; color:#0F3461; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">Cena po rabacie</div>
+        <input class="field__input" type="number" min="0" step="1"
+          value="${outEffPrice}"
+          style="padding:4px 8px; font-size:13px; font-weight:600; color:#0F3461; ${outHasOverride ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
+          onchange="updateMultiOutdoorPrice(${vIdx}, this.value)">
+      </div>
+    </div>` : `
     <div style="display:flex; align-items:end; gap:8px; margin-top:10px;">
       <div class="field" style="max-width:180px;">
         <label class="field__label" style="display:flex;align-items:center;gap:4px;">
@@ -3555,7 +3656,7 @@ function renderMultiVariantBody(container, variant, vIdx) {
           onchange="updateMultiOutdoorPrice(${vIdx}, this.value)"
           title="Zmiana tymczasowa — nie zapisuje w bazie">
       </div>
-    </div>
+    </div>`}
   `;
   container.appendChild(outCard);
 
@@ -3598,6 +3699,30 @@ function renderMultiVariantBody(container, variant, vIdx) {
             <button class="btn btn--danger" onclick="removeMultiIndoor(${vIdx},${uIdx})">Usuń</button>
           </div>
         </div>
+        ${p.cena_kat ? `
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:8px; padding:10px; background:#F0F6FB; border:1px solid #DCE9F5; border-radius:6px;">
+          <div>
+            <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">Cena katalogowa</div>
+            <div style="font-size:14px; font-weight:600; color:#1A2332; font-family:Inter;">${fmtPLN(p.cena_kat)}</div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:4px; font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">
+              Rabat %
+              ${hasOvr ? `<button onclick="resetMultiIndoorPrice(${vIdx},${uIdx})" style="font-size:9px;padding:1px 5px;background:#fee2e2;color:#991b1b;border:none;border-radius:4px;cursor:pointer;">✕ reset</button>` : `<span style="font-size:9px;color:#64748b;font-weight:500;">(dom.)</span>`}
+            </div>
+            <input class="field__input" type="number" min="0" max="100" step="0.5"
+              value="${getCurrentDiscountPct(u, p)}"
+              style="padding:4px 8px; font-size:13px; ${hasOvr ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
+              onchange="updateMultiIndoorDiscount(${vIdx},${uIdx},this.value)">
+          </div>
+          <div>
+            <div style="font-size:10px; font-weight:700; color:#0F3461; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;">Cena po rabacie</div>
+            <input class="field__input" type="number" min="0" step="1"
+              value="${effPrice}"
+              style="padding:4px 8px; font-size:13px; font-weight:600; color:#0F3461; ${hasOvr ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
+              onchange="updateMultiIndoorPrice(${vIdx},${uIdx},this.value)">
+          </div>
+        </div>` : `
         <div style="display:flex; align-items:end; gap:8px; margin-top:8px;">
           <div class="field" style="max-width:180px;">
             <label class="field__label" style="display:flex;align-items:center;gap:4px;">
@@ -3608,7 +3733,7 @@ function renderMultiVariantBody(container, variant, vIdx) {
               style="${hasOvr ? 'border-color:#f59e0b;background:#fffbeb;' : ''}"
               onchange="updateMultiIndoorPrice(${vIdx},${uIdx},this.value)">
           </div>
-        </div>
+        </div>`}
         <div style="margin-top:8px;">
           <div style="font-size:10px;font-weight:700;color:var(--c-primary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📷 Zdjęcia jednostki</div>
           <div id="multiIndoorImgs_${vIdx}_${uIdx}"></div>
@@ -3650,6 +3775,16 @@ function updateSplitPrice(v,u,val) {
     recompute();
   }
 }
+function updateSplitDiscount(v,u,val) {
+  const unit = state.variants[v].units[u];
+  const p = getProductFromPool('split', unit.productIdx) || DB.split[unit.productIdx];
+  if (!p || !p.cena_kat) return;
+  const d = parseFloat(val);
+  if (isNaN(d) || d < 0 || d > 100) return;
+  unit.priceOverride = priceFromDiscount(p, d);
+  renderVariants();
+  recompute();
+}
 function resetSplitPrice(v,u) {
   delete state.variants[v].units[u].priceOverride;
   renderVariants();
@@ -3671,12 +3806,47 @@ function updateMultiOutdoorPrice(v,val) {
   const p = parseFloat(val);
   if (!isNaN(p) && p>=0) { state.variants[v].outdoorPriceOverride = p; renderVariants(); recompute(); }
 }
+function updateMultiOutdoorDiscount(v,val) {
+  const out = getProductFromPool('multi_zew', state.variants[v].outdoor.productIdx) || DB.multi_zew[state.variants[v].outdoor.productIdx];
+  if (!out || !out.cena_kat) return;
+  const d = parseFloat(val);
+  if (isNaN(d) || d < 0 || d > 100) return;
+  state.variants[v].outdoorPriceOverride = priceFromDiscount(out, d);
+  renderVariants(); recompute();
+}
 function resetMultiOutdoorPrice(v) { delete state.variants[v].outdoorPriceOverride; renderVariants(); recompute(); }
 function updateMultiIndoorPrice(v,u,val) {
   const p = parseFloat(val);
   if (!isNaN(p) && p>=0) { state.variants[v].indoor[u].priceOverride = p; renderVariants(); recompute(); }
 }
+function updateMultiIndoorDiscount(v,u,val) {
+  const p = getProductFromPool('multi_wew', state.variants[v].indoor[u].productIdx) || DB.multi_wew[state.variants[v].indoor[u].productIdx];
+  if (!p || !p.cena_kat) return;
+  const d = parseFloat(val);
+  if (isNaN(d) || d < 0 || d > 100) return;
+  state.variants[v].indoor[u].priceOverride = priceFromDiscount(p, d);
+  renderVariants(); recompute();
+}
 function resetMultiIndoorPrice(v,u) { delete state.variants[v].indoor[u].priceOverride; renderVariants(); recompute(); }
+/* --- Mixed mode (split + multi w jednym wariancie) --- */
+function updateMixedOutdoorDiscount(v,ms,val) {
+  const sys = state.variants[v].multiSystems[ms];
+  const out = getProductFromPool('multi_zew', sys.outdoor.productIdx);
+  if (!out || !out.cena_kat) return;
+  const d = parseFloat(val);
+  if (isNaN(d) || d < 0 || d > 100) return;
+  sys.outdoorPriceOverride = priceFromDiscount(out, d);
+  renderVariants(); recompute();
+}
+function updateMixedIndoorDiscount(v,ms,u,val) {
+  const sys = state.variants[v].multiSystems[ms];
+  const p = getProductFromPool('multi_wew', sys.indoor[u].productIdx);
+  if (!p || !p.cena_kat) return;
+  const d = parseFloat(val);
+  if (isNaN(d) || d < 0 || d > 100) return;
+  sys.indoor[u].priceOverride = priceFromDiscount(p, d);
+  renderVariants(); recompute();
+}
 function toggleMultiInstall(v,c) { state.variants[v].includeInstall = c; renderVariants(); recompute(); }
 function updateMultiIndoorQty(v,u,val) { state.variants[v].indoor[u].qty = Math.max(1, parseInt(val)||1); renderVariants(); recompute(); }
 function removeMultiIndoor(v,u) { state.variants[v].indoor.splice(u,1); renderVariants(); recompute(); }
@@ -3706,6 +3876,32 @@ function changeMultiOutdoor(v) {
    Ceny sztywne (kolumna D z Excela). Brutto = netto * (1 + VAT) zaokrąglone do groszy.
 */
 function roundUp(val) { return Math.round(val * 100) / 100; }
+
+/* ---- SYSTEM RABATÓW ----
+   Rabat dotyczy WYŁĄCZNIE urządzeń. Montaż nie jest rabatowany.
+   Model danych: pozostajemy przy `u.priceOverride` — jest to cena po rabacie (netto/szt).
+   Domyślny rabat urządzenia:
+     - jeżeli produkt ma `cena_kat` i `cena` → wynika bezpośrednio: (cena_kat-cena)/cena_kat
+     - w przeciwnym razie: BRAND_MARGINS[marka].sellDiscount
+*/
+function getDefaultDiscountPct(p) {
+  if (!p) return 0;
+  if (p.cena_kat && p.cena_kat > 0 && p.cena != null) {
+    return Math.round(((p.cena_kat - p.cena) / p.cena_kat) * 1000) / 10;
+  }
+  const m = getBrandMargin(p.marka || '');
+  return m ? Math.round(m.sellDiscount * 1000) / 10 : 0;
+}
+function getCurrentDiscountPct(u, p) {
+  if (!p || !p.cena_kat || p.cena_kat <= 0) return getDefaultDiscountPct(p);
+  const effective = (u.priceOverride != null) ? u.priceOverride : (p.cena || 0);
+  return Math.round(((p.cena_kat - effective) / p.cena_kat) * 1000) / 10;
+}
+function priceFromDiscount(p, discountPct) {
+  if (!p || !p.cena_kat) return 0;
+  const d = Math.max(0, Math.min(100, parseFloat(discountPct) || 0));
+  return roundUp(p.cena_kat * (1 - d / 100));
+}
 
 function variantNetTotal(v) {
   if (v.type === 'install') {
@@ -7009,8 +7205,9 @@ function resetForm() {
     scope:'ac', mode:'split', offerType:'variants', hpOfferType:'variants', vatRate:8,
     variants:[], extras:[], extrasShowPrice:true, hpVariants:[], hpExtras:[],
     customServices:[], customOfferImage:null, customOfferImages:[], customOfferDescription:'', customOfferTitle:'', realizationsUrl:'https://4climat.pl/realizacja/', attachments:[], owsKey:'split_multi',
-    linkedClientId:null, clientDirty:false
+    linkedClientId:null, clientDirty:false, _editingOfferId:null
   };
+  if (typeof updateEditingBadge === 'function') updateEditingBadge();
   nextVariantId = 1; nextHpVariantId = 1; nextCustomServiceId = 1;
   ['clientName','clientNip','clientEmail','clientPhone','clientAddress','clientNotes','salesName','salesPhone','salesEmail','customNote','customServicesOws'].forEach(k => {
     const el = document.getElementById(k); if (el) el.value = '';
@@ -7251,7 +7448,8 @@ function generatePdf() {
           th('Liczba szt.', 'center'), th('Link', 'center') ];
 
     // Helpery wierszy z opcjonalną komórką ceny na końcu
-    const prow = (lp, marka, nazwa, color, qty, link, priceBr) => {
+    // priceMeta: {katBr, discountPct} — opcjonalnie do wyświetlenia rabatu w PDF
+    const prow = (lp, marka, nazwa, color, qty, link, priceBr, priceMeta) => {
       const base = [
         { text: lp + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
         { text: marka || '—', fontSize: 9.5, bold: true, color: '#1B4F8C', margin: [6, 5, 6, 5] },
@@ -7263,10 +7461,21 @@ function generatePdf() {
           : { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
       ];
       if (hasSplit) {
-        base.push({
-          text: priceBr != null ? fmtPLN(priceBr) : '—',
-          fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5]
-        });
+        if (priceBr != null && priceMeta && priceMeta.katBr != null && priceMeta.discountPct > 0.05) {
+          base.push({
+            stack: [
+              { text: 'kat. ' + fmtPLN(priceMeta.katBr), fontSize: 7.5, color: '#94A3B8', alignment: 'right', decoration: 'lineThrough' },
+              { text: 'rabat ' + priceMeta.discountPct.toFixed(1).replace('.', ',') + '%', fontSize: 7.5, color: '#B45309', alignment: 'right', bold: true },
+              { text: fmtPLN(priceBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right' }
+            ],
+            margin: [6, 4, 6, 4]
+          });
+        } else {
+          base.push({
+            text: priceBr != null ? fmtPLN(priceBr) : '—',
+            fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5]
+          });
+        }
       }
       return base;
     };
@@ -7362,13 +7571,26 @@ function generatePdf() {
     const tBody = [ headerRow ];
     let lp = 1;
 
+    // Metadane rabatu do PDF: rabat pokazujemy tylko dla urządzeń (nie montażu)
+    const buildPriceMeta = (u, p, qty) => {
+      if (!p || !p.cena_kat) return null;
+      const eff = (u.priceOverride != null) ? u.priceOverride : (p.cena || 0);
+      const discountPct = ((p.cena_kat - eff) / p.cena_kat) * 100;
+      if (discountPct <= 0.05) return null;
+      return {
+        katBr: roundUp(p.cena_kat * (qty || 1) * vatMultLocal),
+        discountPct: discountPct
+      };
+    };
+
     if (v.type === 'split') {
       v.units.forEach(u => {
         const p = getProductFromPool('split', u.productIdx) || DB.split[u.productIdx] || { marka: '', model: '', cena: 0, link: '' };
         if (u.label && u.label.trim()) tBody.push(plabel(u.label.trim()));
         const priceUnit = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
         const priceBrUnit = roundUp(priceUnit * vatMultLocal);
-        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? priceBrUnit : null));
+        const meta = buildPriceMeta(u, p, u.qty || 1);
+        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? priceBrUnit : null, meta));
         if (u.includeInstall) {
           const priceInst = (u.installPrice || 0) * (u.qty || 1);
           const priceBrInst = roundUp(priceInst * vatMultLocal);
@@ -7379,6 +7601,7 @@ function generatePdf() {
       const out = getProductFromPool('multi_zew', v.outdoor.productIdx) || DB.multi_zew[v.outdoor.productIdx] || { marka: '', model: '', cena: 0, link: '' };
       const outNet = (v.outdoorPriceOverride != null ? v.outdoorPriceOverride : out.cena);
       const outBr = roundUp(outNet * vatMultLocal);
+      const outMeta = buildPriceMeta({priceOverride: v.outdoorPriceOverride}, out, 1);
       const outRow = [
         { text: (lp++) + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
         { text: out.marka || '—', fontSize: 9.5, bold: true, color: '#1B4F8C', margin: [6, 5, 6, 5] },
@@ -7389,14 +7612,28 @@ function generatePdf() {
           ? { text: 'Link', link: out.link, fontSize: 10, color: '#1B4F8C', decoration: 'underline', alignment: 'center', margin: [6, 5, 6, 5] }
           : { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
       ];
-      if (hasSplit) outRow.push({ text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
+      if (hasSplit) {
+        if (outMeta && outMeta.katBr != null) {
+          outRow.push({
+            stack: [
+              { text: 'kat. ' + fmtPLN(outMeta.katBr), fontSize: 7.5, color: '#94A3B8', alignment: 'right', decoration: 'lineThrough' },
+              { text: 'rabat ' + outMeta.discountPct.toFixed(1).replace('.', ',') + '%', fontSize: 7.5, color: '#B45309', alignment: 'right', bold: true },
+              { text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right' }
+            ],
+            margin: [6, 4, 6, 4]
+          });
+        } else {
+          outRow.push({ text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
+        }
+      }
       tBody.push(outRow);
 
       v.indoor.forEach(u => {
         const p = getProductFromPool('multi_wew', u.productIdx) || DB.multi_wew[u.productIdx] || { marka: '', model: '', cena: 0, link: '' };
         const inNet = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
         const inBr  = roundUp(inNet * vatMultLocal);
-        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? inBr : null));
+        const inMeta = buildPriceMeta(u, p, u.qty || 1);
+        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? inBr : null, inMeta));
       });
       if (v.includeInstall !== false) {
         const instNet = v.installPrice || 0;
@@ -7409,7 +7646,8 @@ function generatePdf() {
         const p = getProductFromPool('split', u.productIdx) || { marka: '', model: '', cena: 0, link: '' };
         const priceUnit = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
         const priceBrUnit = roundUp(priceUnit * vatMultLocal);
-        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? priceBrUnit : null));
+        const meta = buildPriceMeta(u, p, u.qty || 1);
+        tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? priceBrUnit : null, meta));
         if (u.includeInstall) {
           const priceInst = (u.installPrice || 0) * (u.qty || 1);
           const priceBrInst = roundUp(priceInst * vatMultLocal);
@@ -7421,6 +7659,7 @@ function generatePdf() {
         const out = getProductFromPool('multi_zew', ms.outdoor.productIdx) || { marka: '', model: '', cena: 0, link: '' };
         const outNet = (ms.outdoorPriceOverride != null ? ms.outdoorPriceOverride : out.cena);
         const outBr = roundUp(outNet * vatMultLocal);
+        const outMeta = buildPriceMeta({priceOverride: ms.outdoorPriceOverride}, out, 1);
         const outRow = [
           { text: (lp++) + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
           { text: out.marka || '—', fontSize: 9.5, bold: true, color: '#1B4F8C', margin: [6, 5, 6, 5] },
@@ -7431,14 +7670,28 @@ function generatePdf() {
             ? { text: 'Link', link: out.link, fontSize: 10, color: '#1B4F8C', decoration: 'underline', alignment: 'center', margin: [6, 5, 6, 5] }
             : { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
         ];
-        if (hasSplit) outRow.push({ text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
+        if (hasSplit) {
+          if (outMeta && outMeta.katBr != null) {
+            outRow.push({
+              stack: [
+                { text: 'kat. ' + fmtPLN(outMeta.katBr), fontSize: 7.5, color: '#94A3B8', alignment: 'right', decoration: 'lineThrough' },
+                { text: 'rabat ' + outMeta.discountPct.toFixed(1).replace('.', ',') + '%', fontSize: 7.5, color: '#B45309', alignment: 'right', bold: true },
+                { text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right' }
+              ],
+              margin: [6, 4, 6, 4]
+            });
+          } else {
+            outRow.push({ text: fmtPLN(outBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
+          }
+        }
         tBody.push(outRow);
 
         ms.indoor.forEach(u => {
           const p = getProductFromPool('multi_wew', u.productIdx) || { marka: '', model: '', cena: 0, link: '' };
           const inNet = (u.priceOverride != null ? u.priceOverride : p.cena) * (u.qty || 1);
           const inBr  = roundUp(inNet * vatMultLocal);
-          tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? inBr : null));
+          const inMeta = buildPriceMeta(u, p, u.qty || 1);
+          tBody.push(prow(lp++, p.marka, cleanProductName(p.model), u.color || detectColor(p.model), u.qty, p.link, hasSplit ? inBr : null, inMeta));
         });
         if (v.includeInstall !== false) {
           const instNet = ms.installPrice || 0;
@@ -8103,22 +8356,33 @@ function generatePdf() {
   const fileName = `Oferta_4Climat_${offerNo.replace(/\//g,'-')}_${clientName.replace(/\s+/g,'_').replace(/[^A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż0-9_-]/g,'')}.pdf`;
   pdfMake.createPdf(docDefinition).download(fileName);
 
-  // Zapisz w historii klienta
+  // Wylicz wartość brutto oferty
+  let recordedNet = 0;
+  if (includeAc) {
+    state.variants.forEach(v => recordedNet += variantNetTotal(v));
+    state.extras.forEach(e => recordedNet += getExtraTotalNet(e));
+  }
+  if (includeHp) {
+    state.hpVariants.forEach(v => recordedNet += hpVariantNetTotal(v));
+    state.hpExtras.forEach(e => recordedNet += (parseFloat(e.priceNet)||0)*(parseInt(e.qty)||1));
+  }
+  if (includeCustom) {
+    state.customServices.forEach(s => recordedNet += (parseFloat(s.priceNet)||0)*(parseInt(s.qty)||1));
+  }
+  const recordedBr = roundUp(recordedNet * vatMult);
+
+  // Snapshot pełnego stanu oferty — pozwala wrócić do niej i edytować
+  const snapshot = buildOfferSnapshot();
+
+  // Zapisz do Supabase (zawsze, niezależnie od tego czy klient jest przypisany)
+  recordOfferToSupabase(offerNo, clientName, state.linkedClientId || null, recordedBr, fileName, state.scope, snapshot);
+
+  // Lokalna historia klienta (jeśli powiązany)
   if (state.linkedClientId) {
-    let recordedNet = 0;
-    if (includeAc) {
-      state.variants.forEach(v => recordedNet += variantNetTotal(v));
-      state.extras.forEach(e => recordedNet += getExtraTotalNet(e));
-    }
-    if (includeHp) {
-      state.hpVariants.forEach(v => recordedNet += hpVariantNetTotal(v));
-      state.hpExtras.forEach(e => recordedNet += (parseFloat(e.priceNet)||0)*(parseInt(e.qty)||1));
-    }
-    const recordedBr = roundUp(recordedNet * vatMult);
     recordOfferForClient(offerNo, recordedBr, fileName);
   }
 
-  showToast('📄 PDF wygenerowany · ' + offerNo);
+  showToast(state._editingOfferId ? '📄 PDF zaktualizowany · ' + offerNo : '📄 PDF wygenerowany · ' + offerNo);
   window._lastCommittedOfferNo = offerNo;
   setTimeout(() => {
     const noEl = document.getElementById('offerNo');
@@ -8655,42 +8919,231 @@ async function handleInternalPdf(btn) {
   }
 }
 
+/* =============================================================
+   PODGLĄD OFERTY PRZED WYGENEROWANIEM PDF
+   ============================================================= */
 async function handleGeneratePdf(btn) {
   if (typeof pdfMake === 'undefined') {
     showToast('⚠ Biblioteka PDF nie jest załadowana. Odśwież stronę.');
     return;
   }
-  // pdfmake 0.2.x - vfs jest ustawiane przez vfs_fonts.js automatycznie
   if (!pdfMake.vfs) {
     showToast('⚠ Czcionki PDF jeszcze się ładują. Zaczekaj chwilę i spróbuj ponownie.');
     return;
   }
-
-  const hasAttachments = (state.attachments || []).length > 0;
-
-  // Wygeneruj QR code
-  window._generatedQRCode = await generateQRCodeBase64(state.realizationsUrl);
-
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = hasAttachments ? '⏳ Generuję i łączę...' : '⏳ Generuję...';
+  // Wygeneruj QR code jeśli jeszcze nie ma
+  if (!window._generatedQRCode) {
+    window._generatedQRCode = await generateQRCodeBase64(state.realizationsUrl);
   }
+  await openPdfPreview();
+}
+
+/* Realny "final" generator PDF — wywoływany z przycisku w podglądzie.
+   Zatwierdza zmiany dokonane w podglądzie (usuwa snapshot, żeby nie zostały cofnięte przez closePdfPreview). */
+async function finalizePdfDownload(btn) {
+  const hasAttachments = (state.attachments || []).length > 0;
+  if (btn) { btn.disabled = true; btn.innerHTML = hasAttachments ? '⏳ Generuję i łączę…' : '⏳ Generuję…'; }
   try {
+    // Zmiany z panelu edycji są już wpisane do state / DOM przez event 'input'.
     if (hasAttachments && typeof PDFLib !== 'undefined') {
-      // Wygeneruj ofertę jako blob, potem scal z załącznikami
       await generatePdfWithAttachments();
     } else {
-      if (hasAttachments) {
-        showToast('⚠ Biblioteka pdf-lib nie jest załadowana — generuję bez załączników');
-      }
+      if (hasAttachments) showToast('⚠ Biblioteka pdf-lib nie jest załadowana — generuję bez załączników');
       await generatePdf();
     }
+    // Zatwierdzenie: porzuć snapshot (bez cofania zmian) i zamknij modal.
+    _pdfPreviewSnapshot = null;
+    const m = document.getElementById('pdfPreviewModal');
+    if (m) m.style.display = 'none';
+    const iframe = document.getElementById('pdfPreviewFrame');
+    if (iframe && iframe.src && iframe.src.startsWith('blob:')) {
+      try { URL.revokeObjectURL(iframe.src); } catch(e) {}
+    }
+    // Odśwież widok warianty żeby pokazać zapisane opisy
+    if (typeof renderVariants === 'function') renderVariants();
   } catch(e) {
     console.error('Błąd generowania PDF:', e);
     showToast('⚠ Błąd generowania PDF: ' + e.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '📄 Generuj ofertę (PDF)'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '📄 Zatwierdź i pobierz PDF'; }
   }
+}
+
+function ensurePdfPreviewModal() {
+  if (document.getElementById('pdfPreviewModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'pdfPreviewModal';
+  modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(15,52,97,.75);z-index:9999;justify-content:center;align-items:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:1400px;height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;">
+      <div style="padding:14px 20px;background:#0F3461;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+        <div>
+          <div style="font-size:16px;font-weight:700;letter-spacing:.02em;">Podgląd oferty przed wygenerowaniem PDF</div>
+          <div style="font-size:11px;opacity:.85;margin-top:2px;">Sprawdź układ i wprowadź ewentualne korekty przed zatwierdzeniem.</div>
+        </div>
+        <button id="pdfPreviewCloseX" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✕ Zamknij</button>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden;">
+        <aside style="width:320px;background:#F8FBFD;border-right:1px solid #DCE9F5;overflow-y:auto;padding:16px;flex-shrink:0;">
+          <div style="font-size:11px;font-weight:700;color:#0F3461;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Edycja treści oferty</div>
+          <div id="pdfPreviewEditFields"></div>
+          <button id="pdfPreviewRefreshBtn" style="width:100%;margin-top:12px;padding:9px 12px;background:#1B4F8C;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">↻ Odśwież podgląd</button>
+          <div style="margin-top:16px;padding:12px;background:#FFFBEB;border-left:3px solid #F59E0B;font-size:11px;color:#92400E;border-radius:4px;line-height:1.5;">
+            <strong>Wskazówka:</strong> zmiany w tym panelu są tymczasowe — dopiero kliknięcie <em>„Zatwierdź i pobierz PDF"</em> zapisuje ofertę i pobiera plik. Kliknięcie <em>„Wróć do edycji"</em> anuluje zmiany dokonane w podglądzie.
+          </div>
+        </aside>
+        <main style="flex:1;background:#334155;overflow:hidden;position:relative;">
+          <div id="pdfPreviewLoader" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;">Generuję podgląd…</div>
+          <iframe id="pdfPreviewFrame" style="display:none;width:100%;height:100%;border:none;background:#fff;"></iframe>
+        </main>
+      </div>
+      <div style="padding:12px 20px;background:#F8FBFD;border-top:1px solid #DCE9F5;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+        <div style="font-size:11px;color:#64748b;">Wygenerowany PDF będzie zawierał zastosowane rabaty na urządzeniach.</div>
+        <div style="display:flex;gap:8px;">
+          <button id="pdfPreviewBackBtn" style="padding:10px 18px;background:#e2e8f0;color:#334155;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">← Wróć do edycji</button>
+          <button id="pdfPreviewGenerateBtn" style="padding:10px 22px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">📄 Zatwierdź i pobierz PDF</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('pdfPreviewCloseX').onclick = closePdfPreview;
+  document.getElementById('pdfPreviewBackBtn').onclick = closePdfPreview;
+  document.getElementById('pdfPreviewRefreshBtn').onclick = () => refreshPdfPreview();
+  document.getElementById('pdfPreviewGenerateBtn').onclick = (e) => finalizePdfDownload(e.currentTarget);
+  modal.onclick = (e) => { if (e.target === modal) closePdfPreview(); };
+}
+
+/* Zapamiętujemy oryginalne wartości edytowanych pól — potrzebne do "wróć do edycji" (anuluj). */
+let _pdfPreviewSnapshot = null;
+
+function takePdfPreviewSnapshot() {
+  _pdfPreviewSnapshot = {
+    customNote: (document.getElementById('customNote') || {}).value || '',
+    variantDescriptions: state.variants.map(v => v.description || '')
+  };
+}
+
+function restorePdfPreviewSnapshot() {
+  if (!_pdfPreviewSnapshot) return;
+  const cn = document.getElementById('customNote');
+  if (cn) cn.value = _pdfPreviewSnapshot.customNote;
+  state.variants.forEach((v, i) => {
+    v.description = _pdfPreviewSnapshot.variantDescriptions[i] || '';
+  });
+  _pdfPreviewSnapshot = null;
+  if (typeof renderVariants === 'function') renderVariants();
+}
+
+function buildPdfPreviewEditFields() {
+  const container = document.getElementById('pdfPreviewEditFields');
+  if (!container) return;
+  let html = '';
+  html += `
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:4px;">Uwagi końcowe (na końcu oferty)</label>
+      <textarea id="previewEdit_customNote" rows="4" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;">${escapeHtml((document.getElementById('customNote')||{}).value || '')}</textarea>
+    </div>
+  `;
+  state.variants.forEach((v, i) => {
+    html += `
+      <div style="margin-bottom:14px;padding:10px;background:#fff;border:1px solid #DCE9F5;border-radius:6px;">
+        <label style="font-size:11px;font-weight:700;color:#1B4F8C;display:block;margin-bottom:4px;">Zakres prac — Wariant ${i+1}</label>
+        <textarea id="previewEdit_variantDesc_${i}" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;">${escapeHtml(v.description || '')}</textarea>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+
+  // Live-bind: zmiana w podglądzie od razu aktualizuje state (odśwież ręcznie przez przycisk)
+  const cnEdit = document.getElementById('previewEdit_customNote');
+  if (cnEdit) cnEdit.addEventListener('input', () => {
+    const orig = document.getElementById('customNote');
+    if (orig) orig.value = cnEdit.value;
+  });
+  state.variants.forEach((v, i) => {
+    const el = document.getElementById(`previewEdit_variantDesc_${i}`);
+    if (el) el.addEventListener('input', () => { state.variants[i].description = el.value; });
+  });
+}
+
+async function openPdfPreview() {
+  ensurePdfPreviewModal();
+  takePdfPreviewSnapshot();
+  buildPdfPreviewEditFields();
+  document.getElementById('pdfPreviewModal').style.display = 'flex';
+  await refreshPdfPreview();
+}
+
+function closePdfPreview() {
+  const m = document.getElementById('pdfPreviewModal');
+  if (m) m.style.display = 'none';
+  restorePdfPreviewSnapshot();
+  // odwołaj URL blob jeśli był
+  const iframe = document.getElementById('pdfPreviewFrame');
+  if (iframe && iframe.src && iframe.src.startsWith('blob:')) {
+    try { URL.revokeObjectURL(iframe.src); } catch(e) {}
+  }
+}
+
+async function refreshPdfPreview() {
+  const loader = document.getElementById('pdfPreviewLoader');
+  const iframe = document.getElementById('pdfPreviewFrame');
+  if (loader) loader.style.display = 'flex';
+  if (iframe) iframe.style.display = 'none';
+
+  try {
+    const docDef = await getOfferDocDefinition();
+    if (!docDef) {
+      if (loader) loader.textContent = '⚠ Wypełnij wymagane pola oferty przed podglądem.';
+      return;
+    }
+    pdfMake.createPdf(docDef).getBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      if (iframe) {
+        // zwolnij poprzedni URL
+        if (iframe.src && iframe.src.startsWith('blob:')) {
+          try { URL.revokeObjectURL(iframe.src); } catch(e) {}
+        }
+        iframe.src = url + '#toolbar=1&navpanes=0&view=FitH';
+        iframe.style.display = 'block';
+      }
+      if (loader) loader.style.display = 'none';
+    });
+  } catch (e) {
+    console.error('Błąd podglądu PDF:', e);
+    if (loader) loader.textContent = '⚠ Błąd podglądu: ' + e.message;
+  }
+}
+
+/* Zwraca docDefinition (bez pobierania i bez skutków ubocznych typu zapis klienta czy toast).
+   Trick: monkey-patch pdfMake.createPdf → rzuca specjalny wyjątek zaraz po przechwyceniu docDef,
+   dzięki czemu reszta generatePdf() (recordOfferForClient, showToast) nie wykonuje się. */
+const PDF_PREVIEW_ABORT = Symbol('PDF_PREVIEW_ABORT');
+async function getOfferDocDefinition() {
+  return new Promise((resolve, reject) => {
+    const origCreate = pdfMake.createPdf.bind(pdfMake);
+    let captured = null;
+    pdfMake.createPdf = (def) => {
+      captured = def;
+      pdfMake.createPdf = origCreate;
+      const err = new Error('preview-abort');
+      err.__preview_abort = PDF_PREVIEW_ABORT;
+      throw err;
+    };
+    try {
+      generatePdf();
+      // Nie powinno tu dotrzeć — ale gdyby (np. walidacja się nie powiodła i return przed pdfMake) —
+      // zwracamy null.
+      pdfMake.createPdf = origCreate;
+      resolve(captured);
+    } catch(e) {
+      pdfMake.createPdf = origCreate;
+      if (e && e.__preview_abort === PDF_PREVIEW_ABORT) resolve(captured);
+      else reject(e);
+    }
+  });
 }
 
 async function generatePdfWithAttachments() {
@@ -8817,6 +9270,522 @@ async function renderStatsModal() {
     </div>
   `;
 }
+
+/* =====================================================================
+   MODUŁ: MOJE OFERTY (historia + edycja)
+   ===================================================================== */
+
+/* Buduje snapshot całej oferty — używany do zapisu do Supabase i przywracania. */
+function buildOfferSnapshot() {
+  const snap = {
+    version: 2,
+    state: JSON.parse(JSON.stringify(state)),
+    nextVariantId, nextHpVariantId, nextCustomServiceId,
+    fields: {}
+  };
+  ['offerDate','validityDays','salesName','salesRole','salesPhone','salesEmail','clientName','clientNip','clientEmail','clientPhone','clientAddress','clientNotes','customNote','owsText','customServicesOws','offerNo'].forEach(k => {
+    const el = document.getElementById(k);
+    if (el) snap.fields[k] = el.value;
+  });
+  const owsSel = document.getElementById('owsSelect');
+  if (owsSel) snap.fields.owsSelect = owsSel.value;
+  // Nie zapisujemy _editingOfferId — chcemy żeby był ustawiony osobno przy ładowaniu
+  delete snap.state._editingOfferId;
+  return snap;
+}
+
+/* Ładuje snapshot z Supabase do formularza. */
+function loadOfferSnapshot(snap, opts) {
+  opts = opts || {};
+  try {
+    if (!snap || !snap.state) { showToast('⚠ Nieprawidłowy snapshot oferty'); return false; }
+    state = snap.state;
+    // Uzupełnij defaulty (jak w loadDraft)
+    if (state.linkedClientId === undefined) state.linkedClientId = null;
+    if (state.clientDirty === undefined) state.clientDirty = false;
+    if (state.scope === undefined) state.scope = 'ac';
+    if (state.hpOfferType === undefined) state.hpOfferType = 'variants';
+    if (!Array.isArray(state.hpVariants)) state.hpVariants = [];
+    if (!Array.isArray(state.hpExtras)) state.hpExtras = [];
+    if (!Array.isArray(state.customServices)) state.customServices = [];
+    if (!Array.isArray(state.customOfferImages)) state.customOfferImages = state.customOfferImage ? [state.customOfferImage] : [];
+    if (state.customOfferDescription === undefined) state.customOfferDescription = '';
+    if (state.customOfferTitle === undefined) state.customOfferTitle = '';
+    if (state.realizationsUrl === undefined) state.realizationsUrl = 'https://4climat.pl/realizacja/';
+    if (!Array.isArray(state.attachments)) state.attachments = [];
+    if (state.extrasShowPrice === undefined) state.extrasShowPrice = true;
+    if (!state.owsKey) state.owsKey = 'split_multi';
+
+    nextVariantId = snap.nextVariantId || 1;
+    nextHpVariantId = snap.nextHpVariantId || 1;
+    nextCustomServiceId = snap.nextCustomServiceId || 1;
+
+    // Odtwórz pola formularza
+    Object.entries(snap.fields || {}).forEach(([k,v]) => { const el = document.getElementById(k); if (el) el.value = v; });
+    const owsSel = document.getElementById('owsSelect');
+    if (owsSel && snap.fields && snap.fields.owsSelect) owsSel.value = snap.fields.owsSelect;
+
+    // Ustaw tryb edycji: kolejne "Generuj PDF" zaktualizuje wpis, a nie utworzy nowy.
+    // Duplikat: nie ustawiamy _editingOfferId — nowy numer, nowy wpis.
+    if (opts.duplicate) {
+      state._editingOfferId = null;
+      // wyzeruj numer oferty aby wygenerował się nowy
+      const noEl = document.getElementById('offerNo');
+      if (noEl) { noEl.value = ''; noEl.dataset.offerDate = ''; }
+      if (typeof updateOfferNumber === 'function') updateOfferNumber();
+    } else if (opts.offerId) {
+      state._editingOfferId = opts.offerId;
+    }
+
+    // Przełącz UI scope/mode
+    document.querySelectorAll('.scope-switcher__btn').forEach(b => b.classList.toggle('scope-switcher__btn--active', b.dataset.scope === state.scope));
+    document.querySelectorAll('.mode-switcher__btn').forEach(b => b.classList.toggle('mode-switcher__btn--active', b.dataset.mode === state.mode));
+    document.querySelectorAll('.offer-type-switcher__btn[data-otype]').forEach(b => b.classList.toggle('offer-type-switcher__btn--active', b.dataset.otype === state.offerType));
+    document.querySelectorAll('.offer-type-switcher__btn[data-hp-otype]').forEach(b => b.classList.toggle('offer-type-switcher__btn--active', b.dataset['hpOtype'] === state.hpOfferType));
+    document.querySelectorAll('.vat-toggle__btn').forEach(b => b.classList.toggle('vat-toggle__btn--active', parseInt(b.dataset.vat) === state.vatRate));
+    const showAc = (state.scope === 'ac' || state.scope === 'both');
+    const showHp = (state.scope === 'hp' || state.scope === 'both');
+    const acSec = document.getElementById('acSection'); if (acSec) acSec.style.display = showAc ? '' : 'none';
+    const hpSec = document.getElementById('hpSection'); if (hpSec) hpSec.style.display = showHp ? '' : 'none';
+    const acBar = document.getElementById('acControlsBar'); if (acBar) acBar.style.display = showAc ? '' : 'none';
+    if (typeof updateClientStatusLabel === 'function') updateClientStatusLabel();
+    if (typeof renderVariants === 'function') renderVariants();
+    if (typeof updateVariantButtons === 'function') updateVariantButtons();
+    if (typeof renderExtrasCatalog === 'function') renderExtrasCatalog();
+    if (typeof renderExtras === 'function') renderExtras();
+    if (typeof renderHpVariants === 'function') renderHpVariants();
+    if (typeof renderHpExtras === 'function') renderHpExtras();
+    if (typeof renderCustomServices === 'function') renderCustomServices();
+    if (typeof renderCustomOfferImagePreview === 'function') renderCustomOfferImagePreview();
+    if (typeof renderAttachments === 'function') renderAttachments();
+    if (typeof recompute === 'function') recompute();
+    updateEditingBadge();
+    return true;
+  } catch(e) {
+    console.error('Load snapshot error:', e);
+    showToast('⚠ Błąd wczytywania oferty: ' + e.message);
+    return false;
+  }
+}
+
+/* Pasek statusu "Edytujesz ofertę XYZ" — dyskretny wskaźnik trybu edycji. */
+function updateEditingBadge() {
+  let bar = document.getElementById('editingOfferBar');
+  const offerNoEl = document.getElementById('offerNo');
+  const offerNo = offerNoEl ? offerNoEl.value : '';
+  if (!state._editingOfferId) {
+    if (bar) bar.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'editingOfferBar';
+    bar.style.cssText = 'position:sticky;top:0;z-index:100;background:#FEF3C7;border-bottom:2px solid #F59E0B;padding:8px 20px;font-size:13px;color:#92400E;display:flex;justify-content:space-between;align-items:center;font-weight:600;';
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+  bar.innerHTML = `
+    <div>✏ <strong>Tryb edycji</strong> — pracujesz nad ofertą <strong>${escapeHtml(offerNo)}</strong>. Kolejne „Generuj PDF" zaktualizuje ten wpis.</div>
+    <button onclick="exitEditMode()" style="background:#fff;border:1px solid #F59E0B;color:#92400E;padding:4px 10px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;">Wyjdź z trybu edycji</button>
+  `;
+}
+
+function exitEditMode() {
+  state._editingOfferId = null;
+  updateEditingBadge();
+  showToast('✓ Wyjście z trybu edycji — kolejny PDF utworzy nowy wpis');
+}
+
+/* Modal "Moje oferty" — lista wszystkich ofert bieżącego użytkownika. */
+function ensureMyOffersModal() {
+  if (document.getElementById('myOffersModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'myOffersModal';
+  modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(15,52,97,.75);z-index:9998;justify-content:center;align-items:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:1200px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;">
+      <div style="padding:14px 20px;background:#0F3461;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+        <div>
+          <div style="font-size:16px;font-weight:700;letter-spacing:.02em;">📋 Moje oferty</div>
+          <div style="font-size:11px;opacity:.85;margin-top:2px;">Historia wygenerowanych ofert — otwórz do edycji, duplikuj lub pobierz ponownie.</div>
+        </div>
+        <button onclick="closeMyOffers()" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✕ Zamknij</button>
+      </div>
+      <div style="padding:14px 20px;background:#F8FBFD;border-bottom:1px solid #DCE9F5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="myOffersSearch" placeholder="Szukaj po numerze, kliencie…" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+        <select id="myOffersScope" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;">
+          <option value="">Wszystkie zakresy</option>
+          <option value="ac">Klimatyzacja</option>
+          <option value="hp">Pompa ciepła</option>
+          <option value="both">Klima + PC</option>
+          <option value="custom">Dowolna wycena</option>
+        </select>
+        <button onclick="renderMyOffersList()" style="padding:8px 14px;background:#1B4F8C;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">↻ Odśwież</button>
+      </div>
+      <div id="myOffersBody" style="flex:1;overflow-y:auto;padding:0;">
+        <div style="text-align:center;padding:40px;color:#94A3B8;">⏳ Ładowanie…</div>
+      </div>
+      <div style="padding:10px 20px;background:#F8FBFD;border-top:1px solid #DCE9F5;font-size:11px;color:#64748b;flex-shrink:0;">
+        <span id="myOffersCount">—</span>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) closeMyOffers(); };
+  const search = document.getElementById('myOffersSearch');
+  const scope = document.getElementById('myOffersScope');
+  if (search) search.oninput = () => renderMyOffersList();
+  if (scope) scope.onchange = () => renderMyOffersList();
+}
+
+let _myOffersCache = [];
+
+async function openMyOffers() {
+  if (!currentUser) { showToast('⚠ Musisz być zalogowany'); return; }
+  ensureMyOffersModal();
+  document.getElementById('myOffersModal').style.display = 'flex';
+  const body = document.getElementById('myOffersBody');
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:#94A3B8;">⏳ Ładowanie ofert…</div>';
+  _myOffersCache = await listMyOffers();
+  renderMyOffersList();
+}
+
+function closeMyOffers() {
+  const m = document.getElementById('myOffersModal');
+  if (m) m.style.display = 'none';
+}
+
+function renderMyOffersList() {
+  const body = document.getElementById('myOffersBody');
+  const countEl = document.getElementById('myOffersCount');
+  if (!body) return;
+  const search = (document.getElementById('myOffersSearch') || {}).value || '';
+  const scope = (document.getElementById('myOffersScope') || {}).value || '';
+  const s = search.toLowerCase();
+  let list = _myOffersCache.filter(o => {
+    if (scope && o.scope !== scope) return false;
+    if (!s) return true;
+    const blob = [o.offer_no, o.client_name].filter(Boolean).join(' ').toLowerCase();
+    return blob.includes(s);
+  });
+  if (countEl) countEl.textContent = list.length + ' z ' + _myOffersCache.length + ' ofert · łączna wartość widocznych: ' + fmtPLNLocal(list.reduce((a,o) => a + (parseFloat(o.total_br)||0), 0));
+  if (list.length === 0) {
+    body.innerHTML = '<div style="text-align:center;padding:40px;color:#94A3B8;font-size:13px;">Brak ofert spełniających kryteria</div>';
+    return;
+  }
+  const scopeLabel = s => ({ac:'Klima', hp:'Pompa', both:'Klima+PC', custom:'Dowolna'}[s] || s || '—');
+  const scopeColor = s => ({ac:'#0891B2', hp:'#EA580C', both:'#7C3AED', custom:'#64748B'}[s] || '#64748B');
+  body.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead style="position:sticky;top:0;background:#F8FBFD;z-index:1;">
+        <tr style="border-bottom:2px solid #D8E3EE;">
+          <th style="padding:10px 14px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">DATA</th>
+          <th style="padding:10px 14px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">NR OFERTY</th>
+          <th style="padding:10px 14px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">KLIENT</th>
+          <th style="padding:10px 14px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">ZAKRES</th>
+          <th style="padding:10px 14px;text-align:right;font-size:11px;color:#1B4F8C;font-weight:700;">WARTOŚĆ</th>
+          <th style="padding:10px 14px;text-align:center;font-size:11px;color:#1B4F8C;font-weight:700;">AKCJE</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map((o,i) => `
+          <tr style="border-bottom:1px solid #F1F5F9;${i%2===0?'':'background:#FAFCFF'}">
+            <td style="padding:10px 14px;font-size:12px;color:#64748B;">${new Date(o.created_at).toLocaleDateString('pl-PL')}<br><span style="font-size:10px;color:#94A3B8;">${new Date(o.created_at).toLocaleTimeString('pl-PL', {hour:'2-digit',minute:'2-digit'})}</span></td>
+            <td style="padding:10px 14px;font-size:12px;font-weight:700;color:#1B4F8C;">${escapeHtml(o.offer_no||'—')}</td>
+            <td style="padding:10px 14px;font-size:12px;color:#334155;">${escapeHtml(o.client_name||'—')}</td>
+            <td style="padding:10px 14px;font-size:11px;"><span style="padding:2px 8px;background:${scopeColor(o.scope)}20;color:${scopeColor(o.scope)};border-radius:10px;font-weight:600;">${scopeLabel(o.scope)}</span></td>
+            <td style="padding:10px 14px;font-size:13px;font-weight:700;text-align:right;color:#1B4F8C;">${fmtPLNLocal(o.total_br)}</td>
+            <td style="padding:10px 14px;text-align:center;white-space:nowrap;">
+              <button onclick="openOfferForEdit('${o.id}')" style="padding:5px 10px;background:#1B4F8C;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px;" title="Wczytaj do edycji">✏ Edytuj</button>
+              <button onclick="duplicateOffer('${o.id}')" style="padding:5px 10px;background:#e2e8f0;color:#334155;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px;" title="Skopiuj jako nowa oferta">⧉ Duplikuj</button>
+              <button onclick="confirmDeleteOffer('${o.id}', '${escapeHtml(o.offer_no||'').replace(/'/g,'&#39;')}')" style="padding:5px 10px;background:transparent;color:#991b1b;border:1px solid #fee2e2;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;" title="Usuń ofertę">🗑</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function fmtPLNLocal(n) {
+  return Number(n||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' zł';
+}
+
+async function openOfferForEdit(offerId) {
+  const offer = await fetchOfferById(offerId);
+  if (!offer) { showToast('⚠ Nie udało się pobrać oferty'); return; }
+  if (!offer.offer_data) {
+    if (!confirm('Ta oferta została zapisana starą wersją systemu i nie ma pełnego snapshotu. Możesz jednak zobaczyć jej podstawowe dane, ale nie odtworzysz jej pełnej treści. Kontynuować?')) return;
+    showToast('⚠ Brak snapshotu — otwarcie do edycji niemożliwe');
+    return;
+  }
+  const ok = loadOfferSnapshot(offer.offer_data, { offerId: offer.id });
+  if (ok) {
+    closeMyOffers();
+    showToast('📂 Oferta ' + offer.offer_no + ' wczytana');
+  }
+}
+
+async function duplicateOffer(offerId) {
+  const offer = await fetchOfferById(offerId);
+  if (!offer) { showToast('⚠ Nie udało się pobrać oferty'); return; }
+  if (!offer.offer_data) { showToast('⚠ Brak snapshotu — duplikacja niemożliwa'); return; }
+  const ok = loadOfferSnapshot(offer.offer_data, { duplicate: true });
+  if (ok) {
+    closeMyOffers();
+    showToast('⧉ Oferta zduplikowana — otrzyma nowy numer po zapisie');
+  }
+}
+
+async function confirmDeleteOffer(offerId, offerNo) {
+  if (!confirm('Usunąć ofertę ' + offerNo + '? Tej operacji nie da się cofnąć.')) return;
+  const ok = await deleteOfferFromSupabase(offerId);
+  if (ok) {
+    _myOffersCache = _myOffersCache.filter(o => o.id !== offerId);
+    renderMyOffersList();
+    showToast('🗑 Oferta usunięta');
+  } else {
+    showToast('⚠ Błąd usuwania oferty');
+  }
+}
+
+/* =====================================================================
+   MODUŁ: EDYTOR OGÓLNYCH WARUNKÓW SPRZEDAŻY (OWS)
+   Szablony trzymane w Supabase (drafts.user_id='ows_templates_shared').
+   Fallback do OWS_TEMPLATES z kodu.
+   ===================================================================== */
+
+const OWS_LABELS = {
+  split_multi: 'Klimatyzacja (split / multisplit)',
+  pompa_ciepla: 'Pompa ciepła',
+  split_cena_koncowa: 'Klimatyzacja — cena końcowa',
+  hp_cena_koncowa: 'Pompa ciepła — cena końcowa',
+  serwis_klima: 'Serwis klimatyzacji',
+  serwis_hp: 'Serwis pompy ciepła'
+};
+
+/* Pobiera nadpisane szablony OWS z Supabase (jeśli są) i mergeuje z domyślnymi. */
+async function loadOwsTemplatesFromSupabase() {
+  try {
+    const data = await sbFetch('/rest/v1/drafts?user_id=eq.ows_templates_shared&select=data');
+    if (Array.isArray(data) && data.length && data[0].data) {
+      const overrides = data[0].data;
+      Object.keys(overrides).forEach(k => {
+        if (typeof overrides[k] === 'string' && overrides[k].trim()) {
+          OWS_TEMPLATES[k] = overrides[k];
+        }
+      });
+      // Odśwież pole tekstowe jeśli aktualnie wybrany szablon się zmienił
+      const owsEl = document.getElementById('owsText');
+      const owsSel = document.getElementById('owsSelect');
+      if (owsEl && owsSel && OWS_TEMPLATES[owsSel.value] && !owsEl.dataset.userEdited) {
+        owsEl.value = OWS_TEMPLATES[owsSel.value];
+      }
+    }
+  } catch(e) { console.warn('OWS load error:', e); }
+}
+
+/* Zapisuje szablony OWS do Supabase (drafts table). */
+async function saveOwsTemplatesToSupabase(templates) {
+  try {
+    const existing = await sbFetch('/rest/v1/drafts?user_id=eq.ows_templates_shared&select=user_id');
+    if (Array.isArray(existing) && existing.length) {
+      await sbFetch('/rest/v1/drafts?user_id=eq.ows_templates_shared', 'PATCH', { data: templates, updated_at: new Date().toISOString() });
+    } else {
+      await sbFetch('/rest/v1/drafts', 'POST', { user_id: 'ows_templates_shared', data: templates, updated_at: new Date().toISOString() });
+    }
+    return true;
+  } catch(e) { console.warn('OWS save error:', e); return false; }
+}
+
+function ensureOwsEditorModal() {
+  if (document.getElementById('owsEditorModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'owsEditorModal';
+  modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(15,52,97,.75);z-index:9998;justify-content:center;align-items:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:1000px;height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;">
+      <div style="padding:14px 20px;background:#0F3461;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+        <div>
+          <div style="font-size:16px;font-weight:700;letter-spacing:.02em;">📝 Edytor Ogólnych Warunków Sprzedaży</div>
+          <div style="font-size:11px;opacity:.85;margin-top:2px;">Szablony OWS wyświetlane na końcu PDF-a. Zmiany są współdzielone przez wszystkich handlowców 4Climat.</div>
+        </div>
+        <button onclick="closeOwsEditor()" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✕ Zamknij</button>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden;">
+        <aside style="width:260px;background:#F8FBFD;border-right:1px solid #DCE9F5;overflow-y:auto;padding:12px;flex-shrink:0;">
+          <div style="font-size:10px;font-weight:700;color:#0F3461;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;padding:0 4px;">Szablony</div>
+          <div id="owsTemplatesList"></div>
+        </aside>
+        <main style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:16px 20px;border-bottom:1px solid #DCE9F5;background:#fff;flex-shrink:0;">
+            <div style="font-size:13px;color:#1B4F8C;font-weight:700;" id="owsEditorTitle">—</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Edytuj treść i zapisz. Zmiany będą widoczne przy kolejnym otwarciu formularza oferty.</div>
+          </div>
+          <textarea id="owsEditorText" style="flex:1;padding:16px 20px;border:none;font-size:13px;font-family:inherit;line-height:1.55;resize:none;color:#1A2332;background:#fff;outline:none;"></textarea>
+          <div style="padding:12px 20px;background:#F8FBFD;border-top:1px solid #DCE9F5;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+            <button id="owsEditorRestoreBtn" style="padding:8px 14px;background:transparent;color:#991b1b;border:1px solid #fee2e2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">↺ Przywróć domyślny</button>
+            <div style="display:flex;gap:8px;">
+              <button onclick="closeOwsEditor()" style="padding:9px 16px;background:#e2e8f0;color:#334155;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Anuluj</button>
+              <button id="owsEditorSaveBtn" style="padding:9px 20px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">💾 Zapisz szablon</button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) closeOwsEditor(); };
+  document.getElementById('owsEditorSaveBtn').onclick = saveCurrentOwsTemplate;
+  document.getElementById('owsEditorRestoreBtn').onclick = restoreCurrentOwsTemplate;
+}
+
+let _owsEditorCurrentKey = null;
+let _owsEditorOriginals = {}; // kopia oryginałów z kodu (do "przywróć domyślny")
+
+async function openOwsEditor() {
+  if (!currentUser) { showToast('⚠ Musisz być zalogowany'); return; }
+  // Zapisz oryginały (raz)
+  if (Object.keys(_owsEditorOriginals).length === 0) {
+    Object.keys(OWS_LABELS).forEach(k => { _owsEditorOriginals[k] = OWS_TEMPLATES[k] || ''; });
+  }
+  ensureOwsEditorModal();
+  // Odśwież z Supabase (na wypadek zmian z innego stanowiska)
+  await loadOwsTemplatesFromSupabase();
+  document.getElementById('owsEditorModal').style.display = 'flex';
+  renderOwsTemplatesList();
+  // Wybierz pierwszy albo aktualnie używany
+  const currentKey = state.owsKey || 'split_multi';
+  selectOwsTemplate(currentKey);
+}
+
+function closeOwsEditor() {
+  const m = document.getElementById('owsEditorModal');
+  if (m) m.style.display = 'none';
+  _owsEditorCurrentKey = null;
+}
+
+function renderOwsTemplatesList() {
+  const container = document.getElementById('owsTemplatesList');
+  if (!container) return;
+  container.innerHTML = Object.keys(OWS_LABELS).map(k => `
+    <div onclick="selectOwsTemplate('${k}')" data-owskey="${k}" style="padding:10px 12px;margin-bottom:4px;background:#fff;border:1px solid #DCE9F5;border-radius:6px;cursor:pointer;font-size:12px;transition:all .15s;">
+      <div style="font-weight:600;color:#1A2332;">${OWS_LABELS[k]}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:.04em;">${k}</div>
+    </div>
+  `).join('');
+}
+
+function selectOwsTemplate(key) {
+  _owsEditorCurrentKey = key;
+  document.querySelectorAll('#owsTemplatesList [data-owskey]').forEach(el => {
+    if (el.dataset.owskey === key) {
+      el.style.background = '#DCE9F5';
+      el.style.borderColor = '#1B4F8C';
+    } else {
+      el.style.background = '#fff';
+      el.style.borderColor = '#DCE9F5';
+    }
+  });
+  const title = document.getElementById('owsEditorTitle');
+  const textarea = document.getElementById('owsEditorText');
+  if (title) title.textContent = OWS_LABELS[key] || key;
+  if (textarea) textarea.value = OWS_TEMPLATES[key] || '';
+}
+
+async function saveCurrentOwsTemplate() {
+  if (!_owsEditorCurrentKey) return;
+  const textarea = document.getElementById('owsEditorText');
+  const btn = document.getElementById('owsEditorSaveBtn');
+  if (!textarea || !btn) return;
+  const val = textarea.value.trim();
+  if (!val) { showToast('⚠ Treść szablonu nie może być pusta'); return; }
+  btn.disabled = true; btn.textContent = '⏳ Zapisuję…';
+  // Zaktualizuj lokalnie
+  OWS_TEMPLATES[_owsEditorCurrentKey] = val;
+  // Zbuduj obiekt do zapisu (wszystkie szablony)
+  const toSave = {};
+  Object.keys(OWS_LABELS).forEach(k => { toSave[k] = OWS_TEMPLATES[k] || ''; });
+  const ok = await saveOwsTemplatesToSupabase(toSave);
+  btn.disabled = false; btn.textContent = '💾 Zapisz szablon';
+  if (ok) {
+    showToast('✓ Szablon zapisany');
+    // Odśwież pole w formularzu głównym jeśli edytujemy aktualnie używany
+    const owsSel = document.getElementById('owsSelect');
+    const owsEl = document.getElementById('owsText');
+    if (owsSel && owsEl && owsSel.value === _owsEditorCurrentKey && !owsEl.dataset.userEdited) {
+      owsEl.value = val;
+    }
+  } else {
+    showToast('⚠ Błąd zapisu — spróbuj ponownie');
+  }
+}
+
+function restoreCurrentOwsTemplate() {
+  if (!_owsEditorCurrentKey) return;
+  if (!confirm('Przywrócić oryginalną treść szablonu (nadpisze bieżącą wersję po zapisaniu)?')) return;
+  const textarea = document.getElementById('owsEditorText');
+  const original = _owsEditorOriginals[_owsEditorCurrentKey] || '';
+  if (textarea) textarea.value = original;
+  showToast('↺ Przywrócono treść domyślną — pamiętaj o zapisaniu');
+}
+
+/* Oznacz, że user zmienił owsText ręcznie — nie nadpisuj automatycznie. */
+document.addEventListener('DOMContentLoaded', () => {
+  const owsEl = document.getElementById('owsText');
+  if (owsEl) {
+    owsEl.addEventListener('input', () => { owsEl.dataset.userEdited = '1'; });
+  }
+});
+
+/* Po zalogowaniu — pobierz nadpisane szablony OWS. Hook do checkAuth/onLoginSuccess. */
+async function afterLoginHooks() {
+  await loadOwsTemplatesFromSupabase();
+}
+
+/* =====================================================================
+   INTEGRACJA Z ISTNIEJĄCYM UI — dodanie przycisków do topbara
+   ===================================================================== */
+function injectOffersAndOwsButtons() {
+  // Znajdź kontener przycisków topbara — obok "Zapisz wersję roboczą"
+  const draftBtn = document.querySelector('button[onclick*="saveDraft"]');
+  if (!draftBtn || document.getElementById('myOffersBtn')) return;
+  const parent = draftBtn.parentElement;
+  if (!parent) return;
+
+  const btnOffers = document.createElement('button');
+  btnOffers.id = 'myOffersBtn';
+  btnOffers.className = 'btn btn--ghost';
+  btnOffers.innerHTML = '📋 Moje oferty';
+  btnOffers.onclick = openMyOffers;
+  parent.insertBefore(btnOffers, draftBtn);
+
+  const btnOws = document.createElement('button');
+  btnOws.id = 'owsEditorBtn';
+  btnOws.className = 'btn btn--ghost';
+  btnOws.innerHTML = '📝 Edytuj OWS';
+  btnOws.title = 'Edytor Ogólnych Warunków Sprzedaży';
+  btnOws.onclick = openOwsEditor;
+  parent.insertBefore(btnOws, draftBtn);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(injectOffersAndOwsButtons, 500);
+});
+// Fallback jeśli DOMContentLoaded już przeszło
+setTimeout(injectOffersAndOwsButtons, 800);
+
+/* Wykryj zalogowanie (bez modyfikacji istniejącej onLoginSuccess). */
+let _postLoginDone = false;
+async function pollForLogin() {
+  if (currentUser && !_postLoginDone) {
+    _postLoginDone = true;
+    await afterLoginHooks();
+    injectOffersAndOwsButtons();
+    return;
+  }
+  setTimeout(pollForLogin, 500);
+}
+setTimeout(pollForLogin, 500);
 
 /* ============== START ============== */
 checkAuth();
