@@ -1291,7 +1291,7 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
 .modal__filters {
   padding: 16px 24px; background: #FAFCFE;
   border-bottom: 1px solid var(--c-border);
-  display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 10px;
+  display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 10px;
 }
 .modal__body { flex: 1; overflow-y: auto; padding: 12px; }
 .product-row {
@@ -2473,26 +2473,38 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
             <option value="_me">Tylko ja</option>
           </select>
           <div style="flex:1;"></div>
+          <button id="calTeamViewBtn" class="v2-btn v2-btn--ghost" onclick="toggleCalTeamView()" style="display:none;" title="Zobacz zadania całego zespołu (dostępne tylko dla właścicieli)">
+            <i class="ti ti-user"></i> Tylko moje
+          </button>
           <button class="v2-btn v2-btn--primary" onclick="openCustomEventModal(null)">
             <i class="ti ti-plus"></i> Nowe wydarzenie
           </button>
         </div>
 
-        <div class="v2-panel" style="margin-top:12px;padding:16px;">
-          <div class="cal-legend">
-            <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#0369A1;"></span> Follow-up</span>
-            <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#0F3461;"></span> Zadanie</span>
-            <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#059669;"></span> Montaż</span>
-            <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#D97706;"></span> Serwis</span>
-            <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#7C3AED;"></span> Wizja lokalna</span>
-            <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#DC2626;"></span> Własne</span>
+        <div style="display:grid;grid-template-columns:1fr 280px;gap:14px;margin-top:12px;">
+          <div class="v2-panel" style="padding:16px;">
+            <div class="cal-legend">
+              <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#0369A1;"></span> Follow-up</span>
+              <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#0F3461;"></span> Zadanie</span>
+              <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#059669;"></span> Montaż</span>
+              <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#D97706;"></span> Serwis</span>
+              <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#7C3AED;"></span> Wizja lokalna</span>
+              <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#DC2626;"></span> Własne</span>
+            </div>
+
+            <div class="cal-weekdays">
+              <div>Pn</div><div>Wt</div><div>Śr</div><div>Czw</div><div>Pt</div>
+              <div class="cal-weekend">Sob</div><div class="cal-weekend">Ndz</div>
+            </div>
+            <div class="cal-grid" id="inlineCalendarGrid"></div>
           </div>
 
-          <div class="cal-weekdays">
-            <div>Pn</div><div>Wt</div><div>Śr</div><div>Czw</div><div>Pt</div>
-            <div class="cal-weekend">Sob</div><div class="cal-weekend">Ndz</div>
+          <div class="v2-panel" style="padding:14px;height:fit-content;">
+            <div style="font-size:11px;font-weight:700;color:#0A2647;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">
+              <i class="ti ti-clock-hour-3" style="font-size:12px;"></i> Nadchodzące
+            </div>
+            <div id="calUpcomingList" style="display:flex;flex-direction:column;gap:6px;"></div>
           </div>
-          <div class="cal-grid" id="inlineCalendarGrid"></div>
         </div>
       </section>
 
@@ -2577,18 +2589,44 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         </div>
       </section>
 
-      <!-- SEKCJA: PRODUKTY -->
+      <!-- SEKCJA: PRODUKTY KLIMATYZACJI -->
       <section id="v2-section-products" class="v2-section">
-        <h1 class="v2-page-title">Produkty</h1>
-        <p class="v2-page-subtitle">Baza urządzeń, cenniki, marże i produkty własne.</p>
-        <div class="v2-placeholder">
-          <div class="v2-placeholder__icon"><i class="ti ti-air-conditioning" aria-hidden="true"></i></div>
-          <div class="v2-placeholder__title">Zarządzanie produktami</div>
-          <div class="v2-placeholder__text">Wybierz co chcesz otworzyć.</div>
-          <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-            <button onclick="openProductManager()" style="padding:9px 18px;background:#0A2647;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">Zarządzaj produktami</button>
-            <button onclick="showPriceEditor()" style="padding:9px 18px;background:transparent;color:#0A2647;border:1px solid #0A2647;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">Edytuj ceny</button>
+        <h1 class="v2-page-title">Produkty klimatyzacji</h1>
+        <p class="v2-page-subtitle">Baza urządzeń split, multi zewnętrzne i wewnętrzne — cenniki i marże. Ceny widoczne tylko dla handlowców.</p>
+        <div class="v2-toolbar">
+          <label class="v2-toolbar__label">Kategoria:</label>
+          <select id="acProdCatFilter" class="v2-toolbar__select" onchange="renderAcProductsList()">
+            <option value="all">Wszystkie</option>
+            <option value="split">Split</option>
+            <option value="multi_zew">Multi — jedn. zewnętrzna</option>
+            <option value="multi_wew">Multi — jedn. wewnętrzna</option>
+          </select>
+          <label class="v2-toolbar__label">Marka:</label>
+          <select id="acProdBrandFilter" class="v2-toolbar__select" onchange="renderAcProductsList()">
+            <option value="all">Wszystkie</option>
+          </select>
+          <label class="v2-toolbar__label">Moc:</label>
+          <select id="acProdPowerFilter" class="v2-toolbar__select" onchange="renderAcProductsList()">
+            <option value="all">Wszystkie</option>
+            <option value="0-3">do 3,0 kW</option>
+            <option value="3-4">3,0 – 4,0 kW</option>
+            <option value="4-6">4,0 – 6,0 kW</option>
+            <option value="6-8">6,0 – 8,0 kW</option>
+            <option value="8-999">powyżej 8,0 kW</option>
+          </select>
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input id="acProdSearch" type="text" placeholder="Szukaj po marce, modelu lub kolorze..." oninput="renderAcProductsList()">
           </div>
+          <button class="v2-btn v2-btn--primary" onclick="openAcProductEditor(null, null)" title="Dodaj nowe urządzenie do bazy własnych">
+            <i class="ti ti-plus"></i> Dodaj urządzenie
+          </button>
+          <button class="v2-btn v2-btn--ghost" onclick="showPriceEditor()" title="Edycja marż globalnych">
+            <i class="ti ti-percentage"></i> Marże
+          </button>
+        </div>
+        <div class="v2-panel" id="acProductsListWrap" style="margin-top:16px;">
+          <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
         </div>
       </section>
 
@@ -3157,6 +3195,9 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
       <select class="field__select" id="pickerBrand" onchange="renderPicker()">
         <option value="">Wszystkie marki</option>
       </select>
+      <select class="field__select" id="pickerColor" onchange="renderPicker()">
+        <option value="">Każdy kolor</option>
+      </select>
       <select class="field__select" id="pickerPower" onchange="renderPicker()">
         <option value="">Każda moc</option>
         <option value="2">2,0–2,9 kW</option>
@@ -3241,6 +3282,9 @@ textarea.ss-input { resize: vertical; }
     <div style="display:flex;gap:12px;align-items:center;padding:10px 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;flex-wrap:wrap;">
       <!-- Narzędzia -->
       <div style="display:flex;gap:4px;">
+        <button class="ss-tool-btn" data-tool="select" onclick="_ssSetTool('select')" title="Zaznacz / przesuń istniejący element">
+          <i class="ti ti-pointer" style="font-size:16px;"></i>
+        </button>
         <button class="ss-tool-btn ss-tool-btn--active" data-tool="line" onclick="_ssSetTool('line')" title="Linia">
           <i class="ti ti-line" style="font-size:16px;"></i>
         </button>
@@ -3252,6 +3296,25 @@ textarea.ss-input { resize: vertical; }
         </button>
         <button class="ss-tool-btn" data-tool="text" onclick="_ssSetTool('text')" title="Etykieta tekstowa">
           <i class="ti ti-typography" style="font-size:16px;"></i>
+        </button>
+      </div>
+
+      <div style="width:1px;height:24px;background:#E2E8F0;"></div>
+
+      <!-- Presety urządzeń -->
+      <div style="display:flex;gap:4px;align-items:center;">
+        <span style="font-size:10.5px;color:#64748B;font-weight:600;">Wstaw:</span>
+        <button class="ss-tool-btn" onclick="_ssInsertPreset('unit_zew')" title="Jednostka zewnętrzna (agregat AC/HP)">
+          <i class="ti ti-air-conditioning" style="font-size:15px;"></i> Zewn.
+        </button>
+        <button class="ss-tool-btn" onclick="_ssInsertPreset('unit_wew')" title="Jednostka wewnętrzna (klimatyzator ścienny)">
+          <i class="ti ti-wind" style="font-size:15px;"></i> Wewn.
+        </button>
+        <button class="ss-tool-btn" onclick="_ssInsertPreset('rozdzielnia')" title="Rozdzielnia elektryczna">
+          <i class="ti ti-plug" style="font-size:15px;"></i> Rozdz.
+        </button>
+        <button class="ss-tool-btn" onclick="_ssInsertPreset('skropliny')" title="Punkt odprowadzenia skroplin">
+          <i class="ti ti-droplet" style="font-size:15px;"></i> Skropl.
         </button>
       </div>
 
@@ -3285,8 +3348,45 @@ textarea.ss-input { resize: vertical; }
 
       <div style="flex:1;"></div>
 
+      <!-- Zoom zdjęcia -->
+      <div style="display:flex;gap:3px;align-items:center;">
+        <button class="ss-tool-btn" onclick="_ssZoomOut()" title="Pomniejsz zdjęcie">
+          <i class="ti ti-zoom-out" style="font-size:16px;"></i>
+        </button>
+        <span id="ssZoomLabel" style="min-width:44px;text-align:center;font-size:11px;font-weight:600;color:#334155;">100%</span>
+        <button class="ss-tool-btn" onclick="_ssZoomIn()" title="Powiększ zdjęcie">
+          <i class="ti ti-zoom-in" style="font-size:16px;"></i>
+        </button>
+        <button class="ss-tool-btn" onclick="_ssZoomReset()" title="Wpasuj w okno (100%)">
+          <i class="ti ti-zoom-reset" style="font-size:16px;"></i>
+        </button>
+      </div>
+
+      <div style="width:1px;height:24px;background:#E2E8F0;"></div>
+
+      <!-- Transform zaznaczonego -->
+      <div style="display:flex;gap:3px;align-items:center;" title="Działa tylko gdy element jest zaznaczony (narzędzie Zaznacz)">
+        <button class="ss-tool-btn" onclick="_ssRotateSelected(-Math.PI/12)" title="Obróć o -15° (Q)">
+          <i class="ti ti-rotate" style="font-size:16px;transform:scaleX(-1);"></i>
+        </button>
+        <button class="ss-tool-btn" onclick="_ssRotateSelected(Math.PI/12)" title="Obróć o +15° (E)">
+          <i class="ti ti-rotate-clockwise" style="font-size:16px;"></i>
+        </button>
+        <button class="ss-tool-btn" onclick="_ssScaleSelected(0.85)" title="Zmniejsz (-)">
+          <i class="ti ti-minus" style="font-size:16px;"></i>
+        </button>
+        <button class="ss-tool-btn" onclick="_ssScaleSelected(1.15)" title="Powiększ (+)">
+          <i class="ti ti-plus" style="font-size:16px;"></i>
+        </button>
+        <button class="ss-tool-btn" onclick="_ssDuplicateSelected()" title="Duplikuj (Ctrl+D)">
+          <i class="ti ti-copy" style="font-size:16px;"></i>
+        </button>
+      </div>
+
+      <div style="width:1px;height:24px;background:#E2E8F0;"></div>
+
       <!-- Akcje -->
-      <button class="v2-btn v2-btn--ghost" onclick="_ssUndoAnnotation()" title="Cofnij">
+      <button class="v2-btn v2-btn--ghost" onclick="_ssUndoAnnotation()" title="Cofnij (Ctrl+Z)">
         <i class="ti ti-arrow-back-up"></i> Cofnij
       </button>
       <button class="v2-btn v2-btn--ghost" onclick="_ssClearAnnotations()" style="color:#991b1b;border-color:#fee2e2;" title="Wyczyść wszystkie">
@@ -3596,6 +3696,19 @@ textarea.ss-input { resize: vertical; }
       <div style="margin-top:12px;">
         <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Powiąż z klientem (opcjonalne)</label>
         <select id="taskClient" class="v2-toolbar__select" style="width:100%;"></select>
+      </div>
+      <div style="margin-top:12px;padding:10px 12px;background:#F8FAFC;border-radius:7px;">
+        <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:6px;">Widoczność w kalendarzu</label>
+        <div style="display:flex;gap:14px;font-size:12px;color:#334155;">
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="taskVisibility" value="private" checked style="accent-color:#0F3461;">
+            Prywatne (tylko przypisany i autor)
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="taskVisibility" value="team" style="accent-color:#0F3461;">
+            Zespołowe (widzą wszyscy)
+          </label>
+        </div>
       </div>
       <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid #E2E8F0;">
         <div>
@@ -5066,6 +5179,9 @@ function openTaskModal(taskId, prefill) {
     document.getElementById('taskPriority').value = t.priority || 'med';
     document.getElementById('taskDueAt').value = t.due_at ? _toDatetimeLocal(t.due_at) : '';
     clientSel.value = t.related_client_id || '';
+    // Wypełnij widoczność
+    const vis = t.visibility || 'private';
+    document.querySelectorAll('input[name="taskVisibility"]').forEach(r => { r.checked = (r.value === vis); });
     // Delete widoczny tylko dla ownera lub osoby która zleciła
     const canDelete = currentUserIsOwner() || (t.assigner_email?.toLowerCase() === (currentUser?.email || '').toLowerCase());
     deleteBtn.style.display = canDelete ? 'inline-flex' : 'none';
@@ -5077,6 +5193,8 @@ function openTaskModal(taskId, prefill) {
     document.getElementById('taskPriority').value = 'med';
     document.getElementById('taskDueAt').value = '';
     clientSel.value = prefill?.clientId || '';
+    // Domyślna widoczność: prywatne
+    document.querySelectorAll('input[name="taskVisibility"]').forEach(r => { r.checked = (r.value === 'private'); });
     if (prefill?.title) document.getElementById('taskTitle').value = prefill.title;
     deleteBtn.style.display = 'none';
   }
@@ -5113,6 +5231,8 @@ async function saveTask() {
   const priority = document.getElementById('taskPriority').value;
   const dueRaw = document.getElementById('taskDueAt').value;
   const related_client_id = document.getElementById('taskClient').value || null;
+  const visRadio = document.querySelector('input[name="taskVisibility"]:checked');
+  const visibility = visRadio ? visRadio.value : 'private';
 
   if (!title) { showToast('Wpisz tytuł zadania'); return; }
   if (!assignee_email) { showToast('Wybierz osobę do przypisania'); return; }
@@ -5123,7 +5243,8 @@ async function saveTask() {
     assignee_email,
     priority,
     due_at: dueRaw ? new Date(dueRaw).toISOString() : null,
-    related_client_id
+    related_client_id,
+    visibility
   };
   if (!id) payload.assigner_email = currentUser?.email || null;
 
@@ -8991,6 +9112,424 @@ function getMergedPool(type) {
   return [...builtIn, ...custom];
 }
 
+/* ============================================================
+   PRODUKTY KLIMATYZACJI — widok inline z filtrami
+   ============================================================ */
+
+const AC_CAT_LABELS = { split: 'Split', multi_zew: 'Multi zew.', multi_wew: 'Multi wew.' };
+const AC_CAT_COLORS = { split: '#0369A1', multi_zew: '#059669', multi_wew: '#7C3AED' };
+
+const AC_BRAND_COLORS = {
+  'HAIER': '#0284C7', 'GREE': '#DC2626', 'LG': '#7C3AED', 'PANASONIC': '#059669',
+  'SAMSUNG': '#1E40AF', 'TOSHIBA': '#DB2777', 'MITSUBISHI': '#B91C1C',
+  'DAIKIN': '#0F766E', 'VIESSMANN': '#B45309'
+};
+
+/* Wyciąga moc kW z pola moc_kw lub z modelu ("... - 3,5 kW") */
+function _acExtractPower(prod) {
+  if (typeof prod.moc_kw === 'number' && prod.moc_kw > 0) return prod.moc_kw;
+  const m = String(prod.model || '').match(/(\d+[,.]?\d*)\s*kW/i);
+  if (m) return parseFloat(m[1].replace(',', '.'));
+  return null;
+}
+
+/* Wypełnia dropdown marek dostępnymi markami z aktualnie wybranej kategorii */
+function _acPopulateBrandFilter() {
+  const catFilter = document.getElementById('acProdCatFilter')?.value || 'all';
+  const brandSel = document.getElementById('acProdBrandFilter');
+  if (!brandSel) return;
+  const currentVal = brandSel.value || 'all';
+  const brands = new Set();
+  const pushBrands = (arr) => (arr || []).forEach(p => p.marka && brands.add(p.marka));
+  if (catFilter === 'all') {
+    pushBrands(getMergedPool('split'));
+    pushBrands(getMergedPool('multi_zew'));
+    pushBrands(getMergedPool('multi_wew'));
+  } else {
+    pushBrands(getMergedPool(catFilter));
+  }
+  const sorted = Array.from(brands).sort();
+  brandSel.innerHTML = '<option value="all">Wszystkie</option>' +
+    sorted.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+  brandSel.value = sorted.includes(currentVal) ? currentVal : 'all';
+}
+
+function renderAcProductsList() {
+  _acPopulateBrandFilter();
+  const wrap = document.getElementById('acProductsListWrap');
+  if (!wrap) return;
+  const catFilter    = document.getElementById('acProdCatFilter')?.value || 'all';
+  const brandFilter  = document.getElementById('acProdBrandFilter')?.value || 'all';
+  const powerFilter  = document.getElementById('acProdPowerFilter')?.value || 'all';
+  const search       = (document.getElementById('acProdSearch')?.value || '').toLowerCase().trim();
+
+  // Zbuduj listę z odpowiednich pooli, otaguj kategorią
+  let items = [];
+  const addItems = (type) => {
+    getMergedPool(type).forEach(p => items.push({ ...p, _type: type }));
+  };
+  if (catFilter === 'all') { addItems('split'); addItems('multi_zew'); addItems('multi_wew'); }
+  else addItems(catFilter);
+
+  // Filtr marka
+  if (brandFilter !== 'all') items = items.filter(p => p.marka === brandFilter);
+
+  // Filtr moc
+  if (powerFilter !== 'all') {
+    const [minStr, maxStr] = powerFilter.split('-');
+    const min = parseFloat(minStr), max = parseFloat(maxStr);
+    items = items.filter(p => {
+      const kw = _acExtractPower(p);
+      return kw !== null && kw >= min && kw < max;
+    });
+  }
+
+  // Wyszukiwarka po marka/model
+  if (search) {
+    items = items.filter(p => {
+      const blob = [p.marka, p.model].filter(Boolean).join(' ').toLowerCase();
+      return blob.includes(search);
+    });
+  }
+
+  // Statystyki
+  const stats = { all: items.length, split: 0, multi_zew: 0, multi_wew: 0 };
+  items.forEach(p => { if (stats[p._type] !== undefined) stats[p._type]++; });
+
+  if (items.length === 0) {
+    wrap.innerHTML = `
+      <div style="padding:40px 20px;text-align:center;color:#64748B;">
+        <i class="ti ti-package-off" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">Brak wyników dla wybranych filtrów</div>
+        <div style="margin-top:6px;font-size:12px;">Zmień filtry lub wyczyść wyszukiwarkę.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const fmtPl = (x) => Number(x||0).toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  // Statystyka na górze
+  const statsHtml = `
+    <div style="padding:12px 16px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:12px;color:#475569;display:flex;gap:20px;flex-wrap:wrap;">
+      <span><strong style="color:#0A2647;">${stats.all}</strong> pozycji</span>
+      ${stats.split > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${AC_CAT_COLORS.split};margin-right:4px;"></span> Split: <strong>${stats.split}</strong></span>` : ''}
+      ${stats.multi_zew > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${AC_CAT_COLORS.multi_zew};margin-right:4px;"></span> Multi zew.: <strong>${stats.multi_zew}</strong></span>` : ''}
+      ${stats.multi_wew > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${AC_CAT_COLORS.multi_wew};margin-right:4px;"></span> Multi wew.: <strong>${stats.multi_wew}</strong></span>` : ''}
+    </div>
+  `;
+
+  // Ogranicz do 200 pozycji dla wydajności
+  const shown = items.slice(0, 200);
+  const hasMore = items.length > 200;
+
+  wrap.innerHTML = `
+    ${statsHtml}
+    <div style="max-height:calc(100vh - 340px);overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;z-index:1;">
+          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Kategoria</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Marka</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Model</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Moc</th>
+            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;" title="Cena netto dla klienta (już po rabacie od katalogowej)">Cena klienta</th>
+            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;" title="Twój koszt zakupu od dystrybutora">Twój koszt</th>
+            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Marża</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shown.map(p => {
+            const catColor = AC_CAT_COLORS[p._type] || '#64748B';
+            const catLabel = AC_CAT_LABELS[p._type] || p._type;
+            const brandColor = AC_BRAND_COLORS[p.marka] || '#64748B';
+            const kw = _acExtractPower(p);
+            const kwLabel = kw !== null ? kw.toString().replace('.', ',') + ' kW' : '—';
+            const konfig = p.konfig ? ` (${p.konfig})` : '';
+            // Marża — używamy calcCosts() (tak samo jak wizard) żeby wartości zgadzały się z listą urządzeń
+            let margeStr = '—';
+            let kosztStr = '—';
+            const costs = (typeof calcCosts === 'function') ? calcCosts(p.cena, p.marka || '', p.cena_kat) : null;
+            if (costs && costs.marza != null) {
+              margeStr = costs.marza.toFixed(1) + '%';
+              kosztStr = fmtPl(costs.koszt) + ' zł';
+            }
+            // Model — usuń prefixy typu "SPLIT " / "MULTI " dla czytelności
+            const modelClean = String(p.model || '').replace(/^(SPLIT|MULTI\+?|J\.WEW|J\.ZEW)\s+/i, '');
+            return `
+              <tr style="border-bottom:1px solid #F1F5F9;" onmouseover="this.style.background='#FAFCFF'" onmouseout="this.style.background='transparent'">
+                <td style="padding:9px 14px;font-size:11px;white-space:nowrap;">
+                  <span style="padding:2px 8px;background:${catColor}15;color:${catColor};border-radius:10px;font-weight:600;">${escapeHtml(catLabel)}${escapeHtml(konfig)}</span>
+                </td>
+                <td style="padding:9px 14px;font-size:11.5px;white-space:nowrap;">
+                  <span style="padding:2px 8px;background:${brandColor}15;color:${brandColor};border-radius:5px;font-weight:700;">${escapeHtml(p.marka || '')}</span>
+                </td>
+                <td style="padding:9px 14px;font-size:12px;color:#334155;">${escapeHtml(modelClean)}${p._custom ? ' <span style="padding:1px 5px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:9.5px;font-weight:700;margin-left:6px;">WŁASNY</span>' : ''}</td>
+                <td style="padding:9px 14px;font-size:12px;text-align:center;color:#0A2647;font-weight:600;white-space:nowrap;">${kwLabel}</td>
+                <td style="padding:9px 14px;font-size:12.5px;font-weight:700;color:#1B4F8C;text-align:right;white-space:nowrap;">
+                  ${fmtPl(p.cena)} zł
+                  ${p.cena_kat ? `<div style="font-size:10px;color:#94A3B8;font-weight:500;margin-top:1px;">kat. ${fmtPl(p.cena_kat)} zł</div>` : ''}
+                </td>
+                <td style="padding:9px 14px;font-size:12px;color:#334155;text-align:right;white-space:nowrap;">${kosztStr}</td>
+                <td style="padding:9px 14px;font-size:11.5px;text-align:right;white-space:nowrap;">
+                  <span style="padding:2px 7px;background:#F0FDF4;color:#166534;border-radius:5px;font-weight:700;">${margeStr}</span>
+                </td>
+                <td style="padding:9px 14px;text-align:center;white-space:nowrap;">
+                  ${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Otwórz stronę producenta" style="display:inline-block;padding:4px 8px;color:#0F3461;text-decoration:none;"><i class="ti ti-external-link" style="font-size:14px;"></i></a>` : ''}
+                  ${p._custom ? `
+                    <button onclick="openAcProductEditor('${p._type}', ${p._idx})" style="padding:4px 8px;background:#F1F5F9;color:#334155;border:none;border-radius:5px;font-size:11px;cursor:pointer;margin-right:2px;" title="Edytuj"><i class="ti ti-pencil" style="font-size:12px;"></i></button>
+                    <button onclick="deleteCustomAcProduct('${p._type}', ${p._idx})" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;" title="Usuń"><i class="ti ti-trash" style="font-size:12px;"></i></button>
+                  ` : ''}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+      ${hasMore ? `<div style="padding:12px;text-align:center;color:#64748B;font-size:11.5px;background:#F8FAFC;border-top:1px solid #E2E8F0;">Wyświetlono pierwsze <strong>200 z ${items.length}</strong> pozycji. Zawęź filtry aby zobaczyć konkretne modele.</div>` : ''}
+    </div>
+  `;
+}
+
+/* ============================================================
+   MODAL DODAWANIA/EDYCJI URZĄDZENIA KLIMATYZACJI
+   ============================================================ */
+
+let _acProductEditing = null;   // { type, idx | null, data }
+
+function openAcProductEditor(type, idx) {
+  // idx === null → nowe urządzenie
+  // idx >= 10000 → edycja własnej pozycji (idx - 10000 to indeks w customDb[type])
+  const currentCat = document.getElementById('acProdCatFilter')?.value || 'all';
+  const defaultType = (type && type !== 'all') ? type : (currentCat !== 'all' ? currentCat : 'split');
+  let data;
+  if (idx !== null && idx !== undefined) {
+    const customDb = loadCustomDb();
+    const arr = customDb[type] || [];
+    const localIdx = idx - 10000;
+    data = { ...(arr[localIdx] || {}) };
+    _acProductEditing = { type, idx, isNew: false };
+  } else {
+    data = { marka: '', model: '', moc_kw: '', cena: '', cena_kat: '', link: '', konfig: '' };
+    _acProductEditing = { type: defaultType, idx: null, isNew: true };
+  }
+  const mod = document.getElementById('acProdEditModal');
+  if (!mod) { _acProductEditorRender(defaultType, data); return; }
+  _acProductEditorRender(_acProductEditing.type, data);
+}
+
+function _acProductEditorRender(type, data) {
+  // Zapewnij że modal istnieje w DOM
+  let mod = document.getElementById('acProdEditModal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'acProdEditModal';
+    mod.className = 'modal-backdrop';
+    document.body.appendChild(mod);
+  }
+  const brandOptions = Object.keys(BRAND_MARGINS || {}).sort()
+    .map(b => `<option value="${b}"${b === (data.marka || '').toUpperCase() ? ' selected' : ''}>${b}</option>`)
+    .join('');
+  const isMulti = (type === 'multi_zew' || type === 'multi_wew');
+  const isMultiZew = type === 'multi_zew';
+  mod.innerHTML = `
+    <div class="modal" style="max-width:560px;">
+      <div class="modal__head" style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0A2647;">${_acProductEditing.isNew ? 'Nowe urządzenie' : 'Edycja urządzenia'}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">Własna pozycja w bazie ${AC_CAT_LABELS[type] || type}</div>
+        </div>
+        <button onclick="closeAcProductEditor()" style="background:transparent;border:none;color:#64748B;font-size:22px;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div class="modal__body" style="padding:16px 18px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Kategoria <span style="color:#DC2626;">*</span></label>
+            <select id="acEditType" class="v2-toolbar__select" style="width:100%;" onchange="_acEditTypeChanged(this.value)">
+              <option value="split"${type==='split'?' selected':''}>Split (kompletny)</option>
+              <option value="multi_zew"${type==='multi_zew'?' selected':''}>Multi — jedn. zewnętrzna</option>
+              <option value="multi_wew"${type==='multi_wew'?' selected':''}>Multi — jedn. wewnętrzna</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Marka <span style="color:#DC2626;">*</span></label>
+            <select id="acEditMarka" class="v2-toolbar__select" style="width:100%;">
+              <option value="">— wybierz —</option>
+              ${brandOptions}
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Model / nazwa <span style="color:#DC2626;">*</span></label>
+          <input id="acEditModel" type="text" class="v2-toolbar__select" style="width:100%;" placeholder="np. Klimatyzator Haier Jade Plus - 3,5 kW" value="${escapeHtml(data.model || '')}">
+          <div style="font-size:10.5px;color:#94A3B8;margin-top:3px;">Format zalecany: <code>Klimatyzator [Marka] [Nazwa] [kolor] - [X,X kW]</code></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Moc (kW) <span style="color:#94A3B8;font-weight:400;">— jeśli w modelu jest "X,X kW" można pominąć</span></label>
+            <input id="acEditMoc" type="text" class="v2-toolbar__select" style="width:100%;" placeholder="np. 3,5" value="${data.moc_kw || ''}">
+          </div>
+          <div id="acEditKonfigWrap" style="display:${isMultiZew?'block':'none'};">
+            <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Konfiguracja</label>
+            <select id="acEditKonfig" class="v2-toolbar__select" style="width:100%;">
+              <option value="">—</option>
+              <option value="2+1"${data.konfig==='2+1'?' selected':''}>2+1</option>
+              <option value="3+1"${data.konfig==='3+1'?' selected':''}>3+1</option>
+              <option value="4+1"${data.konfig==='4+1'?' selected':''}>4+1</option>
+              <option value="5+1"${data.konfig==='5+1'?' selected':''}>5+1</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Cena klienta netto (zł) <span style="color:#DC2626;">*</span></label>
+            <input id="acEditCena" type="text" class="v2-toolbar__select" style="width:100%;" placeholder="np. 5594.40" value="${data.cena || ''}">
+            <div style="font-size:10.5px;color:#94A3B8;margin-top:3px;">Cena którą klient zapłaci (już po Twoim rabacie od kat.)</div>
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Cena katalogowa netto (zł)</label>
+            <input id="acEditCenaKat" type="text" class="v2-toolbar__select" style="width:100%;" placeholder="np. 6660" value="${data.cena_kat || ''}">
+            <div style="font-size:10.5px;color:#94A3B8;margin-top:3px;">Cena z cennika producenta — do obliczania marży</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Link do strony producenta (opcjonalne)</label>
+          <input id="acEditLink" type="text" class="v2-toolbar__select" style="width:100%;" placeholder="https://..." value="${escapeHtml(data.link || '')}">
+        </div>
+
+        <div id="acEditPreview" style="margin-top:14px;padding:10px 12px;background:#F8FAFC;border-radius:6px;border:1px solid #E2E8F0;font-size:11.5px;color:#475569;">
+          <div style="font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Podgląd marży (przy zapisie policzone automatycznie)</div>
+          <div id="acEditPreviewBody">— wypełnij markę, cenę klienta i cenę katalogową —</div>
+        </div>
+      </div>
+      <div class="modal__foot" style="padding:12px 18px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;gap:8px;">
+        <div>
+          ${!_acProductEditing.isNew ? `<button onclick="deleteCustomAcProduct('${_acProductEditing.type}', ${_acProductEditing.idx})" style="padding:8px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-trash" style="font-size:12px;"></i> Usuń</button>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="closeAcProductEditor()" style="padding:8px 14px;background:transparent;color:#334155;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button onclick="saveAcProductFromEditor()" style="padding:8px 18px;background:#0A2647;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-check" style="font-size:12px;"></i> Zapisz</button>
+        </div>
+      </div>
+    </div>
+  `;
+  mod.classList.add('modal-backdrop--open');
+  // Live preview marży
+  ['acEditMarka', 'acEditCena', 'acEditCenaKat'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', _acRefreshEditorPreview);
+    if (el) el.addEventListener('change', _acRefreshEditorPreview);
+  });
+  _acRefreshEditorPreview();
+}
+
+function _acEditTypeChanged(newType) {
+  const wrap = document.getElementById('acEditKonfigWrap');
+  if (wrap) wrap.style.display = newType === 'multi_zew' ? 'block' : 'none';
+  if (_acProductEditing) _acProductEditing.type = newType;
+}
+
+function _acRefreshEditorPreview() {
+  const body = document.getElementById('acEditPreviewBody');
+  if (!body) return;
+  const marka = document.getElementById('acEditMarka')?.value || '';
+  const cena = parseFloat(String(document.getElementById('acEditCena')?.value || '').replace(',', '.'));
+  const cenaKat = parseFloat(String(document.getElementById('acEditCenaKat')?.value || '').replace(',', '.'));
+  if (!marka || isNaN(cena) || isNaN(cenaKat)) {
+    body.innerHTML = '— wypełnij markę, cenę klienta i cenę katalogową —';
+    return;
+  }
+  const costs = calcCosts(cena, marka, cenaKat);
+  if (!costs) {
+    body.innerHTML = '<span style="color:#DC2626;">Nieznana marka — sprawdź BRAND_MARGINS</span>';
+    return;
+  }
+  const fmtPl = (x) => Number(x||0).toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2});
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div><div style="font-size:10px;color:#94A3B8;">Twój koszt</div><div style="font-size:13px;font-weight:700;color:#334155;">${fmtPl(costs.koszt)} zł</div></div>
+      <div><div style="font-size:10px;color:#94A3B8;">Marża</div><div style="font-size:13px;font-weight:700;color:#166534;">${costs.marza.toFixed(1)}%</div></div>
+      <div><div style="font-size:10px;color:#94A3B8;">Zysk (netto)</div><div style="font-size:13px;font-weight:700;color:#0A2647;">${fmtPl(cena - costs.koszt)} zł</div></div>
+    </div>
+  `;
+}
+
+function closeAcProductEditor() {
+  const mod = document.getElementById('acProdEditModal');
+  if (mod) mod.classList.remove('modal-backdrop--open');
+  _acProductEditing = null;
+}
+
+function saveAcProductFromEditor() {
+  if (!_acProductEditing) return;
+  const type = document.getElementById('acEditType')?.value || _acProductEditing.type;
+  const marka = document.getElementById('acEditMarka')?.value.trim() || '';
+  const model = document.getElementById('acEditModel')?.value.trim() || '';
+  const mocRaw = document.getElementById('acEditMoc')?.value.trim() || '';
+  const cenaRaw = document.getElementById('acEditCena')?.value.trim() || '';
+  const cenaKatRaw = document.getElementById('acEditCenaKat')?.value.trim() || '';
+  const link = document.getElementById('acEditLink')?.value.trim() || '';
+  const konfig = document.getElementById('acEditKonfig')?.value || '';
+
+  // Walidacja
+  if (!marka) { showToast('Wybierz markę'); return; }
+  if (!model) { showToast('Wpisz model / nazwę'); return; }
+  const cena = parseFloat(cenaRaw.replace(',', '.'));
+  if (isNaN(cena) || cena <= 0) { showToast('Wpisz cenę klienta (liczba dodatnia)'); return; }
+  const cenaKat = cenaKatRaw ? parseFloat(cenaKatRaw.replace(',', '.')) : null;
+  if (cenaKatRaw && (isNaN(cenaKat) || cenaKat <= 0)) { showToast('Cena katalogowa musi być liczbą dodatnią'); return; }
+  const moc = mocRaw ? parseFloat(mocRaw.replace(',', '.')) : null;
+
+  const newRow = {
+    marka: marka.toUpperCase(),
+    model,
+    cena,
+    cena_kat: cenaKat || cena,   // fallback jeśli brak katalogowej — do liczenia marży
+    link: link || null,
+    typ: type === 'split' ? 'split' : (type === 'multi_zew' ? 'multi_zew' : 'multi_wew'),
+    moc_kw: moc
+  };
+  if (type === 'multi_zew' && konfig) newRow.konfig = konfig;
+
+  // Zapisz do custom DB
+  const customDb = loadCustomDb();
+  if (!customDb[type]) customDb[type] = [];
+  if (_acProductEditing.isNew) {
+    customDb[type].push(newRow);
+  } else {
+    const localIdx = _acProductEditing.idx - 10000;
+    if (localIdx >= 0 && localIdx < customDb[type].length) {
+      customDb[type][localIdx] = newRow;
+    } else {
+      customDb[type].push(newRow);
+    }
+  }
+  saveCustomDb(customDb);
+  showToast(_acProductEditing.isNew ? 'Urządzenie dodane' : 'Urządzenie zaktualizowane');
+  closeAcProductEditor();
+  renderAcProductsList();
+}
+
+function deleteCustomAcProduct(type, idx) {
+  if (!confirm('Usunąć tę pozycję z bazy własnych urządzeń?')) return;
+  const customDb = loadCustomDb();
+  const localIdx = idx - 10000;
+  if (!customDb[type] || localIdx < 0 || localIdx >= customDb[type].length) {
+    showToast('Nie znaleziono pozycji');
+    return;
+  }
+  customDb[type].splice(localIdx, 1);
+  saveCustomDb(customDb);
+  showToast('Usunięto');
+  closeAcProductEditor();
+  renderAcProductsList();
+}
+
 // Pobierz produkt z połączonej bazy (obsługuje custom indeksy)
 function getProductFromPool(type, idx) {
   if (idx >= 10000) {
@@ -10120,6 +10659,32 @@ function calendarNavToday() {
 
 /* ==================== INLINE CALENDAR RENDER ==================== */
 
+let _calTeamViewMode = false;
+
+function isCurrentUserOwner() {
+  if (!currentUser?.email) return false;
+  if (typeof teamByEmail !== 'function') return false;
+  const m = teamByEmail(currentUser.email);
+  return m && m.role === 'owner' && m.active !== false;
+}
+
+function toggleCalTeamView() {
+  _calTeamViewMode = !_calTeamViewMode;
+  const btn = document.getElementById('calTeamViewBtn');
+  if (btn) {
+    if (_calTeamViewMode) {
+      btn.classList.add('v2-btn--primary');
+      btn.classList.remove('v2-btn--ghost');
+      btn.innerHTML = '<i class="ti ti-users"></i> Widok zespołu (włączony)';
+    } else {
+      btn.classList.remove('v2-btn--primary');
+      btn.classList.add('v2-btn--ghost');
+      btn.innerHTML = '<i class="ti ti-user"></i> Tylko moje';
+    }
+  }
+  renderInlineCalendar();
+}
+
 function renderInlineCalendar() {
   const grid = document.getElementById('inlineCalendarGrid');
   const label = document.getElementById('calMonthLabel');
@@ -10129,6 +10694,12 @@ function renderInlineCalendar() {
   const month = _calendarCurrentMonth.getMonth();
   const monthNames = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
   label.textContent = monthNames[month] + ' ' + year;
+
+  // Pokaż przycisk "Widok zespołu" tylko dla ownerów
+  const teamBtn = document.getElementById('calTeamViewBtn');
+  if (teamBtn) {
+    teamBtn.style.display = isCurrentUserOwner() ? 'inline-flex' : 'none';
+  }
 
   // Filtry
   const typeFilter = document.getElementById('calFilterType')?.value || 'all';
@@ -10186,6 +10757,40 @@ function renderInlineCalendar() {
     html.push(_buildInlineCalDay(new Date(year, month + 1, d), true, eventsByDate, todayStr));
   }
   grid.innerHTML = html.join('');
+
+  // Panel "Nadchodzące" — najbliższe 8 wydarzeń od dziś w przód
+  _renderCalUpcoming(allEvents);
+}
+
+function _renderCalUpcoming(allEvents) {
+  const wrap = document.getElementById('calUpcomingList');
+  if (!wrap) return;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const upcoming = allEvents
+    .filter(e => e.date >= todayStr)
+    .sort((a,b) => (a.date + (a.time || '00:00')).localeCompare(b.date + (b.time || '00:00')))
+    .slice(0, 8);
+  if (upcoming.length === 0) {
+    wrap.innerHTML = '<div style="padding:20px 10px;text-align:center;color:#94A3B8;font-size:11px;font-style:italic;">Brak nadchodzących wydarzeń w tym miesiącu i późniejszych.</div>';
+    return;
+  }
+  wrap.innerHTML = upcoming.map(e => {
+    const d = new Date(e.date);
+    const dayName = ['nd', 'pon', 'wt', 'śr', 'czw', 'pt', 'sob'][d.getDay()];
+    const dateLabel = e.date === todayStr ? 'DZIŚ' : `${dayName} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+    const isToday = e.date === todayStr;
+    return `
+      <button onclick="openInlineDayDetail('${e.date}')" style="width:100%;text-align:left;background:transparent;border:none;border-left:3px solid ${e.color};padding:6px 10px;cursor:pointer;font-family:inherit;border-radius:0 6px 6px 0;transition:background .15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+          <span style="font-size:10px;font-weight:800;color:${isToday ? '#DC2626' : '#334155'};text-transform:uppercase;letter-spacing:.04em;">${dateLabel}${e.time ? ' · ' + e.time : ''}</span>
+          <i class="ti ${e.icon}" style="font-size:11px;color:${e.color};"></i>
+        </div>
+        <div style="font-size:11.5px;color:#0A2647;font-weight:600;margin-top:2px;line-height:1.3;">${escapeHtml(e.title.length > 40 ? e.title.slice(0,38) + '…' : e.title)}</div>
+      </button>
+    `;
+  }).join('');
 }
 
 function _buildInlineCalDay(date, isOther, eventsByDate, todayStr) {
@@ -10201,12 +10806,14 @@ function _buildInlineCalDay(date, isOther, eventsByDate, todayStr) {
 
   const shown = events.slice(0, 3);
   const rest = events.length - shown.length;
-  const evHtml = shown.map(e => `
-    <div class="cal-event" style="background:${e.color};" title="${escapeHtml(e.title)}${e.description ? ' — ' + escapeHtml(e.description) : ''}">
+  const evHtml = shown.map(e => {
+    const tooltip = [e.title, e.description, e.location ? '📍 ' + e.location : ''].filter(Boolean).join(' — ');
+    return `
+    <div class="cal-event" style="background:${e.color};" title="${escapeHtml(tooltip)}">
       <i class="ti ${e.icon}"></i>
       ${e.time ? `<span style="font-weight:800;">${e.time}</span> ` : ''}${escapeHtml(e.title.length > 22 ? e.title.slice(0,20) + '…' : e.title)}
     </div>
-  `).join('');
+  `;}).join('');
   const overflow = rest > 0 ? `<div class="cal-event cal-event--overflow">+ ${rest} więcej</div>` : '';
 
   return `
@@ -10257,6 +10864,7 @@ async function loadCustomCalendarEvents() {
     const data = await sbFetch('/rest/v1/calendar_events?select=*&order=event_date.asc');
     _calendarCustomEvents = (data || []).map(r => ({
       id: r.id, title: r.title, description: r.description,
+      location: r.location || null,
       eventDate: r.event_date, eventTime: r.event_time,
       color: r.color || '#A855F7',
       createdBy: r.created_by_name || null,
@@ -10293,6 +10901,7 @@ async function saveCustomCalendarEvent(event) {
   try {
     const payload = {
       title: event.title, description: event.description || null,
+      location: event.location || null,
       event_date: event.eventDate, event_time: event.eventTime || null,
       color: event.color || '#A855F7',
       created_by_name: event.createdBy || (currentUser.email ? currentUser.email.split('@')[0] : null)
@@ -10376,11 +10985,23 @@ function getAllCalendarEvents() {
     });
   }
 
-  // 2) Zadania (tasks) z terminem
+  // 2) Zadania (tasks) z terminem — respektuj visibility
+  const myEmail = (currentUser?.email || '').toLowerCase();
+  const iAmOwner = typeof isCurrentUserOwner === 'function' ? isCurrentUserOwner() : false;
+  const teamCalendarMode = (typeof _calTeamViewMode !== 'undefined' && _calTeamViewMode === true);
   if (typeof tasksDb !== 'undefined' && Array.isArray(tasksDb)) {
     tasksDb.forEach(t => {
       if (t.status !== 'open') return;
       if (!t.due_at) return;
+      // Widoczność:
+      // - team → wszyscy widzą
+      // - private → widzi tylko assignee albo assigner; owner w trybie team-view też widzi
+      const vis = t.visibility || 'private';
+      if (vis === 'private') {
+        const isMine = t.assignee_email === myEmail || t.assigner_email === myEmail;
+        const ownerCanSee = iAmOwner && teamCalendarMode;
+        if (!isMine && !ownerCanSee) return;
+      }
       const d = new Date(t.due_at);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -10394,6 +11015,7 @@ function getAllCalendarEvents() {
         taskId: t.id,
         handlerEmail: t.assignee_email,
         priority: t.priority,
+        visibility: vis,
         icon: 'ti-checklist', color: '#0F3461'
       });
     });
@@ -10469,6 +11091,7 @@ function getAllCalendarEvents() {
       time: e.eventTime,
       title: e.title,
       description: e.description || '',
+      location: e.location || '',
       createdBy: e.createdBy,
       customEventId: e.id,
       icon: 'ti-pin', color: e.color || '#DC2626'
@@ -10573,15 +11196,19 @@ function openDayModal(dateStr) {
   } else {
     allEvents.forEach(e => {
       const timeStr = e.time ? `<i class="ti ti-clock" style="font-size:12px;"></i> ${e.time.substring(0,5)}` : '';
+      const locationStr = e.location
+        ? `<div style="font-size:11px;color:#7C3AED;margin-top:4px;"><i class="ti ti-map-pin" style="font-size:11px;"></i> ${escapeHtml(e.location)}</div>`
+        : '';
       const clientLink = e.clientId
         ? `<button style="background:transparent; border:none; color:var(--c-primary); font-size:11px; cursor:pointer; padding:0; text-decoration:underline;" onclick="closeDayModal(); openFunnelDetail('${e.clientId}')"><i class="ti ti-user" style="font-size:11px;"></i> ${escapeHtml(e.clientName || '')}</button>`
         : '';
+      const iconHtml = e.icon.startsWith('<') ? e.icon : `<i class="ti ${e.icon}" style="color:${e.color};"></i>`;
       const deleteBtn = e.type === 'custom' && e.customEventId
         ? `<div class="day-event-item__actions"><button onclick="handleDeleteCustomEvent('${e.customEventId}')" title="Usuń"><i class="ti ti-trash"></i></button></div>`
         : '';
       html += `
         <div class="day-event-item day-event-item--${e.type}">
-          <span class="day-event-item__icon">${e.icon}</span>
+          <span class="day-event-item__icon">${iconHtml}</span>
           <div class="day-event-item__content">
             <div class="day-event-item__title">${escapeHtml(e.title)}</div>
             <div class="day-event-item__meta">
@@ -10589,6 +11216,7 @@ function openDayModal(dateStr) {
               ${timeStr}${timeStr && clientLink ? ' · ' : ''}${clientLink}
               ${e.createdBy ? ' · dodał: ' + escapeHtml(e.createdBy) : ''}
             </div>
+            ${locationStr}
           </div>
           ${deleteBtn}
         </div>
@@ -10620,6 +11248,10 @@ function openDayModal(dateStr) {
           </select>
         </div>
         <div class="day-add-event__field full">
+          <label>Lokalizacja (opcjonalnie)</label>
+          <input id="newEventLocation" type="text" placeholder="np. ul. Braniborska 14, Wrocław; salon 4Climat; klient X">
+        </div>
+        <div class="day-add-event__field full">
           <label>Opis (opcjonalnie)</label>
           <textarea id="newEventDesc" rows="2" placeholder="Szczegóły wydarzenia..."></textarea>
         </div>
@@ -10645,6 +11277,7 @@ async function handleAddCustomEvent() {
   const event = {
     title: title,
     description: document.getElementById('newEventDesc').value.trim() || null,
+    location: document.getElementById('newEventLocation')?.value.trim() || null,
     eventDate: _calendarSelectedDate,
     eventTime: document.getElementById('newEventTime').value || null,
     color: document.getElementById('newEventColor').value || '#A855F7',
@@ -10654,6 +11287,7 @@ async function handleAddCustomEvent() {
   if (ok) {
     showToast('✓ Wydarzenie dodane');
     renderCalendar();
+    if (typeof renderInlineCalendar === 'function') renderInlineCalendar();
     openDayModal(_calendarSelectedDate); // przeładuj widok dnia
   }
 }
@@ -10662,6 +11296,7 @@ async function handleDeleteCustomEvent(eventId) {
   if (!confirm('Usunąć to wydarzenie?')) return;
   await deleteCustomCalendarEvent(eventId);
   renderCalendar();
+  if (typeof renderInlineCalendar === 'function') renderInlineCalendar();
   if (_calendarSelectedDate) openDayModal(_calendarSelectedDate);
   else showToast('✓ Usunięto');
 }
@@ -10791,8 +11426,16 @@ async function saveTemplate(template) {
     await sbFetch('/rest/v1/offer_templates', 'POST', payload);
     return true;
   } catch(e) {
-    console.warn('Save template Supabase failed, using localStorage:', e.message);
-    showToast('Zapisano lokalnie — wykonaj migrację SQL szablonów');
+    const msg = String(e.message || e);
+    console.warn('Save template Supabase failed, using localStorage:', msg);
+    // Rozpoznaj czy tabela nie istnieje — daj czytelny komunikat
+    if (msg.includes('relation') && msg.includes('does not exist')) {
+      showToast('Brak tabeli offer_templates. Wykonaj migration_offer_templates.sql. Zapisano lokalnie.');
+    } else if (msg.includes('42P17') || msg.includes('infinite recursion')) {
+      showToast('Błąd RLS (recursion). Zapisano lokalnie.');
+    } else {
+      showToast('Błąd Supabase: ' + msg.slice(0, 80) + '. Zapisano lokalnie.');
+    }
     try {
       const raw = localStorage.getItem('offerTemplates');
       const list = raw ? JSON.parse(raw) : [];
@@ -11105,6 +11748,7 @@ async function showClientCard(clientId) {
             <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">ZAKRES</th>
             <th style="padding:9px 12px;text-align:right;font-size:11px;color:#1B4F8C;font-weight:700;">WARTOŚĆ</th>
             <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">HANDLOWIEC</th>
+            <th style="padding:9px 12px;text-align:center;font-size:11px;color:#1B4F8C;font-weight:700;">AKCJE</th>
           </tr>
         </thead>
         <tbody>
@@ -11115,6 +11759,13 @@ async function showClientCard(clientId) {
               <td style="padding:9px 12px;font-size:12px;">${scopeLabel(o.scope)}</td>
               <td style="padding:9px 12px;font-size:13px;font-weight:700;text-align:right;color:#1B4F8C;">${fmtPLN(o.total_br)}</td>
               <td style="padding:9px 12px;font-size:11px;color:#94A3B8;">${o.user_email ? o.user_email.split('@')[0] : '—'}</td>
+              <td style="padding:9px 12px;text-align:center;">
+                ${o.id ? `
+                  <button onclick="previewOfferPdf('${o.id}')" title="Podgląd PDF (bez edycji)" style="padding:5px 10px;background:#0F3461;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">
+                    <i class="ti ti-eye" style="font-size:11px;"></i> PDF
+                  </button>
+                ` : `<span style="font-size:11px;color:#94A3B8;">—</span>`}
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -11358,7 +12009,10 @@ function openPicker(ctx) {
   document.getElementById('pickerSearch').value = '';
   document.getElementById('pickerBrand').value = '';
   document.getElementById('pickerPower').value = '';
+  const colorSel = document.getElementById('pickerColor');
+  if (colorSel) { colorSel.innerHTML = '<option value="">Każdy kolor</option>'; colorSel.value = ''; }
   populateBrandFilter();
+  if (typeof _pickerPopulateColors === 'function') _pickerPopulateColors(ctx.pool);
   renderPicker();
   document.getElementById('pickerModal').classList.add('modal-backdrop--open');
 }
@@ -11377,20 +12031,55 @@ function populateBrandFilter() {
     sel.appendChild(o);
   });
 }
+function _pickerExtractColor(model) {
+  // Parsuje kolor z nazwy modelu — zwraca lowercase, np. "biały", "czarny mat", "biały połysk"
+  const m = String(model || '').toLowerCase();
+  const colors = [
+    'biały mat', 'biały połysk', 'czarny mat', 'czarny połysk',
+    'biały', 'czarny', 'srebrny', 'szary', 'drewno', 'złoty', 'złota',
+    'grafit', 'antracyt', 'beżowy', 'kremowy'
+  ];
+  for (const c of colors) {
+    if (m.includes(c)) return c;
+  }
+  return null;
+}
+
+function _pickerPopulateColors(pool) {
+  const sel = document.getElementById('pickerColor');
+  if (!sel) return;
+  const current = sel.value || '';
+  const colors = new Set();
+  pool.forEach(p => {
+    const c = _pickerExtractColor(p.model);
+    if (c) colors.add(c);
+  });
+  const sorted = Array.from(colors).sort();
+  sel.innerHTML = '<option value="">Każdy kolor</option>' +
+    sorted.map(c => `<option value="${c}">${c.charAt(0).toUpperCase() + c.slice(1)}</option>`).join('');
+  sel.value = sorted.includes(current) ? current : '';
+}
+
 function renderPicker() {
   if (!currentPickerCtx) return;
   const body = document.getElementById('pickerBody');
   const search = document.getElementById('pickerSearch').value.toLowerCase().trim();
   const brand = document.getElementById('pickerBrand').value;
+  const color = document.getElementById('pickerColor')?.value || '';
   const power = document.getElementById('pickerPower').value;
 
-  // Mapuj do _idx (oryginalny indeks w bazie)
-  // Zachowaj oryginalny _idx z pool - NIE nadpisuj numerem pozycji
+  // Auto-populacja koloru na podstawie puli (przy pierwszym otwarciu)
+  if (document.getElementById('pickerColor')?.options.length <= 1) {
+    _pickerPopulateColors(currentPickerCtx.pool);
+  }
+
+  // Zachowaj oryginalny _idx z pool
   let list = currentPickerCtx.pool.map((p,i) => ({
     ...p,
     _idx: p._idx !== undefined ? p._idx : i
   }));
   if (brand) list = list.filter(p => p.marka === brand);
+  if (color) list = list.filter(p => (_pickerExtractColor(p.model) === color));
   if (power) {
     list = list.filter(p => {
       const m = p.model.match(/(\d+[,.]?\d*)\s*kW/);
@@ -11407,46 +12096,85 @@ function renderPicker() {
 
   body.innerHTML = '';
   if (list.length === 0) {
-    body.innerHTML = '<div class="empty">Brak produktów spełniających kryteria.</div>';
+    body.innerHTML = '<div class="empty">Brak produktów spełniających kryteria. Zmień filtry lub wyczyść wyszukiwarkę.</div>';
     return;
   }
 
-  // Nagłówek kolumn
-  const hdr = document.createElement('div');
-  hdr.className = 'picker-header-row';
-  hdr.innerHTML = `
-    <div>Marka</div>
-    <div>Model</div>
-    <div></div>
-    <div style="text-align:right">Cena klienta</div>
-    <div style="text-align:right">Twój koszt</div>
-    <div style="text-align:center">Marża</div>
-  `;
-  body.appendChild(hdr);
+  // Kolory badge marek (spójne z widokiem Produkty klimatyzacji)
+  const BRAND_BADGE_COLORS = (typeof AC_BRAND_COLORS !== 'undefined') ? AC_BRAND_COLORS : {
+    'HAIER': '#0284C7', 'GREE': '#DC2626', 'LG': '#7C3AED', 'PANASONIC': '#059669',
+    'SAMSUNG': '#1E40AF', 'TOSHIBA': '#DB2777', 'MITSUBISHI': '#B91C1C',
+    'DAIKIN': '#0F766E', 'VIESSMANN': '#B45309'
+  };
 
+  // Grupowanie po markach dla lepszej czytelności
+  const grouped = {};
   list.slice(0, 200).forEach(p => {
-    const costs = calcCosts(p.cena, p.marka, p.cena_kat);
-    const marginClass = !costs ? '' :
-      costs.marza >= 38 ? 'product-row__margin--good' :
-      costs.marza >= 30 ? 'product-row__margin--ok'   :
-      'product-row__margin--low';
-
-    const row = document.createElement('div');
-    row.className = 'product-row';
-    row.innerHTML = `
-      <div class="product-row__brand">${escapeHtml(p.marka)}</div>
-      <div class="product-row__name">${escapeHtml(p.model)}${p._custom ? ' <span style="font-size:10px;color:#4FA8D8;"><i class="ti ti-sparkles" style="font-size:12px;"></i> własny</span>' : ''}</div>
-      <div class="product-row__link">${p.link ? `<a href="${p.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i class="ti ti-link"></i></a>` : ''}</div>
-      <div class="product-row__price">${fmtPLN(p.cena)}${p.cena_kat ? '<br><span style="font-size:10px;color:#94a3b8;font-weight:400;">kat. ' + fmtPLN(p.cena_kat) + '</span>' : ''}</div>
-      <div class="product-row__cost">${costs ? fmtPLN(costs.koszt) : '—'}</div>
-      <div class="product-row__margin ${marginClass}">${costs ? costs.marza.toFixed(1) + '%' : '—'}</div>
-    `;
-    row.onclick = () => {
-      currentPickerCtx.onPick(p._idx);
-      closePicker();
-    };
-    body.appendChild(row);
+    const key = p.marka || 'Inne';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(p);
   });
+
+  Object.keys(grouped).sort().forEach(marka => {
+    const brandColor = BRAND_BADGE_COLORS[marka] || '#64748B';
+    const items = grouped[marka];
+
+    // Separator marki (jeśli więcej niż jedna marka na liście)
+    if (Object.keys(grouped).length > 1) {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'padding:10px 14px 6px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:1;';
+      sep.innerHTML = `
+        <span style="width:6px;height:6px;background:${brandColor};border-radius:50%;"></span>
+        ${escapeHtml(marka)}
+        <span style="color:#94A3B8;font-weight:500;text-transform:none;letter-spacing:0;">· ${items.length}</span>
+      `;
+      body.appendChild(sep);
+    } else {
+      // Nagłówek kolumn tylko jeśli jedna marka
+      const hdr = document.createElement('div');
+      hdr.className = 'picker-header-row';
+      hdr.innerHTML = `
+        <div>Marka</div>
+        <div>Model</div>
+        <div></div>
+        <div style="text-align:right">Cena klienta</div>
+        <div style="text-align:right">Twój koszt</div>
+        <div style="text-align:center">Marża</div>
+      `;
+      body.appendChild(hdr);
+    }
+
+    items.forEach(p => {
+      const costs = calcCosts(p.cena, p.marka, p.cena_kat);
+      const marginClass = !costs ? '' :
+        costs.marza >= 38 ? 'product-row__margin--good' :
+        costs.marza >= 30 ? 'product-row__margin--ok'   :
+        'product-row__margin--low';
+
+      // Wyciągnij czysty model (bez marki, bez końcówki kW)
+      const modelClean = String(p.model || '')
+        .replace(/^(SPLIT|MULTI\+?|J\.WEW|J\.ZEW)\s+/i, '')
+        .replace(new RegExp('^Klimatyzator\\s+' + marka + '\\s+', 'i'), '')
+        .replace(new RegExp('^' + marka + '\\s+', 'i'), '');
+
+      const row = document.createElement('div');
+      row.className = 'product-row';
+      row.innerHTML = `
+        <div class="product-row__brand" style="padding:2px 8px;background:${brandColor}15;color:${brandColor};border-radius:5px;font-weight:700;font-size:11px;display:inline-flex;align-items:center;justify-self:start;">${escapeHtml(marka)}</div>
+        <div class="product-row__name">${escapeHtml(modelClean)}${p._custom ? ' <span style="padding:1px 5px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:9.5px;font-weight:700;margin-left:6px;">WŁASNY</span>' : ''}</div>
+        <div class="product-row__link">${p.link ? `<a href="${p.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Otwórz stronę producenta"><i class="ti ti-link"></i></a>` : ''}</div>
+        <div class="product-row__price">${fmtPLN(p.cena)}${p.cena_kat ? '<br><span style="font-size:10px;color:#94a3b8;font-weight:400;">kat. ' + fmtPLN(p.cena_kat) + '</span>' : ''}</div>
+        <div class="product-row__cost">${costs ? fmtPLN(costs.koszt) : '—'}</div>
+        <div class="product-row__margin ${marginClass}">${costs ? costs.marza.toFixed(1) + '%' : '—'}</div>
+      `;
+      row.onclick = () => {
+        currentPickerCtx.onPick(p._idx);
+        closePicker();
+      };
+      body.appendChild(row);
+    });
+  });
+
   if (list.length > 200) {
     const more = document.createElement('div');
     more.className = 'empty';
@@ -14484,6 +15212,10 @@ function v2ShowSection(id) {
   if (id === 'hp_products' && typeof loadHpProducts === 'function') {
     setTimeout(() => loadHpProducts().then(() => renderHpProductsList()), 50);
   }
+  // Hook: gdy wchodzimy w Produkty klimatyzacji — od razu renderuj
+  if (id === 'products' && typeof renderAcProductsList === 'function') {
+    setTimeout(() => renderAcProductsList(), 50);
+  }
   // Hook: Wizja lokalna — załaduj listę wizji
   if (id === 'site-survey' && typeof loadSiteSurveys === 'function') {
     setTimeout(() => loadSiteSurveys().then(() => renderSiteSurveysList()), 50);
@@ -16357,6 +17089,7 @@ function _ssBlank() {
     cwu_connection_point: '',
     plumbing_notes: '',
     photos: [],
+    attachments: [],   // [{ id, name, sizeKb, dataBase64 }] — dodatkowe PDF-y scalane z wizją
     general_notes: ''
   };
 }
@@ -16369,6 +17102,7 @@ function openSiteSurveyEditor(surveyId) {
     // Normalizacja pól JSONB
     if (!Array.isArray(_ssEditing.install_points)) _ssEditing.install_points = [];
     if (!Array.isArray(_ssEditing.photos))         _ssEditing.photos = [];
+    if (!Array.isArray(_ssEditing.attachments))    _ssEditing.attachments = [];
   } else {
     _ssEditing = _ssBlank();
   }
@@ -16414,10 +17148,17 @@ function _ssRenderEditor() {
       </div>
       <div>
         <label class="ss-label">Klient z bazy *</label>
-        <select class="ss-input" onchange="_ssSetClient(this.value)">
-          <option value="">— wybierz klienta —</option>
-          ${clientOptions}
-        </select>
+        <div style="position:relative;">
+          <input type="text" class="ss-input" id="ssClientSearchInput"
+            value="${selectedClient ? escapeHtml((selectedClient.name || '') + (selectedClient.phone ? ' · ' + selectedClient.phone : '')) : ''}"
+            placeholder="Wpisz nazwę, telefon lub e-mail klienta..."
+            oninput="_ssClientSearch(this.value)"
+            onfocus="_ssClientSearch(this.value); document.getElementById('ssClientDropdown').style.display='block'"
+            onblur="setTimeout(() => { const d=document.getElementById('ssClientDropdown'); if(d) d.style.display='none'; }, 200)"
+            autocomplete="off">
+          <div id="ssClientDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #CBD5E1;border-radius:7px;box-shadow:0 4px 12px rgba(0,0,0,.08);max-height:280px;overflow-y:auto;z-index:100;margin-top:2px;"></div>
+          ${_ssEditing.client_id ? `<button type="button" onclick="_ssSetClient(''); document.getElementById('ssClientSearchInput').value=''" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#94A3B8;cursor:pointer;font-size:16px;padding:4px 8px;" title="Wyczyść wybór">×</button>` : ''}
+        </div>
         ${selectedClient ? `<div style="font-size:11px;color:#64748B;margin-top:4px;">${escapeHtml([selectedClient.phone, selectedClient.email].filter(Boolean).join(' · '))}</div>` : ''}
       </div>
       <div>
@@ -16438,11 +17179,8 @@ function _ssRenderEditor() {
         </select>
       </div>
       <div>
-        <label class="ss-label">Rok budowy / powierzchnia (m²)</label>
-        <div style="display:flex;gap:6px;">
-          <input type="text" class="ss-input" value="${escapeHtml(_ssEditing.building_year || '')}" onchange="_ssSet('building_year', this.value)" placeholder="1998" style="flex:1;">
-          <input type="number" step="0.1" class="ss-input" value="${_ssEditing.building_area_m2 || ''}" onchange="_ssSet('building_area_m2', this.value === '' ? null : parseFloat(this.value))" placeholder="120" style="flex:1;">
-        </div>
+        <label class="ss-label">Rok budowy</label>
+        <input type="text" class="ss-input" value="${escapeHtml(_ssEditing.building_year || '')}" onchange="_ssSet('building_year', this.value)" placeholder="1998">
       </div>
       <div style="grid-column:span 2;">
         <label class="ss-label">Dojazd, klucze, kod bramy, godziny pracy (dla ekipy)</label>
@@ -16572,6 +17310,15 @@ function _ssRenderEditor() {
         <textarea class="ss-input" rows="3" onchange="_ssSet('general_notes', this.value)" placeholder="Dodatkowe informacje dla ekipy: preferencje klienta, ryzyka, ograniczenia czasowe...">${escapeHtml(_ssEditing.general_notes || '')}</textarea>
       </div>
 
+      <!-- ZAŁĄCZNIKI PDF -->
+      <div style="grid-column:span 2;margin-top:10px;">
+        <div class="ss-section-h">7. Załączniki PDF <span style="font-weight:normal;color:#94A3B8;font-size:11px;margin-left:8px;">(DTR-ki, karty katalogowe — zostaną scalone z PDF wizji)</span></div>
+      </div>
+      <div style="grid-column:span 2;">
+        <input type="file" id="ssAttachmentInput" accept="application/pdf" multiple onchange="_ssAddAttachments(this.files)" style="margin-bottom:10px;">
+        <div id="ssAttachmentsWrap">${_ssRenderAttachments()}</div>
+      </div>
+
       <!-- STATUS -->
       <div style="grid-column:span 2;margin-top:10px;padding-top:14px;border-top:1px solid #E2E8F0;">
         <label class="ss-label">Status wizji</label>
@@ -16615,6 +17362,47 @@ function _ssSetClient(clientId) {
     _ssEditing.contact_phone = c.phone;
   }
   _ssRenderEditor();
+}
+
+function _ssClientSearch(query) {
+  const dropdown = document.getElementById('ssClientDropdown');
+  if (!dropdown) return;
+  const q = (query || '').toLowerCase().trim();
+  const list = Array.isArray(clientsDb) ? clientsDb : [];
+  let filtered;
+  if (!q) {
+    // Puste — pokazuj ostatnio dodanych 20
+    filtered = [...list].sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 20);
+  } else {
+    filtered = list.filter(c => {
+      const blob = [c.name, c.phone, c.email, c.address].filter(Boolean).join(' ').toLowerCase();
+      return blob.includes(q);
+    }).slice(0, 30);
+  }
+  if (filtered.length === 0) {
+    dropdown.innerHTML = '<div style="padding:14px;color:#94A3B8;font-size:12px;text-align:center;">Brak klientów pasujących do „' + escapeHtml(query) + '"</div>';
+    dropdown.style.display = 'block';
+    return;
+  }
+  dropdown.innerHTML = filtered.map(c => {
+    const secondary = [c.phone, c.email].filter(Boolean).join(' · ') || c.address || '';
+    return `
+      <button type="button" onmousedown="event.preventDefault(); _ssSelectClientFromSearch('${c.id}')"
+        style="width:100%;text-align:left;background:transparent;border:none;padding:9px 12px;cursor:pointer;font-family:inherit;border-bottom:1px solid #F1F5F9;display:block;"
+        onmouseover="this.style.background='#F8FAFC'"
+        onmouseout="this.style.background='transparent'">
+        <div style="font-size:13px;font-weight:600;color:#0A2647;">${escapeHtml(c.name || '(bez nazwy)')}</div>
+        ${secondary ? `<div style="font-size:11px;color:#64748B;margin-top:2px;">${escapeHtml(secondary)}</div>` : ''}
+      </button>
+    `;
+  }).join('');
+  dropdown.style.display = 'block';
+}
+
+function _ssSelectClientFromSearch(clientId) {
+  _ssSetClient(clientId);
+  const dropdown = document.getElementById('ssClientDropdown');
+  if (dropdown) dropdown.style.display = 'none';
 }
 
 /* Punkty montażu — lista z możliwością dodawania/usuwania */
@@ -16746,7 +17534,13 @@ let _ssPhotoEditor = {
   drawing: false,
   startXY: null,         // px relative to canvas
   imgW: 0, imgH: 0,      // natural size of image
-  canvasW: 0, canvasH: 0 // displayed size (used for coordinate mapping)
+  canvasW: 0, canvasH: 0, // displayed size (used for coordinate mapping)
+  selectedIdx: null,     // indeks zaznaczonej adnotacji
+  dragging: false,
+  dragOffset: null,      // {x,y} przesunięcie od punktu klik
+  zoom: 1,               // 0.5 – 4, 1 = wpasowanie w okno
+  transformMode: null,   // null | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | 'rotate'
+  transformStart: null   // snapshot na starcie: { mouseX, mouseY, centerX, centerY, initialDist, initialAngle, annCopy }
 };
 
 function _ssOpenPhotoEditor(photoIdx) {
@@ -16757,6 +17551,10 @@ function _ssOpenPhotoEditor(photoIdx) {
   _ssPhotoEditor.color = '#DC2626';
   _ssPhotoEditor.width = 5;
   _ssPhotoEditor.annotations = Array.isArray(photo.annotations) ? JSON.parse(JSON.stringify(photo.annotations)) : [];
+  _ssPhotoEditor.selectedIdx = null;
+  _ssPhotoEditor.dragging = false;
+  _ssPhotoEditor.dragOffset = null;
+  _ssPhotoEditor.zoom = 1;
 
   const modal = document.getElementById('ssPhotoEditorModal');
   const img = document.getElementById('ssPhotoEditorImg');
@@ -16786,6 +17584,53 @@ function _ssOpenPhotoEditor(photoIdx) {
   canvas.ontouchmove = _ssCanvasTouchMove;
   canvas.ontouchend = _ssCanvasUp;
   window.addEventListener('resize', _ssResizeCanvas);
+  // Delete/Backspace usuwa zaznaczoną adnotację
+  document.addEventListener('keydown', _ssPhotoEditorKeyHandler);
+  // Ctrl+wheel na wrapperze canvas — zoom
+  const wrap = document.getElementById('ssPhotoEditorCanvasWrap');
+  if (wrap) wrap.addEventListener('wheel', _ssPhotoEditorWheelHandler, { passive: false });
+}
+
+function _ssPhotoEditorWheelHandler(e) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault();
+  if (e.deltaY < 0) _ssZoomIn();
+  else _ssZoomOut();
+}
+
+function _ssPhotoEditorKeyHandler(e) {
+  // Aktywny tylko gdy edytor otwarty i nie jesteśmy w polu tekstowym
+  if (_ssPhotoEditor.photoIdx == null) return;
+  const modal = document.getElementById('ssPhotoEditorModal');
+  if (!modal || !modal.classList.contains('modal-backdrop--open')) return;
+  const target = e.target;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+  const hasSel = _ssPhotoEditor.selectedIdx != null;
+  const ctrl = e.ctrlKey || e.metaKey;
+
+  // Ctrl+Z — cofnij (globalne, nawet bez selekcji)
+  if (ctrl && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); _ssUndoAnnotation(); return; }
+
+  // Zoom Ctrl +/- (jak w przeglądarce)
+  if (ctrl && (e.key === '=' || e.key === '+')) { e.preventDefault(); _ssZoomIn(); return; }
+  if (ctrl && e.key === '-') { e.preventDefault(); _ssZoomOut(); return; }
+  if (ctrl && e.key === '0') { e.preventDefault(); _ssZoomReset(); return; }
+
+  // Skróty dla zaznaczonego
+  if (hasSel) {
+    if (ctrl && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); _ssDuplicateSelected(); return; }
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); _ssDeleteSelected(); return; }
+    if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); _ssRotateSelected(-Math.PI/12); return; }
+    if (e.key === 'e' || e.key === 'E') { e.preventDefault(); _ssRotateSelected(Math.PI/12); return; }
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); _ssScaleSelected(1.15); return; }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); _ssScaleSelected(0.85); return; }
+  }
+
+  if (e.key === 'Escape') {
+    _ssPhotoEditor.selectedIdx = null;
+    _ssRedraw();
+  }
 }
 
 function _ssClosePhotoEditor(save) {
@@ -16796,17 +17641,56 @@ function _ssClosePhotoEditor(save) {
   }
   document.getElementById('ssPhotoEditorModal').classList.remove('modal-backdrop--open');
   window.removeEventListener('resize', _ssResizeCanvas);
+  document.removeEventListener('keydown', _ssPhotoEditorKeyHandler);
+  const wrap = document.getElementById('ssPhotoEditorCanvasWrap');
+  if (wrap) wrap.removeEventListener('wheel', _ssPhotoEditorWheelHandler);
   _ssPhotoEditor.photoIdx = null;
+  _ssPhotoEditor.selectedIdx = null;
+  _ssPhotoEditor.dragging = false;
+  _ssPhotoEditor.zoom = 1;
 }
 
 function _ssResizeCanvas() {
   const img = document.getElementById('ssPhotoEditorImg');
   const canvas = document.getElementById('ssPhotoEditorCanvas');
   if (!img || !canvas || !img.naturalWidth) return;
+
+  // Zoom: ustaw wymiary img w CSS na podstawie zoomu.
+  // zoom=1 → dopasowane do okna (max-width/max-height z CSS). zoom>1 → większe niż wrapper (scroll).
+  const zoom = _ssPhotoEditor.zoom || 1;
+  if (zoom === 1) {
+    // Reset — pozwól CSS max-width/max-height zadziałać
+    img.style.width = '';
+    img.style.height = '';
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = 'calc(90vh - 240px)';
+  } else {
+    // Powiększenie proporcjonalne — bierzemy "naturalną" wielkość dopasowaną (jak przy zoom=1) i mnożymy
+    // Trzeba najpierw zdjąć maxy żeby uzyskać "przeskalowaną" wielkość
+    img.style.maxWidth = 'none';
+    img.style.maxHeight = 'none';
+    // Bazowa wielkość: img.naturalWidth ograniczony wcześniejszym wpasowaniem — bierzemy aktualne rect
+    // ale skalujemy względem PIERWOTNEGO fit (najpierw obliczmy fit fit-to-window i pomnóżmy)
+    const wrap = document.getElementById('ssPhotoEditorCanvasWrap');
+    const maxW = wrap.clientWidth - 32;
+    const maxH = Math.min(window.innerHeight * 0.9 - 240, 800);
+    const naturalRatio = img.naturalWidth / img.naturalHeight;
+    let fitW, fitH;
+    if (img.naturalWidth / maxW > img.naturalHeight / maxH) {
+      fitW = Math.min(maxW, img.naturalWidth);
+      fitH = fitW / naturalRatio;
+    } else {
+      fitH = Math.min(maxH, img.naturalHeight);
+      fitW = fitH * naturalRatio;
+    }
+    img.style.width  = (fitW * zoom) + 'px';
+    img.style.height = (fitH * zoom) + 'px';
+  }
+
+  // Po zmianie rozmiaru img — przelicz canvas
   const rect = img.getBoundingClientRect();
   _ssPhotoEditor.canvasW = rect.width;
   _ssPhotoEditor.canvasH = rect.height;
-  // Sharp rendering na HiDPI
   const dpr = window.devicePixelRatio || 1;
   canvas.width = rect.width * dpr;
   canvas.height = rect.height * dpr;
@@ -16815,7 +17699,20 @@ function _ssResizeCanvas() {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   _ssRedraw();
+
+  // Update UI badge z aktualnym zoomem
+  const zoomLabel = document.getElementById('ssZoomLabel');
+  if (zoomLabel) zoomLabel.textContent = Math.round(zoom * 100) + '%';
 }
+
+function _ssSetZoom(newZoom) {
+  const z = Math.max(0.5, Math.min(4, newZoom));
+  _ssPhotoEditor.zoom = z;
+  _ssResizeCanvas();
+}
+function _ssZoomIn()  { _ssSetZoom((_ssPhotoEditor.zoom || 1) * 1.25); }
+function _ssZoomOut() { _ssSetZoom((_ssPhotoEditor.zoom || 1) / 1.25); }
+function _ssZoomReset() { _ssSetZoom(1); }
 
 function _ssRedraw() {
   const canvas = document.getElementById('ssPhotoEditorCanvas');
@@ -16824,7 +17721,102 @@ function _ssRedraw() {
   const w = _ssPhotoEditor.canvasW;
   const h = _ssPhotoEditor.canvasH;
   ctx.clearRect(0, 0, w, h);
-  _ssPhotoEditor.annotations.forEach(a => _ssDrawAnnotation(ctx, a, w, h));
+  _ssPhotoEditor.annotations.forEach((a, i) => {
+    _ssDrawAnnotation(ctx, a, w, h);
+    if (i === _ssPhotoEditor.selectedIdx) _ssDrawSelectionHandles(ctx, a, w, h);
+  });
+}
+
+function _ssDrawSelectionHandles(ctx, a, w, h) {
+  const bbox = _ssAnnotationBBox(a, w, h);
+  if (!bbox) return;
+  ctx.save();
+  // Ramka
+  ctx.strokeStyle = '#0F3461';
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(bbox.x - 6, bbox.y - 6, bbox.w + 12, bbox.h + 12);
+  ctx.setLineDash([]);
+
+  // 4 rogi — kwadratowe uchwyty do skalowania
+  const HANDLE = 10;   // rozmiar uchwytu w px
+  const corners = _ssGetHandlePositions(bbox);
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = '#0F3461';
+  ctx.lineWidth = 2;
+  ['nw','ne','sw','se'].forEach(k => {
+    const [cx, cy] = corners[k];
+    ctx.fillRect(cx - HANDLE/2, cy - HANDLE/2, HANDLE, HANDLE);
+    ctx.strokeRect(cx - HANDLE/2, cy - HANDLE/2, HANDLE, HANDLE);
+  });
+
+  // Uchwyt rotacji — kółko nad (lub pod) ramką, z linią łączącą
+  const [rx, ry] = corners.rotate;
+  const [tcx, tcy] = corners.rotateAnchor;
+  ctx.strokeStyle = '#0F3461';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(tcx, tcy);
+  ctx.lineTo(rx, ry);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(rx, ry, 9, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.stroke();
+  // Ikona rotacji (łuk ze strzałką w środku)
+  ctx.strokeStyle = '#0F3461';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(rx, ry, 4, -Math.PI/2, Math.PI, false);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* Zwraca pozycje wszystkich uchwytów zaznaczonej adnotacji (w pikselach canvas) */
+function _ssGetHandlePositions(bbox) {
+  const pad = 6;
+  const x1 = bbox.x - pad, y1 = bbox.y - pad;
+  const x2 = bbox.x + bbox.w + pad, y2 = bbox.y + bbox.h + pad;
+  const cx = (x1 + x2) / 2;
+  const canvasH = _ssPhotoEditor.canvasH || 1000;
+  // Uchwyt rotacji: domyślnie 28px NAD ramką. Jeśli nie mieści się w canvas (obiekt za blisko góry) —
+  // umieść POD ramką. Trzymamy stałą etykietę: rotateAbove/rotateBelow.
+  const gap = 28;
+  const rotateY = (y1 - gap < 4) ? (y2 + gap) : (y1 - gap);
+  const rotateAnchor = (y1 - gap < 4) ? [cx, y2] : [cx, y1];   // linia od kółka do ramki
+  return {
+    nw: [x1, y1],
+    ne: [x2, y1],
+    sw: [x1, y2],
+    se: [x2, y2],
+    rotate:       [cx, rotateY],
+    rotateAnchor: rotateAnchor
+  };
+}
+
+/* Hit-test na uchwytach zaznaczonej adnotacji.
+   Zwraca 'nw'|'ne'|'sw'|'se'|'rotate' albo null. Współrzędne wejściowe 0-1. */
+function _ssHitTestHandle(px, py) {
+  const i = _ssPhotoEditor.selectedIdx;
+  if (i == null) return null;
+  const a = _ssPhotoEditor.annotations[i];
+  if (!a) return null;
+  const w = _ssPhotoEditor.canvasW, h = _ssPhotoEditor.canvasH;
+  const bbox = _ssAnnotationBBox(a, w, h);
+  if (!bbox) return null;
+  const positions = _ssGetHandlePositions(bbox);
+  const x = px * w, y = py * h;
+  const HIT = 14;   // strefa trafienia (nieco większa niż uchwyt dla łatwości)
+  const HIT_ROT = 18;
+  // Sprawdź uchwyt rotacji NAJPIERW — jest osobno (nad/pod ramką), nie koliduje z rogami
+  const [rx, ry] = positions.rotate;
+  if ((x - rx) ** 2 + (y - ry) ** 2 <= HIT_ROT ** 2) return 'rotate';
+  for (const key of ['nw','ne','sw','se']) {
+    const [hx, hy] = positions[key];
+    if (Math.abs(x - hx) <= HIT/2 && Math.abs(y - hy) <= HIT/2) return key;
+  }
+  return null;
 }
 
 /* Rysuje annotacje — współrzędne relatywne (0-1) przelicza na piksele */
@@ -16862,25 +17854,220 @@ function _ssDrawAnnotation(ctx, a, w, h) {
     const [p1, p2] = a.points;
     const x1 = p1[0] * w, y1 = p1[1] * h;
     const x2 = p2[0] * w, y2 = p2[1] * h;
-    ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+    const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+    const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+    ctx.save();
+    if (a.rotation) {
+      ctx.translate(cx, cy);
+      ctx.rotate(a.rotation);
+      ctx.strokeRect(-rw/2, -rh/2, rw, rh);
+    } else {
+      ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), rw, rh);
+    }
+    ctx.restore();
   } else if (a.type === 'text') {
     const fontSize = Math.max(14, (a.width || 5) * 4);
     ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
     const x = a.x * w, y = a.y * h;
-    // Tło pod tekstem dla czytelności
     const metrics = ctx.measureText(a.text || '');
+    ctx.save();
+    if (a.rotation) { ctx.translate(x + metrics.width/2, y - fontSize/2); ctx.rotate(a.rotation); ctx.translate(-(x + metrics.width/2), -(y - fontSize/2)); }
+    // Tło pod tekstem dla czytelności
     ctx.fillStyle = 'rgba(255,255,255,.9)';
     ctx.fillRect(x - 4, y - fontSize, metrics.width + 8, fontSize + 6);
     ctx.fillStyle = a.color || '#000';
     ctx.fillText(a.text || '', x, y);
+    ctx.restore();
+  } else if (a.type === 'preset') {
+    _ssDrawPreset(ctx, a, w, h);
   }
+}
+
+/* Rysuje presety urządzeń — schematyczne symbole */
+const _SS_PRESET_META = {
+  unit_zew:   { label: 'JEDN. ZEW.',  color: '#059669', size: 0.14, icon: 'AC' },
+  unit_wew:   { label: 'JEDN. WEW.',  color: '#0284C7', size: 0.14, icon: 'JW' },
+  rozdzielnia:{ label: 'ROZDZIELNIA', color: '#DC2626', size: 0.11, icon: 'R' },
+  skropliny:  { label: 'SKROPLINY',   color: '#7C3AED', size: 0.09, icon: 'S' }
+};
+
+function _ssDrawPreset(ctx, a, w, h) {
+  const meta = _SS_PRESET_META[a.preset] || _SS_PRESET_META.unit_zew;
+  const cx = a.x * w, cy = a.y * h;
+  const size = (a.scale || meta.size) * Math.min(w, h);
+  const halfW = size / 2, halfH = size / 3;
+  ctx.save();
+  // Obrót wokół środka presetu
+  if (a.rotation) {
+    ctx.translate(cx, cy);
+    ctx.rotate(a.rotation);
+    ctx.translate(-cx, -cy);
+  }
+  // Prostokąt urządzenia
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.strokeStyle = meta.color;
+  ctx.lineWidth = 3;
+  ctx.fillRect(cx - halfW, cy - halfH, size, halfH * 2);
+  ctx.strokeRect(cx - halfW, cy - halfH, size, halfH * 2);
+  // Kratki (jak żaluzje agregatu / grill klimatyzatora)
+  ctx.strokeStyle = meta.color;
+  ctx.lineWidth = 1.5;
+  const lines = a.preset === 'unit_zew' ? 5 : (a.preset === 'unit_wew' ? 6 : 3);
+  for (let i = 1; i < lines; i++) {
+    const ly = cy - halfH + (halfH * 2 * i / lines);
+    ctx.beginPath();
+    ctx.moveTo(cx - halfW + 4, ly);
+    ctx.lineTo(cx + halfW - 4, ly);
+    ctx.stroke();
+  }
+  // Etykieta
+  const fontSize = Math.max(10, size * 0.14);
+  ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
+  const text = a.label || meta.label;
+  const textW = ctx.measureText(text).width;
+  ctx.fillStyle = meta.color;
+  ctx.fillRect(cx - textW/2 - 4, cy + halfH + 4, textW + 8, fontSize + 6);
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, cx - textW/2, cy + halfH + 7);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
+/* Bounding box adnotacji w px canvas — do zaznaczenia i hit-testu */
+function _ssAnnotationBBox(a, w, h) {
+  if ((a.type === 'line' || a.type === 'arrow' || a.type === 'rect') && a.points?.length >= 2) {
+    const [p1, p2] = a.points;
+    const x1 = p1[0] * w, y1 = p1[1] * h;
+    const x2 = p2[0] * w, y2 = p2[1] * h;
+    return { x: Math.min(x1,x2), y: Math.min(y1,y2), w: Math.abs(x2-x1), h: Math.abs(y2-y1) };
+  }
+  if (a.type === 'text') {
+    const fontSize = Math.max(14, (a.width || 5) * 4);
+    return { x: a.x * w - 4, y: a.y * h - fontSize, w: 200, h: fontSize + 10 };
+  }
+  if (a.type === 'preset') {
+    const meta = _SS_PRESET_META[a.preset] || _SS_PRESET_META.unit_zew;
+    const size = (a.scale || meta.size) * Math.min(w, h);
+    return { x: a.x * w - size/2, y: a.y * h - size/3, w: size, h: (size/3) * 2 + 20 };
+  }
+  return null;
+}
+
+/* Zwraca indeks adnotacji trafionej przez punkt (relatywny 0-1) lub null */
+function _ssHitTest(px, py) {
+  const w = _ssPhotoEditor.canvasW, h = _ssPhotoEditor.canvasH;
+  const x = px * w, y = py * h;
+  // Iteruj od tyłu — górna warstwa najpierw
+  for (let i = _ssPhotoEditor.annotations.length - 1; i >= 0; i--) {
+    const bbox = _ssAnnotationBBox(_ssPhotoEditor.annotations[i], w, h);
+    if (bbox && x >= bbox.x - 8 && x <= bbox.x + bbox.w + 8 && y >= bbox.y - 8 && y <= bbox.y + bbox.h + 8) {
+      return i;
+    }
+  }
+  return null;
+}
+
+/* Wstaw preset urządzenia na środku obrazka */
+function _ssInsertPreset(presetType) {
+  _ssPhotoEditor.annotations.push({
+    type: 'preset',
+    preset: presetType,
+    x: 0.5, y: 0.5,   // środek — użytkownik przesunie
+    color: _SS_PRESET_META[presetType]?.color || '#0F3461'
+  });
+  // Automatycznie zaznacz i przełącz na narzędzie select żeby od razu można było przesuwać
+  _ssPhotoEditor.selectedIdx = _ssPhotoEditor.annotations.length - 1;
+  _ssSetTool('select');
+  _ssRedraw();
+  if (typeof showToast === 'function') showToast('Wstawiono — przeciągnij aby ustawić w prawidłowym miejscu');
+}
+
+/* Usuwa aktualnie zaznaczoną adnotację */
+function _ssDeleteSelected() {
+  if (_ssPhotoEditor.selectedIdx == null) return;
+  _ssPhotoEditor.annotations.splice(_ssPhotoEditor.selectedIdx, 1);
+  _ssPhotoEditor.selectedIdx = null;
+  _ssRedraw();
+}
+
+/* Obrót zaznaczonej — dla line/arrow obracamy punkty (linia sama zmienia kierunek),
+   dla rect/text/preset zmieniamy pole rotation (obiekt trzyma swój axis-aligned kształt) */
+function _ssRotateSelected(deltaRad) {
+  const i = _ssPhotoEditor.selectedIdx;
+  if (i == null) return;
+  const a = _ssPhotoEditor.annotations[i];
+  if (!a) return;
+  if (a.type === 'line' || a.type === 'arrow') {
+    if (!a.points || a.points.length < 2) return;
+    const cx = (a.points[0][0] + a.points[1][0]) / 2;
+    const cy = (a.points[0][1] + a.points[1][1]) / 2;
+    const cos = Math.cos(deltaRad), sin = Math.sin(deltaRad);
+    a.points = a.points.map(([x, y]) => {
+      const dx = x - cx, dy = y - cy;
+      return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
+    });
+  } else {
+    // rect, preset, text — rotation field
+    a.rotation = (a.rotation || 0) + deltaRad;
+  }
+  _ssRedraw();
+}
+
+/* Skalowanie zaznaczonej */
+function _ssScaleSelected(factor) {
+  const i = _ssPhotoEditor.selectedIdx;
+  if (i == null) return;
+  const a = _ssPhotoEditor.annotations[i];
+  if (!a) return;
+  if (a.type === 'line' || a.type === 'arrow' || a.type === 'rect') {
+    if (!a.points || a.points.length < 2) return;
+    const cx = (a.points[0][0] + a.points[1][0]) / 2;
+    const cy = (a.points[0][1] + a.points[1][1]) / 2;
+    a.points = a.points.map(([x, y]) => [cx + (x - cx) * factor, cy + (y - cy) * factor]);
+  } else if (a.type === 'preset') {
+    const meta = _SS_PRESET_META[a.preset] || _SS_PRESET_META.unit_zew;
+    const cur = a.scale || meta.size;
+    a.scale = Math.max(0.03, Math.min(0.6, cur * factor));
+  } else if (a.type === 'text') {
+    a.width = Math.max(2, Math.min(20, (a.width || 5) * factor));
+  }
+  _ssRedraw();
+}
+
+/* Duplikowanie — kopia z lekkim przesunięciem żeby była widoczna */
+function _ssDuplicateSelected() {
+  const i = _ssPhotoEditor.selectedIdx;
+  if (i == null) return;
+  const a = _ssPhotoEditor.annotations[i];
+  if (!a) return;
+  const copy = JSON.parse(JSON.stringify(a));
+  const offset = 0.03;  // 3% szerokości
+  if (copy.points) {
+    copy.points = copy.points.map(([x, y]) => [x + offset, y + offset]);
+  } else {
+    copy.x = (copy.x || 0.5) + offset;
+    copy.y = (copy.y || 0.5) + offset;
+  }
+  _ssPhotoEditor.annotations.push(copy);
+  _ssPhotoEditor.selectedIdx = _ssPhotoEditor.annotations.length - 1;
+  _ssRedraw();
 }
 
 function _ssSetTool(tool) {
   _ssPhotoEditor.tool = tool;
+  // Zaznaczenie czyścimy przy przełączeniu na cokolwiek innego niż select
+  if (tool !== 'select') {
+    _ssPhotoEditor.selectedIdx = null;
+    _ssRedraw();
+  }
   document.querySelectorAll('#ssPhotoEditorModal .ss-tool-btn').forEach(b => b.classList.toggle('ss-tool-btn--active', b.dataset.tool === tool));
   const canvas = document.getElementById('ssPhotoEditorCanvas');
-  if (canvas) canvas.style.cursor = tool === 'text' ? 'text' : 'crosshair';
+  if (canvas) {
+    if (tool === 'text') canvas.style.cursor = 'text';
+    else if (tool === 'select') canvas.style.cursor = 'move';
+    else canvas.style.cursor = 'crosshair';
+  }
 }
 
 function _ssSetColor(color) {
@@ -16921,6 +18108,26 @@ function _ssGetXY(e) {
 function _ssCanvasDown(e) {
   e.preventDefault();
   const p = _ssGetXY(e);
+
+  // Narzędzie SELECT — najpierw uchwyty (jeśli coś zaznaczone), potem hit-test na adnotacji
+  if (_ssPhotoEditor.tool === 'select') {
+    // 1) Uchwyt zaznaczonej adnotacji?
+    const handle = _ssHitTestHandle(p.x, p.y);
+    if (handle && _ssPhotoEditor.selectedIdx != null) {
+      _ssStartTransform(handle, p);
+      return;
+    }
+    // 2) Hit-test na innej adnotacji
+    const hit = _ssHitTest(p.x, p.y);
+    _ssPhotoEditor.selectedIdx = hit;
+    if (hit !== null) {
+      _ssPhotoEditor.dragging = true;
+      _ssPhotoEditor.dragOffset = { x: p.x, y: p.y };
+    }
+    _ssRedraw();
+    return;
+  }
+
   if (_ssPhotoEditor.tool === 'text') {
     const text = prompt('Wpisz etykietę:', '');
     if (text && text.trim()) {
@@ -16939,7 +18146,71 @@ function _ssCanvasDown(e) {
   _ssPhotoEditor.startXY = p;
 }
 
+/* Rozpoczyna transform (resize lub rotate) — snapshot startowy do obliczania delt */
+function _ssStartTransform(handle, mouseP) {
+  const i = _ssPhotoEditor.selectedIdx;
+  const a = _ssPhotoEditor.annotations[i];
+  if (!a) return;
+  const w = _ssPhotoEditor.canvasW, h = _ssPhotoEditor.canvasH;
+  const bbox = _ssAnnotationBBox(a, w, h);
+  if (!bbox) return;
+  const centerX = (bbox.x + bbox.w / 2) / w;   // relatywnie 0-1
+  const centerY = (bbox.y + bbox.h / 2) / h;
+  const dx = mouseP.x - centerX;
+  const dy = mouseP.y - centerY;
+  _ssPhotoEditor.transformMode = handle === 'rotate' ? 'rotate' : ('resize-' + handle);
+  _ssPhotoEditor.transformStart = {
+    mouseX: mouseP.x, mouseY: mouseP.y,
+    centerX, centerY,
+    initialDist: Math.sqrt(dx*dx + dy*dy),
+    initialAngle: Math.atan2(dy, dx),
+    annCopy: JSON.parse(JSON.stringify(a))
+  };
+}
+
 function _ssCanvasMove(e) {
+  // TRANSFORM (resize / rotate przez uchwyty)
+  if (_ssPhotoEditor.transformMode && _ssPhotoEditor.transformStart) {
+    e.preventDefault();
+    const p = _ssGetXY(e);
+    _ssApplyTransform(p);
+    _ssRedraw();
+    return;
+  }
+
+  // Dragging zaznaczonej adnotacji
+  if (_ssPhotoEditor.dragging && _ssPhotoEditor.selectedIdx != null) {
+    e.preventDefault();
+    const p = _ssGetXY(e);
+    const dx = p.x - _ssPhotoEditor.dragOffset.x;
+    const dy = p.y - _ssPhotoEditor.dragOffset.y;
+    const a = _ssPhotoEditor.annotations[_ssPhotoEditor.selectedIdx];
+    if (a) {
+      if (a.points) {
+        a.points = a.points.map(pt => [pt[0] + dx, pt[1] + dy]);
+      } else {
+        a.x = (a.x || 0) + dx;
+        a.y = (a.y || 0) + dy;
+      }
+    }
+    _ssPhotoEditor.dragOffset = { x: p.x, y: p.y };
+    _ssRedraw();
+    return;
+  }
+
+  // Hover — zmień kursor gdy nad uchwytem
+  if (_ssPhotoEditor.tool === 'select' && _ssPhotoEditor.selectedIdx != null && !_ssPhotoEditor.drawing) {
+    const p = _ssGetXY(e);
+    const handle = _ssHitTestHandle(p.x, p.y);
+    const canvas = document.getElementById('ssPhotoEditorCanvas');
+    if (canvas) {
+      if (handle === 'rotate') canvas.style.cursor = 'grab';
+      else if (handle === 'nw' || handle === 'se') canvas.style.cursor = 'nwse-resize';
+      else if (handle === 'ne' || handle === 'sw') canvas.style.cursor = 'nesw-resize';
+      else canvas.style.cursor = 'move';
+    }
+  }
+
   if (!_ssPhotoEditor.drawing) return;
   e.preventDefault();
   const p = _ssGetXY(e);
@@ -16956,7 +18227,65 @@ function _ssCanvasMove(e) {
   }, w, h);
 }
 
+/* Stosuje aktualną transformację na zaznaczonej adnotacji na podstawie pozycji myszy.
+   Za każdym razem restartujemy od `annCopy` (snapshot startowy) żeby uniknąć narastających błędów. */
+function _ssApplyTransform(mouseP) {
+  const s = _ssPhotoEditor.transformStart;
+  if (!s) return;
+  const i = _ssPhotoEditor.selectedIdx;
+  const a = _ssPhotoEditor.annotations[i];
+  if (!a) return;
+  const orig = s.annCopy;
+  const cx = s.centerX, cy = s.centerY;
+
+  const dx = mouseP.x - cx;
+  const dy = mouseP.y - cy;
+  const currentDist = Math.sqrt(dx*dx + dy*dy);
+  const currentAngle = Math.atan2(dy, dx);
+
+  if (_ssPhotoEditor.transformMode === 'rotate') {
+    const deltaAngle = currentAngle - s.initialAngle;
+    // Line/arrow → obracamy punkty (kierunek linii się zmienia naturalnie).
+    // Rect/preset/text → używamy rotation field (obiekt trzyma proporcje).
+    if (orig.points && (orig.type === 'line' || orig.type === 'arrow')) {
+      const cosT = Math.cos(deltaAngle), sinT = Math.sin(deltaAngle);
+      a.points = orig.points.map(([x, y]) => {
+        const rx = x - cx, ry = y - cy;
+        return [cx + rx * cosT - ry * sinT, cy + rx * sinT + ry * cosT];
+      });
+    } else {
+      a.rotation = (orig.rotation || 0) + deltaAngle;
+    }
+    return;
+  }
+
+  // Resize — factor = current / initial
+  if (s.initialDist < 0.001) return;
+  const factor = Math.max(0.1, Math.min(6, currentDist / s.initialDist));
+  if (orig.points) {
+    a.points = orig.points.map(([x, y]) => [cx + (x - cx) * factor, cy + (y - cy) * factor]);
+  } else if (orig.type === 'preset') {
+    const meta = _SS_PRESET_META[orig.preset] || _SS_PRESET_META.unit_zew;
+    const baseScale = orig.scale || meta.size;
+    a.scale = Math.max(0.03, Math.min(0.6, baseScale * factor));
+  } else if (orig.type === 'text') {
+    a.width = Math.max(2, Math.min(20, (orig.width || 5) * factor));
+  }
+}
+
 function _ssCanvasUp(e) {
+  // Zakończ transform (resize/rotate przez uchwyty)
+  if (_ssPhotoEditor.transformMode) {
+    _ssPhotoEditor.transformMode = null;
+    _ssPhotoEditor.transformStart = null;
+    return;
+  }
+  // Zakończ dragging
+  if (_ssPhotoEditor.dragging) {
+    _ssPhotoEditor.dragging = false;
+    _ssPhotoEditor.dragOffset = null;
+    return;
+  }
   if (!_ssPhotoEditor.drawing) return;
   _ssPhotoEditor.drawing = false;
   if (!e || !_ssPhotoEditor.startXY) return;
@@ -16997,6 +18326,140 @@ function _ssCanvasUp(e) {
 function _ssCanvasTouchDown(e) { _ssCanvasDown(e); }
 function _ssCanvasTouchMove(e) { _ssCanvasMove(e); }
 
+
+/* ============================================================
+   ZAŁĄCZNIKI PDF DO WIZJI — scalanie z generowanym PDF wizji
+   ============================================================ */
+
+/* Limity: max 10 MB na plik, max 30 MB łącznie — inaczej Supabase zaczyna dławić się na JSONB */
+const _SS_ATT_MAX_FILE_KB   = 10 * 1024;
+const _SS_ATT_MAX_TOTAL_KB  = 30 * 1024;
+
+async function _ssAddAttachments(fileList) {
+  if (!_ssEditing || !fileList || fileList.length === 0) return;
+  if (!Array.isArray(_ssEditing.attachments)) _ssEditing.attachments = [];
+
+  const currentTotalKb = _ssEditing.attachments.reduce((sum, a) => sum + (a.sizeKb || 0), 0);
+  let addedTotalKb = 0;
+
+  for (const file of fileList) {
+    if (file.type !== 'application/pdf') {
+      showToast('Pomijam „' + file.name + '" — to nie jest PDF');
+      continue;
+    }
+    const sizeKb = Math.round(file.size / 1024);
+    if (sizeKb > _SS_ATT_MAX_FILE_KB) {
+      showToast('„' + file.name + '" ma ' + Math.round(sizeKb/1024*10)/10 + ' MB — max 10 MB na plik. Pomijam.');
+      continue;
+    }
+    if (currentTotalKb + addedTotalKb + sizeKb > _SS_ATT_MAX_TOTAL_KB) {
+      showToast('Limit 30 MB łącznie osiągnięty — pomijam „' + file.name + '"');
+      break;
+    }
+    try {
+      const dataBase64 = await _ssFileToBase64(file);
+      _ssEditing.attachments.push({
+        id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        name: file.name,
+        sizeKb,
+        dataBase64
+      });
+      addedTotalKb += sizeKb;
+    } catch(e) {
+      console.warn('Attachment error:', e);
+      showToast('Błąd wczytywania „' + file.name + '"');
+    }
+  }
+  document.getElementById('ssAttachmentsWrap').innerHTML = _ssRenderAttachments();
+  document.getElementById('ssAttachmentInput').value = '';
+}
+
+function _ssFileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);   // pełny data URL "data:application/pdf;base64,..."
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function _ssRemoveAttachment(idx) {
+  if (!_ssEditing?.attachments) return;
+  if (!confirm('Usunąć „' + _ssEditing.attachments[idx].name + '" z załączników?')) return;
+  _ssEditing.attachments.splice(idx, 1);
+  document.getElementById('ssAttachmentsWrap').innerHTML = _ssRenderAttachments();
+}
+
+function _ssMoveAttachment(idx, dir) {
+  if (!_ssEditing?.attachments) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= _ssEditing.attachments.length) return;
+  const tmp = _ssEditing.attachments[idx];
+  _ssEditing.attachments[idx] = _ssEditing.attachments[newIdx];
+  _ssEditing.attachments[newIdx] = tmp;
+  document.getElementById('ssAttachmentsWrap').innerHTML = _ssRenderAttachments();
+}
+
+function _ssRenderAttachments() {
+  const atts = Array.isArray(_ssEditing?.attachments) ? _ssEditing.attachments : [];
+  if (atts.length === 0) {
+    return '<div style="padding:14px;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:7px;color:#94A3B8;font-size:12px;text-align:center;">Brak załączników. Dodaj pliki PDF które mają zostać scalone z PDF wizji (np. DTR jednostki, karty katalogowe, gwarancja).</div>';
+  }
+  const totalKb = atts.reduce((sum, a) => sum + (a.sizeKb || 0), 0);
+  const totalMb = (totalKb / 1024).toFixed(1);
+  return `
+    <div style="font-size:11px;color:#64748B;margin-bottom:6px;">
+      ${atts.length} plik${atts.length === 1 ? '' : (atts.length < 5 ? 'i' : 'ów')} · łącznie ${totalMb} MB · zostaną doklejone na końcu PDF wizji w kolejności widocznej poniżej
+    </div>
+    ${atts.map((a, i) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border:1px solid #E2E8F0;border-radius:7px;margin-bottom:6px;">
+        <i class="ti ti-file-type-pdf" style="font-size:22px;color:#DC2626;flex-shrink:0;"></i>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:600;color:#0A2647;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(a.name)}</div>
+          <div style="font-size:10.5px;color:#94A3B8;margin-top:2px;">${(a.sizeKb / 1024).toFixed(2)} MB</div>
+        </div>
+        <div style="display:flex;gap:3px;flex-shrink:0;">
+          <button onclick="_ssMoveAttachment(${i}, -1)" ${i === 0 ? 'disabled style="opacity:.3;"' : ''} title="W górę" style="padding:5px 8px;background:#F1F5F9;color:#334155;border:none;border-radius:5px;font-size:11px;cursor:pointer;">↑</button>
+          <button onclick="_ssMoveAttachment(${i}, 1)" ${i === atts.length - 1 ? 'disabled style="opacity:.3;"' : ''} title="W dół" style="padding:5px 8px;background:#F1F5F9;color:#334155;border:none;border-radius:5px;font-size:11px;cursor:pointer;">↓</button>
+          <button onclick="_ssRemoveAttachment(${i})" title="Usuń" style="padding:5px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;"><i class="ti ti-trash" style="font-size:12px;"></i></button>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+/* Scala wygenerowany PDF wizji z załącznikami — wykorzystuje pdf-lib */
+async function _ssMergeAttachmentsIntoPdf(wizjaPdfBytes, attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return wizjaPdfBytes;
+  if (typeof PDFLib === 'undefined') {
+    showToast('Biblioteka pdf-lib niedostępna — załączniki pominięte');
+    return wizjaPdfBytes;
+  }
+  const { PDFDocument } = PDFLib;
+  const mergedDoc = await PDFDocument.create();
+
+  // 1) Strony wizji
+  const wizjaDoc = await PDFDocument.load(wizjaPdfBytes);
+  const wizjaPages = await mergedDoc.copyPages(wizjaDoc, wizjaDoc.getPageIndices());
+  wizjaPages.forEach(p => mergedDoc.addPage(p));
+
+  // 2) Strony z każdego załącznika (w kolejności listy)
+  for (const att of attachments) {
+    try {
+      const b64 = String(att.dataBase64 || '').split(',')[1] || att.dataBase64;
+      const binStr = atob(b64);
+      const bytes = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+      const attDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const attPages = await mergedDoc.copyPages(attDoc, attDoc.getPageIndices());
+      attPages.forEach(p => mergedDoc.addPage(p));
+    } catch(e) {
+      console.warn('Nie udało się dołączyć załącznika:', att.name, e);
+      showToast('Pominięto „' + att.name + '" — plik zaszyfrowany lub uszkodzony');
+    }
+  }
+  return await mergedDoc.save();
+}
 
 async function _ssAddPhotos(fileList) {
   if (!_ssEditing || !fileList || fileList.length === 0) return;
@@ -17116,16 +18579,63 @@ function _ssBakePhotoWithAnnotations(photo) {
         } else if (a.type === 'rect' && a.points?.length >= 2) {
           const [p1, p2] = a.points;
           const x1 = p1[0] * w, y1 = p1[1] * h, x2 = p2[0] * w, y2 = p2[1] * h;
-          ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+          const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+          const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+          ctx.save();
+          if (a.rotation) {
+            ctx.translate(cx, cy);
+            ctx.rotate(a.rotation);
+            ctx.strokeRect(-rw/2, -rh/2, rw, rh);
+          } else {
+            ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), rw, rh);
+          }
+          ctx.restore();
         } else if (a.type === 'text') {
           const fontSize = Math.max(14, (a.width || 5) * 4) * scale;
           ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
           const x = a.x * w, y = a.y * h;
           const metrics = ctx.measureText(a.text || '');
+          ctx.save();
+          if (a.rotation) { ctx.translate(x + metrics.width/2, y - fontSize/2); ctx.rotate(a.rotation); ctx.translate(-(x + metrics.width/2), -(y - fontSize/2)); }
           ctx.fillStyle = 'rgba(255,255,255,.92)';
           ctx.fillRect(x - 4, y - fontSize, metrics.width + 8, fontSize + 6);
           ctx.fillStyle = a.color || '#000';
           ctx.fillText(a.text || '', x, y);
+          ctx.restore();
+        } else if (a.type === 'preset') {
+          const savedLW = ctx.lineWidth;
+          const meta = _SS_PRESET_META[a.preset] || _SS_PRESET_META.unit_zew;
+          const cx = a.x * w, cy = a.y * h;
+          const size = (a.scale || meta.size) * Math.min(w, h);
+          const halfW = size / 2, halfH = size / 3;
+          ctx.save();
+          if (a.rotation) { ctx.translate(cx, cy); ctx.rotate(a.rotation); ctx.translate(-cx, -cy); }
+          ctx.fillStyle = 'rgba(255,255,255,.92)';
+          ctx.strokeStyle = meta.color;
+          ctx.lineWidth = 3 * scale;
+          ctx.fillRect(cx - halfW, cy - halfH, size, halfH * 2);
+          ctx.strokeRect(cx - halfW, cy - halfH, size, halfH * 2);
+          ctx.lineWidth = 1.5 * scale;
+          const lines = a.preset === 'unit_zew' ? 5 : (a.preset === 'unit_wew' ? 6 : 3);
+          for (let i = 1; i < lines; i++) {
+            const ly = cy - halfH + (halfH * 2 * i / lines);
+            ctx.beginPath();
+            ctx.moveTo(cx - halfW + 4, ly);
+            ctx.lineTo(cx + halfW - 4, ly);
+            ctx.stroke();
+          }
+          const fontSize2 = Math.max(10, size * 0.14);
+          ctx.font = `700 ${fontSize2}px system-ui, -apple-system, sans-serif`;
+          const text = a.label || meta.label;
+          const textW = ctx.measureText(text).width;
+          ctx.fillStyle = meta.color;
+          ctx.fillRect(cx - textW/2 - 4, cy + halfH + 4, textW + 8, fontSize2 + 6);
+          ctx.fillStyle = '#fff';
+          ctx.textBaseline = 'top';
+          ctx.fillText(text, cx - textW/2, cy + halfH + 7);
+          ctx.textBaseline = 'alphabetic';
+          ctx.restore();
+          ctx.lineWidth = savedLW;
         }
       });
       resolve(canvas.toDataURL('image/jpeg', 0.82));
@@ -17199,99 +18709,89 @@ async function ssGeneratePdfForContractor() {
   });
 
   // SEKCJA 1: Klient + adres + dojazd
-  content.push(_ssSectionH('1. Dane klienta i lokalizacja'));
-  content.push(_ssRows([
+  content.push(_ssSection('1. Dane klienta i lokalizacja', _ssRows([
     ['Klient (osoba kontaktowa)', clientName],
     ['Telefon', na(s.contact_phone)],
     ['Adres montażu', na(s.address)],
     ['Dostępność (kiedy zastać)', na(s.availability)],
     ['Dojazd, klucze, kod bramy, uwagi wejściowe', na(s.access_notes)]
-  ]));
+  ])));
 
   // SEKCJA 2: Budynek + zakres
-  content.push(_ssSectionH('2. Obiekt i zakres prac'));
-  content.push(_ssRows([
+  content.push(_ssSection('2. Obiekt i zakres prac', _ssRows([
     ['Typ obiektu', _ssLbl('building_type', s.building_type)],
     ['Rok budowy', na(s.building_year)],
-    ['Powierzchnia (m²)', na(s.building_area_m2)],
     ['Zakres montażu', _ssLbl('scope', s.scope)]
-  ]));
+  ])));
 
   // SEKCJA 3: Punkty montażu
   const points = Array.isArray(s.install_points) ? s.install_points : [];
-  content.push(_ssSectionH(`3. Punkty montażu (${points.length})`));
-  if (points.length === 0) {
-    content.push({ text: 'Brak zdefiniowanych punktów. Uzupełnij w edytorze wizji.', italics: true, color: '#94A3B8', fontSize: 9, margin: [0, 0, 0, 8] });
-  } else {
-    const pointsTable = {
-      table: {
-        headerRows: 1,
-        widths: [22, '*', 'auto'],
-        body: [
-          [
-            { text: 'L.p.', style: 'thCell', alignment: 'center' },
-            { text: 'Typ / pomieszczenie / szczegóły', style: 'thCell' },
-            { text: 'Notatki', style: 'thCell' }
-          ],
-          ...points.map((p, i) => [
-            { text: String(i+1), style: 'tdCell', alignment: 'center' },
-            { stack: [
-              { text: na(p.typ), bold: true, fontSize: 9.5 },
-              p.pomieszczenie ? { text: 'Pomieszczenie: ' + p.pomieszczenie, fontSize: 8.5, color: '#475569' } : {}
-            ], style: 'tdCell' },
-            { text: na(p.notatki), style: 'tdCell', fontSize: 8.5, color: '#475569' }
-          ])
-        ]
-      },
-      layout: _ssTableLayout,
-      margin: [0, 0, 0, 8]
-    };
-    content.push(pointsTable);
-  }
+  const pointsContent = points.length === 0
+    ? { text: 'Brak zdefiniowanych punktów. Uzupełnij w edytorze wizji.', italics: true, color: '#94A3B8', fontSize: 9, margin: [0, 0, 0, 8] }
+    : {
+        table: {
+          headerRows: 1,
+          widths: [22, '*', 'auto'],
+          body: [
+            [
+              { text: 'L.p.', style: 'thCell', alignment: 'center' },
+              { text: 'Typ / pomieszczenie / szczegóły', style: 'thCell' },
+              { text: 'Notatki', style: 'thCell' }
+            ],
+            ...points.map((p, i) => [
+              { text: String(i+1), style: 'tdCell', alignment: 'center' },
+              { stack: [
+                { text: na(p.typ), bold: true, fontSize: 9.5 },
+                p.pomieszczenie ? { text: 'Pomieszczenie: ' + p.pomieszczenie, fontSize: 8.5, color: '#475569' } : {}
+              ], style: 'tdCell' },
+              { text: na(p.notatki), style: 'tdCell', fontSize: 8.5, color: '#475569' }
+            ])
+          ]
+        },
+        layout: _ssTableLayout,
+        dontBreakRows: true,
+        margin: [0, 0, 0, 8]
+      };
+  content.push(_ssSection(`3. Punkty montażu (${points.length})`, pointsContent));
 
   // SEKCJA 4: Elektryka
-  content.push(_ssSectionH('4. Zasilanie i elektryka'));
-  content.push(_ssRows([
+  content.push(_ssSection('4. Zasilanie i elektryka', _ssRows([
     ['Typ zasilania', _ssLbl('power_phase', s.power_phase)],
     ['Zabezpieczenie główne (rozdzielnia)', na(s.power_main_breaker)],
     ['Lokalizacja rozdzielni', na(s.power_panel_location)],
     ['Odległość rozdzielnia → agregat', s.power_distance_mb ? s.power_distance_mb + ' mb' : '—'],
     ['Uwagi elektryczne', na(s.power_notes)]
-  ]));
+  ])));
 
   // SEKCJA 5A: Skropliny (AC)
   if (isAc) {
-    content.push(_ssSectionH('5. Odprowadzenie skroplin (klimatyzacja)'));
-    content.push(_ssRows([
+    content.push(_ssSection('5. Odprowadzenie skroplin (klimatyzacja)', _ssRows([
       ['Docelowe miejsce', _ssLbl('condensate_target', s.condensate_target)],
       ['Długość odprowadzenia', s.condensate_length_mb ? s.condensate_length_mb + ' mb' : '—'],
       ['Uwagi', na(s.condensate_notes)]
-    ]));
+    ])));
   }
 
   // SEKCJA 5B: Hydraulika (HP)
   if (isHp) {
-    content.push(_ssSectionH(isAc ? '6. Wpięcie w CO/CWU (pompa ciepła)' : '5. Wpięcie w CO/CWU (pompa ciepła)'));
-    content.push(_ssRows([
+    content.push(_ssSection(isAc ? '6. Wpięcie w CO/CWU (pompa ciepła)' : '5. Wpięcie w CO/CWU (pompa ciepła)', _ssRows([
       ['Typ instalacji CO', _ssLbl('co_type', s.co_type)],
       ['Istniejący bojler (typ / pojemność)', na(s.boiler_existing)],
       ['Punkt wpięcia CO', na(s.co_connection_point)],
       ['Punkt wpięcia CWU', na(s.cwu_connection_point)],
       ['Uwagi hydrauliczne', na(s.plumbing_notes)]
-    ]));
+    ])));
   }
 
   // SEKCJA 6: Uwagi ogólne
   const notesSecNo = isAc && isHp ? 7 : (isAc || isHp ? 6 : 5);
-  content.push(_ssSectionH(`${notesSecNo}. Uwagi ogólne`));
-  if (s.general_notes) {
-    content.push({
-      table: { widths: ['*'], body: [[{ text: s.general_notes, fontSize: 9.5, color: '#1A2332', margin: [10, 10, 10, 10], fillColor: '#F8FBFD', border: [false, false, false, false] }]] },
-      margin: [0, 0, 0, 12]
-    });
-  } else {
-    content.push({ text: 'Brak dodatkowych uwag.', italics: true, color: '#94A3B8', fontSize: 9, margin: [0, 0, 0, 12] });
-  }
+  const notesBody = s.general_notes
+    ? {
+        table: { widths: ['*'], body: [[{ text: s.general_notes, fontSize: 9.5, color: '#1A2332', margin: [10, 10, 10, 10], fillColor: '#F8FBFD', border: [false, false, false, false] }]] },
+        margin: [0, 0, 0, 12]
+      }
+    : { text: 'Brak dodatkowych uwag.', italics: true, color: '#94A3B8', fontSize: 9, margin: [0, 0, 0, 12] };
+  content.push(_ssSection(`${notesSecNo}. Uwagi ogólne`, notesBody));
 
   // SEKCJA 7: Zdjęcia (osobna strona jeśli są)
   if (bakedPhotos.length > 0) {
@@ -17301,18 +18801,20 @@ async function ssGeneratePdfForContractor() {
       text: 'Legenda kolorów adnotacji: czerwony = trasa freonu, niebieski = hydraulika/skropliny, zielony = elektryka, pomarańczowy = uwaga.',
       fontSize: 8, italics: true, color: '#64748B', margin: [0, 0, 0, 10]
     });
-    // Grid 2 kolumn — 2 zdjęcia obok siebie
+    // Grid 2 kolumn — 2 zdjęcia obok siebie, każda para w unbreakable stack
     for (let i = 0; i < bakedPhotos.length; i += 2) {
       const left = bakedPhotos[i];
       const right = bakedPhotos[i+1] || null;
       content.push({
-        columns: [
-          _ssPhotoCard(left),
-          right ? _ssPhotoCard(right) : { text: '' }
-        ],
-        columnGap: 10,
-        margin: [0, 0, 0, 10],
-        unbreakable: true
+        unbreakable: true,
+        stack: [{
+          columns: [
+            _ssPhotoCard(left),
+            right ? _ssPhotoCard(right) : { text: '', width: '*' }
+          ],
+          columnGap: 10
+        }],
+        margin: [0, 0, 0, 12]
       });
     }
   }
@@ -17344,9 +18846,38 @@ async function ssGeneratePdfForContractor() {
   const safeClient = clientName.replace(/[^a-zA-Z0-9ĄąĆćĘęŁłŃńÓóŚśŹźŻż\-\s]/g, '').trim().slice(0, 40) || 'klient';
   const fileName = `Wizja_lokalna_${safeClient}_${fmtDate(s.survey_date).replace(/\./g,'-')}.pdf`;
 
+  const attachments = Array.isArray(s.attachments) ? s.attachments : [];
+
   try {
-    pdfMake.createPdf(docDefinition).download(fileName);
-    showToast('PDF wygenerowany — sprawdź folder pobieranych');
+    if (attachments.length === 0) {
+      // Brak załączników — normalny download
+      pdfMake.createPdf(docDefinition).download(fileName);
+      showToast('PDF wygenerowany — sprawdź folder pobieranych');
+    } else {
+      // Są załączniki — najpierw pobierz PDF wizji jako buffer, scal z załącznikami, zapisz
+      showToast('Scalam ' + attachments.length + ' załącznik' + (attachments.length === 1 ? '' : (attachments.length < 5 ? 'i' : 'ów')) + '…');
+      pdfMake.createPdf(docDefinition).getBuffer(async (buffer) => {
+        try {
+          const wizjaBytes = new Uint8Array(buffer);
+          const mergedBytes = await _ssMergeAttachmentsIntoPdf(wizjaBytes, attachments);
+          const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+          // Trigger download
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          showToast('PDF ze scalonymi załącznikami gotowy');
+        } catch(e) {
+          console.error('Merge error:', e);
+          showToast('Błąd scalania: ' + (e.message || e) + ' — pobieram bez załączników');
+          pdfMake.createPdf(docDefinition).download(fileName);
+        }
+      });
+    }
   } catch (e) {
     console.error('ss PDF error:', e);
     showToast('Błąd generowania PDF: ' + (e.message || e));
@@ -17356,6 +18887,18 @@ async function ssGeneratePdfForContractor() {
 /* Pomocnicze buildery */
 function _ssSectionH(text) {
   return { text: text.toUpperCase(), style: 'sectionH' };
+}
+
+/**
+ * Sekcja unbreakable — nagłówek + treść razem, nigdy nie rozdzielone na 2 strony.
+ * Użyj: content.push(_ssSection('1. Klient i adres', _ssRows([...])))
+ */
+function _ssSection(headerText, ...bodyItems) {
+  return {
+    unbreakable: true,
+    stack: [_ssSectionH(headerText), ...bodyItems],
+    margin: [0, 0, 0, 4]
+  };
 }
 
 function _ssRows(rows) {
@@ -17413,6 +18956,18 @@ async function saveSiteSurvey() {
   if (!payload.created_by) {
     payload.created_by = currentUser?.email ? currentUser.email.split('@')[0] : null;
   }
+  // Puste stringi w polach UUID/numeric → null (Supabase odrzuca puste stringi w tych typach)
+  if (payload.offer_id === '' || payload.offer_id === undefined) payload.offer_id = null;
+  if (payload.building_area_m2 === '' || payload.building_area_m2 === undefined) payload.building_area_m2 = null;
+  if (payload.power_distance_mb === '' || payload.power_distance_mb === undefined) payload.power_distance_mb = null;
+  if (payload.condensate_length_mb === '' || payload.condensate_length_mb === undefined) payload.condensate_length_mb = null;
+  // Wymuś typy — jeśli user wpisał string "120", zamień na number
+  ['building_area_m2', 'power_distance_mb', 'condensate_length_mb'].forEach(k => {
+    if (payload[k] !== null && payload[k] !== undefined && typeof payload[k] === 'string') {
+      const n = parseFloat(payload[k].replace(',', '.'));
+      payload[k] = isNaN(n) ? null : n;
+    }
+  });
 
   try {
     if (_ssEditing.id) {
@@ -17427,7 +18982,14 @@ async function saveSiteSurvey() {
     renderSiteSurveysList();
   } catch(e) {
     console.error('saveSiteSurvey error:', e);
-    showToast('Błąd zapisu: ' + (e.message || e));
+    const msg = String(e.message || e);
+    if (msg.includes('invalid input syntax for type uuid')) {
+      showToast('Błąd typu ID — wykonaj fix_site_surveys_client_id.sql w Supabase');
+    } else if (msg.includes('invalid input syntax for type numeric')) {
+      showToast('Sprawdź pola liczbowe (moc, powierzchnia, długość) — mogą być tylko cyfry');
+    } else {
+      showToast('Błąd zapisu: ' + msg.slice(0, 120));
+    }
   }
 }
 
