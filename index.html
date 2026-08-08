@@ -2150,6 +2150,15 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         <i class="ti ti-package v2-sidebar__item-icon" aria-hidden="true"></i>
         <span class="v2-sidebar__item-label">Magazyn</span>
       </button>
+      <button class="v2-sidebar__item" data-section="installed_units" onclick="v2ShowSection('installed_units')">
+        <i class="ti ti-device-desktop v2-sidebar__item-icon" aria-hidden="true"></i>
+        <span class="v2-sidebar__item-label">Zamontowane</span>
+      </button>
+      <button class="v2-sidebar__item" data-section="services" onclick="v2ShowSection('services')">
+        <i class="ti ti-tool v2-sidebar__item-icon" aria-hidden="true"></i>
+        <span class="v2-sidebar__item-label">Serwisy</span>
+        <span class="v2-sidebar__item-badge" id="servicesSidebarBadge" style="display:none;background:#DC2626;color:#fff;padding:1px 6px;border-radius:9px;font-size:9.5px;font-weight:700;margin-left:auto;"></span>
+      </button>
       <button class="v2-sidebar__item v2-sidebar__item--disabled" data-section="contractors" onclick="v2ShowSection('contractors')">
         <i class="ti ti-tools v2-sidebar__item-icon" aria-hidden="true"></i>
         <span class="v2-sidebar__item-label">Podwykonawcy</span>
@@ -2362,7 +2371,15 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         <h1 class="v2-page-title">Baza klientów</h1>
         <p class="v2-page-subtitle">Zarządzaj bazą klientów i przeglądaj historię ich ofert.</p>
         <div class="v2-toolbar">
-          <div class="v2-toolbar__search">
+          <label class="v2-toolbar__label">Sortuj:</label>
+          <select id="clientsSort" class="v2-toolbar__select" onchange="renderClientsList()">
+            <option value="newest">Od najnowszego</option>
+            <option value="oldest">Od najstarszego</option>
+            <option value="name_asc">Nazwa A→Z</option>
+            <option value="name_desc">Nazwa Z→A</option>
+            <option value="updated">Ostatnio edytowany</option>
+          </select>
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
             <i class="ti ti-search" aria-hidden="true"></i>
             <input id="clientsSearch" type="text" placeholder="Szukaj po nazwisku, firmie, NIP, telefonie, mailu..." oninput="renderClientsList()">
           </div>
@@ -2574,6 +2591,87 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         </div>
         <div id="whSummary" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;"></div>
         <div class="v2-panel" id="whListWrap" style="margin-top:12px;">
+          <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
+        </div>
+      </section>
+
+      <!-- SEKCJA: ZAMONTOWANE URZĄDZENIA -->
+      <section id="v2-section-installed_units" class="v2-section">
+        <h1 class="v2-page-title">Zamontowane urządzenia</h1>
+        <p class="v2-page-subtitle">Baza urządzeń u klientów — auto-planowanie przeglądów, historia serwisów, śledzenie gwarancji.</p>
+        <div class="v2-toolbar">
+          <label class="v2-toolbar__label">Typ:</label>
+          <select id="iuTypeFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()">
+            <option value="all">Wszystkie</option>
+            <option value="ac_split">Klimatyzator split</option>
+            <option value="ac_multi_zew">Klima — jedn. zew.</option>
+            <option value="ac_multi_wew">Klima — jedn. wew.</option>
+            <option value="hp">Pompa ciepła</option>
+            <option value="rekuperator">Rekuperator</option>
+            <option value="inne">Inne</option>
+          </select>
+          <label class="v2-toolbar__label">Serwis:</label>
+          <select id="iuServiceFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()">
+            <option value="all">Wszystkie</option>
+            <option value="overdue">Przeterminowane</option>
+            <option value="soon">W ciągu 30 dni</option>
+            <option value="ok">W terminie</option>
+          </select>
+          <label class="v2-toolbar__label">Status:</label>
+          <select id="iuStatusFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()">
+            <option value="active">Aktywne</option>
+            <option value="all">Wszystkie</option>
+            <option value="archived">Zarchiwizowane</option>
+            <option value="removed">Wycofane</option>
+          </select>
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input id="iuSearch" type="text" placeholder="Szukaj po marce, modelu, S/N, kliencie, adresie..." oninput="renderInstalledUnitsList()">
+          </div>
+          <button class="v2-btn v2-btn--primary" onclick="openInstalledUnitEditor(null)">
+            <i class="ti ti-plus"></i> Dodaj urządzenie
+          </button>
+        </div>
+        <div id="iuSummary" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;"></div>
+        <div class="v2-panel" id="iuListWrap" style="margin-top:12px;">
+          <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
+        </div>
+      </section>
+
+      <!-- SEKCJA: SERWISY -->
+      <section id="v2-section-services" class="v2-section">
+        <h1 class="v2-page-title">Serwisy</h1>
+        <p class="v2-page-subtitle">Planowanie i historia wizyt serwisowych. Zaplanowane serwisy pojawiają się w kalendarzu.</p>
+        <div class="v2-toolbar">
+          <label class="v2-toolbar__label">Status:</label>
+          <select id="svStatusFilter" class="v2-toolbar__select" onchange="renderServicesList()">
+            <option value="all">Wszystkie</option>
+            <option value="planned">Zaplanowane</option>
+            <option value="completed">Zrealizowane</option>
+            <option value="cancelled">Anulowane</option>
+          </select>
+          <label class="v2-toolbar__label">Zakres:</label>
+          <select id="svRangeFilter" class="v2-toolbar__select" onchange="renderServicesList()">
+            <option value="upcoming">Nadchodzące</option>
+            <option value="this_month">Ten miesiąc</option>
+            <option value="next_30">Najbliższe 30 dni</option>
+            <option value="past">Historia</option>
+            <option value="all">Wszystkie</option>
+          </select>
+          <label class="v2-toolbar__label">Technik:</label>
+          <select id="svTechFilter" class="v2-toolbar__select" onchange="renderServicesList()">
+            <option value="all">Wszyscy</option>
+          </select>
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input id="svSearch" type="text" placeholder="Szukaj po kliencie, marce, notatce..." oninput="renderServicesList()">
+          </div>
+          <button class="v2-btn v2-btn--primary" onclick="openServiceVisitEditor(null)">
+            <i class="ti ti-plus"></i> Nowy serwis
+          </button>
+        </div>
+        <div id="svSummary" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;"></div>
+        <div class="v2-panel" id="svListWrap" style="margin-top:12px;">
           <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
         </div>
       </section>
@@ -3695,7 +3793,7 @@ textarea.ss-input { resize: vertical; }
       </div>
       <div style="margin-top:12px;">
         <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:4px;">Powiąż z klientem (opcjonalne)</label>
-        <select id="taskClient" class="v2-toolbar__select" style="width:100%;"></select>
+        <div id="taskClientWidgetWrap"></div>
       </div>
       <div style="margin-top:12px;padding:10px 12px;background:#F8FAFC;border-radius:7px;">
         <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:6px;">Widoczność w kalendarzu</label>
@@ -5159,15 +5257,18 @@ function openTaskModal(taskId, prefill) {
   const assigneeSel = document.getElementById('taskAssignee');
   assigneeSel.innerHTML = teamActive().map(m => `<option value="${escapeHtml(m.email)}">${escapeHtml(m.display_name)}</option>`).join('');
 
-  // Wypełnij dropdown klientów (posortowany po nazwisku)
-  const clientSel = document.getElementById('taskClient');
-  const options = ['<option value="">— Brak powiązania —</option>'];
-  if (typeof clientsDb !== 'undefined' && Array.isArray(clientsDb)) {
-    clientsDb.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', 'pl')).forEach(c => {
-      options.push(`<option value="${c.id}">${escapeHtml(c.name || '(bez nazwy)')}${c.phone ? ' · ' + escapeHtml(c.phone) : ''}</option>`);
+  // Wypełnij widget wyszukiwarki klientów (zamiast dropdown)
+  const clientWrap = document.getElementById('taskClientWidgetWrap');
+  let currentClientId = null;
+  const clientSel = { get value() { return currentClientId || ''; }, set value(v) { currentClientId = v || null; } };
+  if (clientWrap) {
+    clientWrap.innerHTML = renderClientSearch({
+      widgetId: 'taskClientSearch',
+      selectedClientId: null,   // uzupełnimy poniżej jeśli edytujemy istniejące zadanie
+      placeholder: '— Brak powiązania —',
+      onSelect: (cid) => { currentClientId = cid; }
     });
   }
-  clientSel.innerHTML = options.join('');
 
   if (taskId) {
     const t = tasksDb.find(x => x.id === taskId);
@@ -5179,6 +5280,15 @@ function openTaskModal(taskId, prefill) {
     document.getElementById('taskPriority').value = t.priority || 'med';
     document.getElementById('taskDueAt').value = t.due_at ? _toDatetimeLocal(t.due_at) : '';
     clientSel.value = t.related_client_id || '';
+    // Re-render widget wyszukiwarki z zapisanym klientem
+    if (clientWrap) {
+      clientWrap.innerHTML = renderClientSearch({
+        widgetId: 'taskClientSearch',
+        selectedClientId: t.related_client_id || null,
+        placeholder: '— Brak powiązania —',
+        onSelect: (cid) => { currentClientId = cid; }
+      });
+    }
     // Wypełnij widoczność
     const vis = t.visibility || 'private';
     document.querySelectorAll('input[name="taskVisibility"]').forEach(r => { r.checked = (r.value === vis); });
@@ -5193,6 +5303,15 @@ function openTaskModal(taskId, prefill) {
     document.getElementById('taskPriority').value = 'med';
     document.getElementById('taskDueAt').value = '';
     clientSel.value = prefill?.clientId || '';
+    // Prefill klienta jeśli otwarto z kontekstu klienta
+    if (clientWrap && prefill?.clientId) {
+      clientWrap.innerHTML = renderClientSearch({
+        widgetId: 'taskClientSearch',
+        selectedClientId: prefill.clientId,
+        placeholder: '— Brak powiązania —',
+        onSelect: (cid) => { currentClientId = cid; }
+      });
+    }
     // Domyślna widoczność: prywatne
     document.querySelectorAll('input[name="taskVisibility"]').forEach(r => { r.checked = (r.value === 'private'); });
     if (prefill?.title) document.getElementById('taskTitle').value = prefill.title;
@@ -5230,7 +5349,12 @@ async function saveTask() {
   const assignee_email = document.getElementById('taskAssignee').value;
   const priority = document.getElementById('taskPriority').value;
   const dueRaw = document.getElementById('taskDueAt').value;
-  const related_client_id = document.getElementById('taskClient').value || null;
+  // Klient — odczyt z widgetu wyszukiwarki (przez shared _clientSearchCallbacks state)
+  const clientInput = document.getElementById('taskClientSearch_input');
+  // Nasz callback aktualizuje wewnętrzną zmienną currentClientId w scopie openTaskModal.
+  // W saveTask nie mamy do niej dostępu, więc odczytujemy przez data-attribute widgetu:
+  const clientWidget = document.querySelector('[data-client-search="taskClientSearch"]');
+  const related_client_id = clientWidget?.dataset.selectedId || null;
   const visRadio = document.querySelector('input[name="taskVisibility"]:checked');
   const visibility = visRadio ? visRadio.value : 'private';
 
@@ -6686,6 +6810,9 @@ function init() {
   if (typeof loadTasks === 'function') loadTasks();
   // Załaduj follow-upy (dla widgetu dashboardu i karty klienta)
   if (typeof loadFollowups === 'function') loadFollowups();
+  // Załaduj serwisy i urządzenia (dla sidebar badge + kalendarza)
+  if (typeof loadServiceVisits === 'function') loadServiceVisits();
+  if (typeof loadInstalledUnits === 'function') loadInstalledUnits();
   updateClientStatusLabel();
   const showPriceEl = document.getElementById('extrasShowPrice');
   if (showPriceEl) showPriceEl.checked = state.extrasShowPrice !== false;
@@ -11083,6 +11210,54 @@ function getAllCalendarEvents() {
     }
   });
 
+  // 5.5) Serwisy z tabeli service_visits (zaplanowane wizyty serwisowe)
+  if (Array.isArray(serviceVisitsDb)) {
+    serviceVisitsDb.forEach(v => {
+      if (!v.scheduled_date) return;
+      if (v.status === 'cancelled') return;
+      // Nie duplikuj wizyt już zrealizowanych — pokazuj tylko planned/in_progress na kalendarzu w przyszłości
+      // (zrealizowane pojawiają się jeśli sprawdzamy historię)
+      const client = clientsDb.find(c => c.id === v.client_id);
+      const unit = installedUnitsDb.find(u => u.id === v.installed_unit_id);
+      events.push({
+        type: 'service',
+        date: v.scheduled_date,
+        time: v.scheduled_time ? v.scheduled_time.slice(0,5) : null,
+        title: `${SV_TYPE_LABELS[v.service_type] || 'Serwis'}: ${client?.name || '—'}`,
+        description: unit ? `${unit.marka} ${unit.model || ''}${v.description ? ' — ' + v.description : ''}` : (v.description || ''),
+        clientId: client?.id, clientName: client?.name,
+        serviceVisitId: v.id,
+        handlerEmail: v.technician_email,
+        icon: 'ti-tool', color: v.status === 'completed' ? '#059669' : '#D97706'
+      });
+    });
+  }
+
+  // 5.6) Zbliżające się przeglądy z installed_units (bez konkretnej wizyty — tylko gdy jest next_service_date w przyszłości)
+  if (Array.isArray(installedUnitsDb)) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    installedUnitsDb.forEach(u => {
+      if (u.status !== 'active' || !u.next_service_date) return;
+      // Sprawdź czy nie ma już zaplanowanej wizyty na tę datę dla tego urządzenia (unikaj duplikatów)
+      const hasVisit = Array.isArray(serviceVisitsDb) && serviceVisitsDb.some(v => v.installed_unit_id === u.id && v.scheduled_date === u.next_service_date && v.status !== 'cancelled');
+      if (hasVisit) return;
+      const nextDate = new Date(u.next_service_date);
+      // Pokazuj tylko w oknie -60 do +365 dni żeby nie zaśmiecać
+      const diffDays = Math.floor((nextDate - today) / (24*3600*1000));
+      if (diffDays < -60 || diffDays > 365) return;
+      const client = clientsDb.find(c => c.id === u.client_id);
+      events.push({
+        type: 'service',
+        date: u.next_service_date,
+        title: `Termin przeglądu: ${client?.name || '—'}`,
+        description: `${u.marka} ${u.model || ''} — należy zaplanować wizytę`,
+        clientId: client?.id, clientName: client?.name,
+        installedUnitId: u.id,
+        icon: 'ti-clock-exclamation', color: diffDays < 0 ? '#DC2626' : '#D97706'
+      });
+    });
+  }
+
   // 5) Własne wydarzenia
   _calendarCustomEvents.forEach(e => {
     events.push({
@@ -11826,8 +12001,19 @@ function renderClientsList() {
       return blob.includes(search);
     });
   }
-  // sortuj alfabetycznie po nazwie
-  list.sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+  // Sortowanie z toolbara
+  const sortMode = document.getElementById('clientsSort')?.value || 'newest';
+  if (sortMode === 'newest') {
+    list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  } else if (sortMode === 'oldest') {
+    list.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+  } else if (sortMode === 'name_asc') {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pl'));
+  } else if (sortMode === 'name_desc') {
+    list.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'pl'));
+  } else if (sortMode === 'updated') {
+    list.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+  }
 
   if (list.length === 0) {
     body.innerHTML = '<div class="empty">Brak klientów spełniających kryteria.</div>';
@@ -15158,6 +15344,8 @@ const V2_SECTION_LABELS = {
   'site-survey': 'Wizja lokalna',
   'contracts': 'Umowy i protokoły',
   'warehouse': 'Magazyn',
+  'installed_units': 'Zamontowane urządzenia',
+  'services': 'Serwisy',
   'contractors': 'Podwykonawcy',
   'products': 'Produkty klimatyzacji',
   'hp_products': 'Produkty pomp ciepła',
@@ -15216,6 +15404,20 @@ function v2ShowSection(id) {
   if (id === 'products' && typeof renderAcProductsList === 'function') {
     setTimeout(() => renderAcProductsList(), 50);
   }
+  // Hook: Zamontowane urządzenia
+  if (id === 'installed_units' && typeof loadInstalledUnits === 'function') {
+    setTimeout(async () => {
+      await Promise.all([loadInstalledUnits(), loadServiceVisits()]);
+      renderInstalledUnitsList();
+    }, 50);
+  }
+  // Hook: Serwisy
+  if (id === 'services' && typeof loadServiceVisits === 'function') {
+    setTimeout(async () => {
+      await Promise.all([loadServiceVisits(), loadInstalledUnits()]);
+      renderServicesList();
+    }, 50);
+  }
   // Hook: Wizja lokalna — załaduj listę wizji
   if (id === 'site-survey' && typeof loadSiteSurveys === 'function') {
     setTimeout(() => loadSiteSurveys().then(() => renderSiteSurveysList()), 50);
@@ -15228,6 +15430,8 @@ function v2ShowSection(id) {
       if (typeof loadTasks === 'function') promises.push(loadTasks());
       if (typeof loadSiteSurveys === 'function') promises.push(loadSiteSurveys());
       if (typeof loadCustomCalendarEvents === 'function') promises.push(loadCustomCalendarEvents());
+      if (typeof loadServiceVisits === 'function') promises.push(loadServiceVisits());
+      if (typeof loadInstalledUnits === 'function') promises.push(loadInstalledUnits());
       await Promise.all(promises);
       if (typeof renderInlineCalendar === 'function') renderInlineCalendar();
     }, 50);
@@ -16943,6 +17147,1210 @@ function wzAddHpItemFromPicker(productId) {
    Dokumentacja techniczna dla ekipy montażowej.
    Zapisywana w Supabase (site_surveys), snapshot fotek jako base64 w JSONB. */
 
+/* ============================================================
+   UNIWERSALNA WYSZUKIWARKA KLIENTA
+   Renderuje input z autouzupełnianiem który zastępuje <select> klienta.
+   Użycie:
+     renderClientSearch({
+       widgetId: 'iuClientSearch',        // unikatowy id widgetu
+       selectedClientId: u.client_id,     // aktualnie wybrany klient
+       onSelect: (clientId) => { ... }    // callback po wyborze
+     })
+   ============================================================ */
+
+/* Globalny rejestr callbacków dla wszystkich widgetów wyszukiwarki */
+window._clientSearchCallbacks = window._clientSearchCallbacks || {};
+
+function renderClientSearch(opts) {
+  const widgetId = opts.widgetId;
+  const clientId = opts.selectedClientId || '';
+  const placeholder = opts.placeholder || 'Wpisz nazwę, telefon lub e-mail klienta...';
+  const showClear = opts.showClear !== false;
+
+  window._clientSearchCallbacks[widgetId] = opts.onSelect;
+
+  const selected = clientId && Array.isArray(clientsDb) ? clientsDb.find(c => c.id === clientId) : null;
+  const displayValue = selected ? (selected.name || '') + (selected.phone ? ' · ' + selected.phone : '') : '';
+  const secondaryLine = selected ? [selected.phone, selected.email].filter(Boolean).join(' · ') : '';
+
+  return `
+    <div style="position:relative;" data-client-search="${widgetId}" data-selected-id="${escapeHtml(clientId)}">
+      <input type="text" id="${widgetId}_input" class="ss-input"
+        value="${escapeHtml(displayValue)}"
+        placeholder="${escapeHtml(placeholder)}"
+        oninput="_clientSearchRender('${widgetId}', this.value)"
+        onfocus="_clientSearchRender('${widgetId}', this.value); document.getElementById('${widgetId}_dropdown').style.display='block'"
+        onblur="setTimeout(() => { const d=document.getElementById('${widgetId}_dropdown'); if(d) d.style.display='none'; }, 200)"
+        autocomplete="off">
+      <div id="${widgetId}_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #CBD5E1;border-radius:7px;box-shadow:0 4px 12px rgba(0,0,0,.08);max-height:280px;overflow-y:auto;z-index:1000;margin-top:2px;"></div>
+      ${showClear && clientId ? `<button type="button" onclick="_clientSearchClear('${widgetId}')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#94A3B8;cursor:pointer;font-size:16px;padding:4px 8px;" title="Wyczyść">×</button>` : ''}
+      ${secondaryLine ? `<div id="${widgetId}_secondary" style="font-size:11px;color:#64748B;margin-top:4px;">${escapeHtml(secondaryLine)}</div>` : `<div id="${widgetId}_secondary"></div>`}
+    </div>
+  `;
+}
+
+function _clientSearchRender(widgetId, query) {
+  const dropdown = document.getElementById(widgetId + '_dropdown');
+  if (!dropdown) return;
+  const q = (query || '').toLowerCase().trim();
+  const list = Array.isArray(clientsDb) ? clientsDb : [];
+  let filtered;
+  if (!q) {
+    // Puste — najnowsi 20
+    filtered = [...list].sort((a,b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 20);
+  } else {
+    filtered = list.filter(c => {
+      const blob = [c.name, c.phone, c.email, c.address].filter(Boolean).join(' ').toLowerCase();
+      return blob.includes(q);
+    }).slice(0, 30);
+  }
+  if (filtered.length === 0) {
+    dropdown.innerHTML = '<div style="padding:14px;color:#94A3B8;font-size:12px;text-align:center;">Brak klientów pasujących do „' + escapeHtml(query) + '"</div>';
+    dropdown.style.display = 'block';
+    return;
+  }
+  dropdown.innerHTML = filtered.map(c => {
+    const secondary = [c.phone, c.email].filter(Boolean).join(' · ') || c.address || '';
+    return `
+      <button type="button" onmousedown="event.preventDefault(); _clientSearchPick('${widgetId}', '${c.id}')"
+        style="width:100%;text-align:left;background:transparent;border:none;padding:9px 12px;cursor:pointer;font-family:inherit;border-bottom:1px solid #F1F5F9;display:block;"
+        onmouseover="this.style.background='#F8FAFC'"
+        onmouseout="this.style.background='transparent'">
+        <div style="font-size:13px;font-weight:600;color:#0A2647;">${escapeHtml(c.name || '(bez nazwy)')}</div>
+        ${secondary ? `<div style="font-size:11px;color:#64748B;margin-top:2px;">${escapeHtml(secondary)}</div>` : ''}
+      </button>
+    `;
+  }).join('');
+  dropdown.style.display = 'block';
+}
+
+function _clientSearchPick(widgetId, clientId) {
+  const dropdown = document.getElementById(widgetId + '_dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  const input = document.getElementById(widgetId + '_input');
+  const secondary = document.getElementById(widgetId + '_secondary');
+  const c = clientsDb.find(x => x.id === clientId);
+  if (input && c) {
+    input.value = (c.name || '') + (c.phone ? ' · ' + c.phone : '');
+  }
+  if (secondary && c) {
+    const line = [c.phone, c.email].filter(Boolean).join(' · ');
+    secondary.textContent = line;
+  }
+  // Zapisz wybór na wrapperze — czytelne z dowolnego scope przez data-selected-id
+  const wrap = document.querySelector('[data-client-search="' + widgetId + '"]');
+  if (wrap) wrap.dataset.selectedId = clientId;
+  const cb = window._clientSearchCallbacks[widgetId];
+  if (typeof cb === 'function') cb(clientId);
+}
+
+function _clientSearchClear(widgetId) {
+  const input = document.getElementById(widgetId + '_input');
+  const secondary = document.getElementById(widgetId + '_secondary');
+  if (input) input.value = '';
+  if (secondary) secondary.textContent = '';
+  const wrap = document.querySelector('[data-client-search="' + widgetId + '"]');
+  if (wrap) wrap.dataset.selectedId = '';
+  const cb = window._clientSearchCallbacks[widgetId];
+  if (typeof cb === 'function') cb(null);
+}
+
+/* ============================================================
+   BAZA ZAMONTOWANYCH URZĄDZEŃ + SERWISY
+   ============================================================ */
+
+/* Lokalna funkcja formatowania daty — używana wewnątrz modułu (fmtDate w kodzie jest lokalna
+   w innych funkcjach, więc nie jest tu widoczna). */
+const _iuFmtDate = (d) => {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('pl-PL'); } catch(e) { return String(d); }
+};
+
+let installedUnitsDb = [];
+let serviceVisitsDb = [];
+
+const IU_DEVICE_LABELS = {
+  ac_split: 'Klimatyzator split',
+  ac_multi_zew: 'Klimatyzacja — jedn. zew.',
+  ac_multi_wew: 'Klimatyzacja — jedn. wew.',
+  hp: 'Pompa ciepła',
+  rekuperator: 'Rekuperator',
+  inne: 'Inne'
+};
+
+const IU_DEVICE_COLORS = {
+  ac_split: '#0369A1',
+  ac_multi_zew: '#0284C7',
+  ac_multi_wew: '#0EA5E9',
+  hp: '#DC2626',
+  rekuperator: '#059669',
+  inne: '#64748B'
+};
+
+const SV_TYPE_LABELS = {
+  przeglad: 'Przegląd',
+  konserwacja: 'Konserwacja',
+  naprawa: 'Naprawa',
+  wymiana_filtra: 'Wymiana filtra',
+  gwarancyjny: 'Serwis gwarancyjny',
+  inne: 'Inne'
+};
+
+const SV_STATUS_LABELS = {
+  planned: 'Zaplanowany',
+  in_progress: 'W trakcie',
+  completed: 'Zrealizowany',
+  cancelled: 'Anulowany'
+};
+
+async function loadInstalledUnits() {
+  try {
+    const data = await sbFetch('/rest/v1/installed_units?select=*&order=next_service_date.asc.nullslast');
+    installedUnitsDb = data || [];
+    _iuUpdateServicesBadge();
+  } catch(e) {
+    console.info('installed_units unavailable:', e.message);
+    installedUnitsDb = [];
+    if (String(e.message).includes('42P01')) {
+      showToast('Brak tabeli installed_units — wykonaj SQL migration_installed_units_and_services.sql');
+    }
+  }
+}
+
+async function loadServiceVisits() {
+  try {
+    const data = await sbFetch('/rest/v1/service_visits?select=*&order=scheduled_date.asc');
+    serviceVisitsDb = data || [];
+    _iuUpdateServicesBadge();
+  } catch(e) {
+    console.info('service_visits unavailable:', e.message);
+    serviceVisitsDb = [];
+  }
+}
+
+/* Aktualizuje badge w sidebarze — pokazuje liczbę nadchodzących serwisów w ciągu 30 dni */
+function _iuUpdateServicesBadge() {
+  const badge = document.getElementById('servicesSidebarBadge');
+  if (!badge) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const in30 = new Date(today.getTime() + 30 * 24 * 3600 * 1000);
+  const count = serviceVisitsDb.filter(sv => {
+    if (sv.status !== 'planned') return false;
+    const d = new Date(sv.scheduled_date);
+    return d >= today && d <= in30;
+  }).length;
+  // Plus przeterminowane serwisy z installed_units
+  const overdue = installedUnitsDb.filter(u => {
+    if (u.status !== 'active' || !u.next_service_date) return false;
+    return new Date(u.next_service_date) < today;
+  }).length;
+  const total = count + overdue;
+  if (total > 0) {
+    badge.textContent = String(total);
+    badge.style.display = 'inline-block';
+    badge.style.background = overdue > 0 ? '#DC2626' : '#D97706';
+    badge.title = `${overdue} przeterminowanych, ${count} w ciągu 30 dni`;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+/* ==================== ZAMONTOWANE URZĄDZENIA ==================== */
+
+let _iuEditing = null;
+
+function _iuBlank() {
+  const today = new Date().toISOString().slice(0,10);
+  return {
+    id: null,
+    client_id: null,
+    offer_id: null,
+    site_survey_id: null,
+    parent_unit_id: null,
+    device_type: 'ac_split',
+    category: 'klimatyzacja',
+    marka: '',
+    model: '',
+    serial_number: '',
+    power_kw: null,
+    installation_date: today,
+    installer_name: null,
+    location_room: '',
+    installation_address: '',
+    warranty_years: 5,
+    warranty_end_date: null,
+    service_interval_months: 12,
+    next_service_date: null,
+    last_service_date: null,
+    status: 'active',
+    notes: '',
+    // Tylko dla multi_zew — draft listy jednostek wewnętrznych (nie zapisywane bezpośrednio,
+    // konwertowane na osobne rekordy z parent_unit_id przy zapisie parenta)
+    _indoor_units_draft: []
+  };
+}
+
+function _iuDeviceTypeToCategory(deviceType) {
+  if (deviceType === 'hp') return 'pompa_ciepla';
+  if (deviceType === 'rekuperator') return 'rekuperacja';
+  if (String(deviceType || '').startsWith('ac_')) return 'klimatyzacja';
+  return 'inne';
+}
+
+/* Auto-oblicz next_service_date i warranty_end_date */
+function _iuRecalcDates(u) {
+  if (u.installation_date && u.service_interval_months) {
+    const base = u.last_service_date || u.installation_date;
+    const d = new Date(base);
+    d.setMonth(d.getMonth() + Number(u.service_interval_months));
+    u.next_service_date = d.toISOString().slice(0,10);
+  }
+  if (u.installation_date && u.warranty_years) {
+    const d = new Date(u.installation_date);
+    d.setFullYear(d.getFullYear() + Number(u.warranty_years));
+    u.warranty_end_date = d.toISOString().slice(0,10);
+  }
+  u.category = _iuDeviceTypeToCategory(u.device_type);
+}
+
+/* Status serwisu w wizualnej formie */
+function _iuGetServiceStatus(u) {
+  if (!u.next_service_date) return { key: 'none', label: '—', color: '#94A3B8' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const next = new Date(u.next_service_date);
+  const diffDays = Math.floor((next - today) / (24 * 3600 * 1000));
+  if (diffDays < 0) return { key: 'overdue', label: `${Math.abs(diffDays)} dni po`, color: '#DC2626' };
+  if (diffDays <= 30) return { key: 'soon', label: `za ${diffDays} dni`, color: '#D97706' };
+  if (diffDays <= 90) return { key: 'ok', label: `za ${diffDays} dni`, color: '#059669' };
+  return { key: 'ok', label: _iuFmtDate(u.next_service_date), color: '#059669' };
+}
+
+/* Otwiera modal edycji/dodawania */
+function openInstalledUnitEditor(unitId, prefill) {
+  if (unitId) {
+    const u = installedUnitsDb.find(x => x.id === unitId);
+    if (!u) { showToast('Nie znaleziono urządzenia'); return; }
+    _iuEditing = JSON.parse(JSON.stringify(u));
+    // Jeśli edytujemy jednostkę zewnętrzną multi-split — załaduj powiązane wewnętrzne jako draft
+    if (u.device_type === 'ac_multi_zew') {
+      _iuEditing._indoor_units_draft = installedUnitsDb
+        .filter(child => child.parent_unit_id === u.id)
+        .map(child => ({
+          id: child.id,
+          marka: child.marka || '',
+          model: child.model || '',
+          power_kw: child.power_kw,
+          serial_number: child.serial_number || '',
+          location_room: child.location_room || '',
+          notes: child.notes || '',
+          _existing: true          // znacznik: już istnieje w bazie
+        }));
+    } else {
+      _iuEditing._indoor_units_draft = [];
+    }
+  } else {
+    _iuEditing = _iuBlank();
+    if (prefill) Object.assign(_iuEditing, prefill);
+  }
+  _iuRenderEditor();
+}
+
+function _iuRenderEditor() {
+  const u = _iuEditing;
+  if (!u) return;
+  let mod = document.getElementById('installedUnitEditorModal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'installedUnitEditorModal';
+    mod.className = 'modal-backdrop';
+    document.body.appendChild(mod);
+  }
+  const clientList = Array.isArray(clientsDb) ? clientsDb : [];
+  const clientOptions = clientList
+    .sort((a,b) => (a.name || '').localeCompare(b.name || '', 'pl'))
+    .map(c => `<option value="${c.id}"${u.client_id === c.id ? ' selected' : ''}>${escapeHtml(c.name || '(bez nazwy)')}${c.phone ? ' · ' + escapeHtml(c.phone) : ''}</option>`)
+    .join('');
+  const isNew = !u.id;
+
+  mod.innerHTML = `
+    <div class="modal" style="max-width:720px;">
+      <div class="modal__head" style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0A2647;">${isNew ? 'Nowe urządzenie' : 'Edycja urządzenia'}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">Baza zamontowanych urządzeń — auto-planowanie serwisów</div>
+        </div>
+        <button onclick="closeInstalledUnitEditor()" style="background:transparent;border:none;color:#64748B;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="modal__body" style="padding:16px 18px;max-height:calc(100vh - 200px);overflow-y:auto;">
+
+        <div class="ss-section-h" style="margin-bottom:8px;">1. Klient i lokalizacja</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Klient *</label>
+            ${renderClientSearch({
+              widgetId: 'iuClientSearch',
+              selectedClientId: u.client_id,
+              onSelect: (clientId) => _iuSetClient(clientId)
+            })}
+          </div>
+          <div>
+            <label class="ss-label">Data montażu *</label>
+            <input type="date" class="ss-input" value="${u.installation_date || ''}" onchange="_iuSet('installation_date', this.value)">
+          </div>
+          <div style="grid-column:span 2;">
+            <label class="ss-label">Adres montażu</label>
+            <input type="text" class="ss-input" value="${escapeHtml(u.installation_address || '')}" onchange="_iuSet('installation_address', this.value)" placeholder="Skopiuj z klienta lub wpisz inny (np. lokal firmy zamiast domu)">
+          </div>
+          <div>
+            <label class="ss-label">Pomieszczenie / lokalizacja</label>
+            <input type="text" class="ss-input" value="${escapeHtml(u.location_room || '')}" onchange="_iuSet('location_room', this.value)" placeholder="np. salon, sypialnia, kotłownia">
+          </div>
+          <div>
+            <label class="ss-label">Ekipa montażowa</label>
+            <input type="text" class="ss-input" value="${escapeHtml(u.installer_name || '')}" onchange="_iuSet('installer_name', this.value)" placeholder="Imię/nazwa ekipy lub firmy">
+          </div>
+        </div>
+
+        <div class="ss-section-h" style="margin:16px 0 8px;">2. Urządzenie</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Typ urządzenia *</label>
+            <select class="ss-input" onchange="_iuSet('device_type', this.value)">
+              ${Object.entries(IU_DEVICE_LABELS).map(([k,v]) => `<option value="${k}"${u.device_type === k ? ' selected' : ''}>${v}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="ss-label">Moc (kW)</label>
+            <input type="number" step="0.1" class="ss-input" value="${u.power_kw || ''}" onchange="_iuSet('power_kw', this.value === '' ? null : parseFloat(this.value))" placeholder="np. 3.5">
+          </div>
+          <div>
+            <label class="ss-label">Marka *</label>
+            <input type="text" class="ss-input" value="${escapeHtml(u.marka || '')}" onchange="_iuSet('marka', this.value)" placeholder="np. HAIER" list="iuBrandsList">
+            <datalist id="iuBrandsList">
+              ${['HAIER','GREE','LG','PANASONIC','SAMSUNG','TOSHIBA','MITSUBISHI','DAIKIN','VIESSMANN','VAILLANT','KAISAI','SINCLAIR'].map(b => `<option value="${b}">`).join('')}
+            </datalist>
+          </div>
+          <div>
+            <label class="ss-label">Model *</label>
+            <input type="text" class="ss-input" value="${escapeHtml(u.model || '')}" onchange="_iuSet('model', this.value)" placeholder="np. Jade Plus 2,6 kW">
+          </div>
+          <div style="grid-column:span 2;">
+            <label class="ss-label">Numer seryjny</label>
+            <input type="text" class="ss-input" value="${escapeHtml(u.serial_number || '')}" onchange="_iuSet('serial_number', this.value)" placeholder="np. XY123456789 — potrzebny do zgłoszeń gwarancyjnych">
+          </div>
+        </div>
+
+        <div class="ss-section-h" style="margin:16px 0 8px;">3. Serwis i gwarancja</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Częstotliwość przeglądu</label>
+            <select class="ss-input" onchange="_iuSet('service_interval_months', parseInt(this.value))">
+              <option value="6" ${u.service_interval_months === 6 ? 'selected' : ''}>Co 6 miesięcy</option>
+              <option value="12" ${u.service_interval_months === 12 ? 'selected' : ''}>Co 12 miesięcy (raz w roku)</option>
+              <option value="24" ${u.service_interval_months === 24 ? 'selected' : ''}>Co 24 miesiące</option>
+            </select>
+          </div>
+          <div>
+            <label class="ss-label">Gwarancja (lata)</label>
+            <input type="number" min="0" max="20" class="ss-input" value="${u.warranty_years || 5}" onchange="_iuSet('warranty_years', parseInt(this.value))">
+          </div>
+          <div>
+            <label class="ss-label">Ostatni serwis</label>
+            <input type="date" class="ss-input" value="${u.last_service_date || ''}" onchange="_iuSet('last_service_date', this.value || null)">
+          </div>
+        </div>
+        <div id="iuDatesPreview" style="margin-top:10px;padding:10px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:7px;font-size:11.5px;color:#166534;">
+          ${_iuRenderDatesPreview(u)}
+        </div>
+
+        <div id="iuIndoorUnitsSection">
+          ${_iuRenderIndoorUnitsSection(u)}
+        </div>
+
+        <div class="ss-section-h" style="margin:16px 0 8px;">5. Uwagi i status</div>
+        <div style="display:grid;grid-template-columns:1fr 200px;gap:12px;">
+          <div>
+            <label class="ss-label">Notatki</label>
+            <textarea class="ss-input" rows="3" onchange="_iuSet('notes', this.value)" placeholder="Uwagi montażowe, specyfika instalacji, kolor obudowy, akcesoria...">${escapeHtml(u.notes || '')}</textarea>
+          </div>
+          <div>
+            <label class="ss-label">Status</label>
+            <select class="ss-input" onchange="_iuSet('status', this.value)">
+              <option value="active" ${u.status === 'active' ? 'selected' : ''}>Aktywne</option>
+              <option value="archived" ${u.status === 'archived' ? 'selected' : ''}>Zarchiwizowane</option>
+              <option value="replaced" ${u.status === 'replaced' ? 'selected' : ''}>Wymienione</option>
+              <option value="removed" ${u.status === 'removed' ? 'selected' : ''}>Wycofane</option>
+            </select>
+          </div>
+        </div>
+
+        ${u.id ? _iuRenderServiceHistory(u.id) : ''}
+      </div>
+      <div class="modal__foot" style="padding:12px 18px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;gap:8px;">
+        <div>
+          ${u.id ? `<button onclick="deleteInstalledUnit('${u.id}')" style="padding:8px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-trash"></i> Usuń</button>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="closeInstalledUnitEditor()" style="padding:8px 14px;background:transparent;color:#334155;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button onclick="saveInstalledUnit()" style="padding:8px 18px;background:#0A2647;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-check"></i> Zapisz</button>
+        </div>
+      </div>
+    </div>
+  `;
+  mod.classList.add('modal-backdrop--open');
+}
+
+function _iuRenderDatesPreview(u) {
+  const tmp = JSON.parse(JSON.stringify(u));
+  _iuRecalcDates(tmp);
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div><strong>Następny serwis:</strong> ${tmp.next_service_date ? _iuFmtDate(tmp.next_service_date) : '—'}</div>
+      <div><strong>Koniec gwarancji:</strong> ${tmp.warranty_end_date ? _iuFmtDate(tmp.warranty_end_date) : '—'}</div>
+    </div>
+    <div style="font-size:10.5px;color:#166534;margin-top:5px;">Daty przeliczają się automatycznie na podstawie daty montażu, ostatniego serwisu i częstotliwości.</div>
+  `;
+}
+
+/* Sekcja "Jednostki wewnętrzne" — pokazywana tylko dla ac_multi_zew (jedn. zewnętrzna multi) */
+function _iuRenderIndoorUnitsSection(u) {
+  if (u.device_type !== 'ac_multi_zew') return '';
+  const drafts = Array.isArray(u._indoor_units_draft) ? u._indoor_units_draft : [];
+  return `
+    <div class="ss-section-h" style="margin:16px 0 8px;">4. Jednostki wewnętrzne w instalacji <span style="font-weight:normal;color:#94A3B8;font-size:11px;margin-left:8px;">(zapisane jako osobne rekordy powiązane z tą jedn. zewnętrzną)</span></div>
+    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+      ${drafts.length === 0 ? `
+        <div style="text-align:center;color:#94A3B8;font-size:12px;padding:16px;font-style:italic;">
+          Brak jednostek wewnętrznych. Dodaj pierwszą klikając „+ Dodaj jednostkę".
+        </div>
+      ` : `
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+          ${drafts.map((d, i) => `
+            <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:10px 12px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span style="padding:2px 8px;background:#0EA5E915;color:#0EA5E9;border-radius:5px;font-size:10.5px;font-weight:700;">Jedn. wew. #${i+1}</span>
+                ${d._existing ? '<span style="padding:2px 6px;background:#F0FDF4;color:#166534;border-radius:4px;font-size:9.5px;font-weight:600;">W BAZIE</span>' : '<span style="padding:2px 6px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:9.5px;font-weight:600;">NOWA</span>'}
+                <div style="flex:1;"></div>
+                <button onclick="_iuRemoveIndoor(${i})" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;" title="${d._existing ? 'Usuń z bazy przy zapisie' : 'Usuń'}"><i class="ti ti-trash" style="font-size:12px;"></i></button>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                <div>
+                  <label style="display:block;font-size:10.5px;color:#64748B;font-weight:600;margin-bottom:3px;">Marka</label>
+                  <input type="text" class="ss-input" style="padding:6px 8px;font-size:12px;" value="${escapeHtml(d.marka || '')}" onchange="_iuSetIndoor(${i}, 'marka', this.value)" placeholder="HAIER">
+                </div>
+                <div>
+                  <label style="display:block;font-size:10.5px;color:#64748B;font-weight:600;margin-bottom:3px;">Model</label>
+                  <input type="text" class="ss-input" style="padding:6px 8px;font-size:12px;" value="${escapeHtml(d.model || '')}" onchange="_iuSetIndoor(${i}, 'model', this.value)" placeholder="np. Flexis Plus 2,6 kW">
+                </div>
+                <div>
+                  <label style="display:block;font-size:10.5px;color:#64748B;font-weight:600;margin-bottom:3px;">Moc (kW)</label>
+                  <input type="number" step="0.1" class="ss-input" style="padding:6px 8px;font-size:12px;" value="${d.power_kw || ''}" onchange="_iuSetIndoor(${i}, 'power_kw', this.value === '' ? null : parseFloat(this.value))" placeholder="2.6">
+                </div>
+                <div>
+                  <label style="display:block;font-size:10.5px;color:#64748B;font-weight:600;margin-bottom:3px;">Pomieszczenie</label>
+                  <input type="text" class="ss-input" style="padding:6px 8px;font-size:12px;" value="${escapeHtml(d.location_room || '')}" onchange="_iuSetIndoor(${i}, 'location_room', this.value)" placeholder="np. salon">
+                </div>
+                <div style="grid-column:span 2;">
+                  <label style="display:block;font-size:10.5px;color:#64748B;font-weight:600;margin-bottom:3px;">Numer seryjny</label>
+                  <input type="text" class="ss-input" style="padding:6px 8px;font-size:12px;font-family:monospace;" value="${escapeHtml(d.serial_number || '')}" onchange="_iuSetIndoor(${i}, 'serial_number', this.value)" placeholder="opcjonalnie">
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+      <button onclick="_iuAddIndoor()" style="width:100%;padding:9px;background:#fff;color:#0F3461;border:1px dashed #0F3461;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+        <i class="ti ti-plus" style="font-size:12px;"></i> Dodaj jednostkę wewnętrzną
+      </button>
+      ${drafts.length > 0 ? `<div style="font-size:10.5px;color:#64748B;margin-top:8px;">Zaplanowany przegląd jedn. zewnętrznej obejmuje całą instalację — dla wewnętrznych osobne przeglądy nie są dodawane.</div>` : ''}
+    </div>
+  `;
+}
+
+function _iuAddIndoor() {
+  if (!_iuEditing) return;
+  if (!Array.isArray(_iuEditing._indoor_units_draft)) _iuEditing._indoor_units_draft = [];
+  _iuEditing._indoor_units_draft.push({
+    marka: _iuEditing.marka || '',   // dziedzicz markę z zewnętrznej jako domyślną
+    model: '',
+    power_kw: null,
+    serial_number: '',
+    location_room: '',
+    notes: '',
+    _existing: false
+  });
+  const section = document.getElementById('iuIndoorUnitsSection');
+  if (section) section.innerHTML = _iuRenderIndoorUnitsSection(_iuEditing);
+}
+
+function _iuRemoveIndoor(idx) {
+  if (!_iuEditing?._indoor_units_draft) return;
+  const d = _iuEditing._indoor_units_draft[idx];
+  if (d._existing && !confirm('Ta jednostka wewnętrzna jest zapisana w bazie. Usunąć również z bazy przy zapisie?')) return;
+  _iuEditing._indoor_units_draft.splice(idx, 1);
+  const section = document.getElementById('iuIndoorUnitsSection');
+  if (section) section.innerHTML = _iuRenderIndoorUnitsSection(_iuEditing);
+}
+
+function _iuSetIndoor(idx, field, value) {
+  if (!_iuEditing?._indoor_units_draft?.[idx]) return;
+  _iuEditing._indoor_units_draft[idx][field] = value;
+}
+
+function _iuRenderServiceHistory(unitId) {
+  const visits = serviceVisitsDb.filter(v => v.installed_unit_id === unitId)
+    .sort((a,b) => (b.scheduled_date || '').localeCompare(a.scheduled_date || ''));
+  if (visits.length === 0) {
+    return `
+      <div class="ss-section-h" style="margin:16px 0 8px;">Historia serwisów</div>
+      <div style="padding:14px;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:7px;font-size:12px;color:#94A3B8;text-align:center;">
+        Brak wizyt serwisowych. <button onclick="openServiceVisitEditor(null, {installed_unit_id: '${unitId}', client_id: '${_iuEditing?.client_id || ''}'})" style="background:transparent;border:none;color:#0F3461;cursor:pointer;text-decoration:underline;font-size:12px;">Dodaj serwis</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="ss-section-h" style="margin:16px 0 8px;">Historia serwisów (${visits.length})</div>
+    <div style="border:1px solid #E2E8F0;border-radius:7px;overflow:hidden;">
+      ${visits.map((v, i) => `
+        <div style="padding:8px 12px;${i > 0 ? 'border-top:1px solid #F1F5F9;' : ''}display:flex;align-items:center;gap:10px;">
+          <span style="padding:2px 8px;background:${v.status === 'completed' ? '#F0FDF4' : '#FEF3C7'};color:${v.status === 'completed' ? '#166534' : '#92400E'};border-radius:5px;font-size:10.5px;font-weight:700;">${SV_STATUS_LABELS[v.status] || v.status}</span>
+          <span style="font-size:12px;color:#334155;">${_iuFmtDate(v.completed_date || v.scheduled_date)}</span>
+          <span style="font-size:11.5px;color:#64748B;">${SV_TYPE_LABELS[v.service_type] || v.service_type}</span>
+          <span style="flex:1;font-size:11px;color:#94A3B8;">${escapeHtml((v.notes || v.description || '').slice(0, 60))}</span>
+          <button onclick="openServiceVisitEditor('${v.id}')" style="padding:3px 8px;background:#F1F5F9;color:#334155;border:none;border-radius:4px;font-size:10.5px;cursor:pointer;">Otwórz</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function _iuSet(field, value) {
+  if (!_iuEditing) return;
+  _iuEditing[field] = value;
+  // Recalc dates on relevant field changes
+  if (['installation_date', 'service_interval_months', 'warranty_years', 'last_service_date', 'device_type'].includes(field)) {
+    _iuRecalcDates(_iuEditing);
+    const preview = document.getElementById('iuDatesPreview');
+    if (preview) preview.innerHTML = _iuRenderDatesPreview(_iuEditing);
+  }
+  // Zmiana typu urządzenia — pokaż/ukryj sekcję "Jednostki wewnętrzne"
+  if (field === 'device_type') {
+    const section = document.getElementById('iuIndoorUnitsSection');
+    if (section) section.innerHTML = _iuRenderIndoorUnitsSection(_iuEditing);
+  }
+}
+
+function _iuSetClient(clientId) {
+  if (!_iuEditing) return;
+  _iuEditing.client_id = clientId || null;
+  // Auto-fill adresu jeśli nie ma
+  if (clientId && !_iuEditing.installation_address) {
+    const c = clientsDb.find(cc => cc.id === clientId);
+    if (c && c.address) _iuEditing.installation_address = c.address;
+  }
+  _iuRenderEditor();
+}
+
+function closeInstalledUnitEditor() {
+  const mod = document.getElementById('installedUnitEditorModal');
+  if (mod) mod.classList.remove('modal-backdrop--open');
+  _iuEditing = null;
+}
+
+async function saveInstalledUnit() {
+  if (!_iuEditing) return;
+  if (!_iuEditing.client_id) { showToast('Wybierz klienta'); return; }
+  if (!_iuEditing.marka) { showToast('Wpisz markę'); return; }
+  if (!_iuEditing.model) { showToast('Wpisz model'); return; }
+  if (!_iuEditing.installation_date) { showToast('Wpisz datę montażu'); return; }
+
+  _iuRecalcDates(_iuEditing);
+  const payload = { ..._iuEditing };
+  const indoorDrafts = Array.isArray(payload._indoor_units_draft) ? payload._indoor_units_draft : [];
+  delete payload._indoor_units_draft;
+  delete payload.id;
+  delete payload.created_at;
+  delete payload.updated_at;
+  if (!payload.created_by) payload.created_by = currentUser?.email ? currentUser.email.split('@')[0] : null;
+
+  // Sanityzacja pustych stringów
+  ['power_kw', 'warranty_years', 'service_interval_months'].forEach(k => {
+    if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
+    if (typeof payload[k] === 'string') payload[k] = payload[k] ? parseFloat(payload[k]) : null;
+  });
+  ['offer_id', 'site_survey_id', 'parent_unit_id'].forEach(k => {
+    if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
+  });
+
+  try {
+    const isNew = !_iuEditing.id;
+    let parentId = _iuEditing.id;
+
+    if (_iuEditing.id) {
+      await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(_iuEditing.id), 'PATCH', payload);
+    } else {
+      const created = await sbFetch('/rest/v1/installed_units', 'POST', payload);
+      if (created && Array.isArray(created) && created[0]) parentId = created[0].id;
+
+      // Automatycznie utwórz zaplanowany serwis (nowej zewnętrznej / zwykłej jednostki)
+      if (parentId && payload.next_service_date) {
+        try {
+          await sbFetch('/rest/v1/service_visits', 'POST', {
+            installed_unit_id: parentId,
+            client_id: payload.client_id,
+            scheduled_date: payload.next_service_date,
+            service_type: 'przeglad',
+            description: `Przegląd okresowy: ${payload.marka} ${payload.model}`,
+            status: 'planned',
+            created_by: payload.created_by
+          });
+        } catch(e) { console.warn('Auto-service creation failed:', e.message); }
+      }
+    }
+
+    // === JEDNOSTKI WEWNĘTRZNE (tylko dla multi_zew) ===
+    if (_iuEditing.device_type === 'ac_multi_zew' && parentId) {
+      // 1) Usuń dzieci które były w bazie ale zniknęły z draft
+      const oldChildren = installedUnitsDb.filter(x => x.parent_unit_id === parentId);
+      const draftExistingIds = new Set(indoorDrafts.filter(d => d._existing && d.id).map(d => d.id));
+      for (const oldChild of oldChildren) {
+        if (!draftExistingIds.has(oldChild.id)) {
+          try { await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(oldChild.id), 'DELETE'); }
+          catch(e) { console.warn('Delete child failed:', e.message); }
+        }
+      }
+      // 2) Insert/update wszystkie z draftu
+      for (const d of indoorDrafts) {
+        const childPayload = {
+          parent_unit_id: parentId,
+          client_id: payload.client_id,
+          device_type: 'ac_multi_wew',
+          category: 'klimatyzacja',
+          marka: d.marka || payload.marka,
+          model: d.model || '(bez modelu)',
+          serial_number: d.serial_number || null,
+          power_kw: d.power_kw || null,
+          installation_date: payload.installation_date,
+          installer_name: payload.installer_name,
+          installation_address: payload.installation_address,
+          location_room: d.location_room || null,
+          warranty_years: payload.warranty_years,
+          warranty_end_date: payload.warranty_end_date,
+          service_interval_months: payload.service_interval_months,
+          next_service_date: payload.next_service_date,
+          last_service_date: payload.last_service_date,
+          status: payload.status,
+          notes: d.notes || null,
+          created_by: payload.created_by
+        };
+        // Puste stringi na null dla numeric
+        if (typeof childPayload.power_kw === 'string') childPayload.power_kw = childPayload.power_kw ? parseFloat(childPayload.power_kw) : null;
+        try {
+          if (d._existing && d.id) {
+            await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(d.id), 'PATCH', childPayload);
+          } else {
+            await sbFetch('/rest/v1/installed_units', 'POST', childPayload);
+          }
+        } catch(e) { console.warn('Save child failed:', e.message); }
+      }
+    }
+
+    if (isNew) {
+      const childCount = _iuEditing.device_type === 'ac_multi_zew' ? indoorDrafts.length : 0;
+      showToast(childCount > 0 ? `Instalacja zapisana (1 zew. + ${childCount} wew.)` : 'Urządzenie dodane — auto-utworzono przegląd');
+    } else {
+      showToast('Zaktualizowano');
+    }
+    closeInstalledUnitEditor();
+    await Promise.all([loadInstalledUnits(), loadServiceVisits()]);
+    renderInstalledUnitsList();
+    if (document.getElementById('v2-section-services')?.classList.contains('v2-section--active')) renderServicesList();
+  } catch(e) {
+    console.error('saveInstalledUnit error:', e);
+    showToast('Błąd zapisu: ' + String(e.message || e).slice(0, 100));
+  }
+}
+
+async function deleteInstalledUnit(unitId) {
+  if (!confirm('Usunąć urządzenie z bazy? Wszystkie powiązane serwisy również zostaną usunięte.')) return;
+  try {
+    await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(unitId), 'DELETE');
+    showToast('Usunięto');
+    closeInstalledUnitEditor();
+    await Promise.all([loadInstalledUnits(), loadServiceVisits()]);
+    renderInstalledUnitsList();
+  } catch(e) {
+    showToast('Błąd usuwania: ' + (e.message || e));
+  }
+}
+
+function renderInstalledUnitsList() {
+  const wrap = document.getElementById('iuListWrap');
+  if (!wrap) return;
+  const typeF   = document.getElementById('iuTypeFilter')?.value || 'all';
+  const svcF    = document.getElementById('iuServiceFilter')?.value || 'all';
+  const statusF = document.getElementById('iuStatusFilter')?.value || 'active';
+  const search  = (document.getElementById('iuSearch')?.value || '').toLowerCase().trim();
+
+  let list = [...installedUnitsDb];
+  if (statusF !== 'all') list = list.filter(u => u.status === statusF);
+  if (typeF !== 'all') list = list.filter(u => u.device_type === typeF);
+  if (svcF !== 'all') list = list.filter(u => _iuGetServiceStatus(u).key === svcF);
+  if (search) {
+    list = list.filter(u => {
+      const client = clientsDb.find(c => c.id === u.client_id);
+      const blob = [u.marka, u.model, u.serial_number, u.installation_address, u.location_room, client?.name, client?.phone].filter(Boolean).join(' ').toLowerCase();
+      return blob.includes(search);
+    });
+  }
+
+  // Filtruj dzieci multi-splitów — pokazuj je tylko jako dzieci parenta, nie osobno
+  // (chyba że użytkownik szuka konkretnie po parametrach wewnętrznej)
+  const childrenByParent = {};
+  list.forEach(u => {
+    if (u.parent_unit_id) {
+      if (!childrenByParent[u.parent_unit_id]) childrenByParent[u.parent_unit_id] = [];
+      childrenByParent[u.parent_unit_id].push(u);
+    }
+  });
+  const topLevel = list.filter(u => !u.parent_unit_id);
+  // Jeśli w wynikach jest dziecko którego rodzic NIE ma w wynikach (bo nie pasuje do filtrów) —
+  // pokaż go jednak samodzielnie u góry z informacją że jest częścią instalacji
+  const orphanChildren = list.filter(u => u.parent_unit_id && !topLevel.find(p => p.id === u.parent_unit_id));
+
+  // Summary badges
+  const summary = document.getElementById('iuSummary');
+  if (summary) {
+    const active = installedUnitsDb.filter(u => u.status === 'active').length;
+    const overdue = installedUnitsDb.filter(u => u.status === 'active' && _iuGetServiceStatus(u).key === 'overdue').length;
+    const soon = installedUnitsDb.filter(u => u.status === 'active' && _iuGetServiceStatus(u).key === 'soon').length;
+    summary.innerHTML = `
+      <div style="padding:8px 14px;background:#EFF6FF;border-radius:7px;font-size:11.5px;color:#1E40AF;font-weight:600;"><i class="ti ti-device-desktop"></i> Aktywnych urządzeń: <strong>${active}</strong></div>
+      ${overdue > 0 ? `<div style="padding:8px 14px;background:#FEF2F2;border-radius:7px;font-size:11.5px;color:#991B1B;font-weight:600;"><i class="ti ti-alert-triangle"></i> Przeterminowane serwisy: <strong>${overdue}</strong></div>` : ''}
+      ${soon > 0 ? `<div style="padding:8px 14px;background:#FFFBEB;border-radius:7px;font-size:11.5px;color:#92400E;font-weight:600;"><i class="ti ti-clock"></i> W ciągu 30 dni: <strong>${soon}</strong></div>` : ''}
+    `;
+  }
+
+  if (list.length === 0) {
+    wrap.innerHTML = `
+      <div style="padding:40px 20px;text-align:center;color:#64748B;">
+        <i class="ti ti-device-desktop-off" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">${installedUnitsDb.length === 0 ? 'Baza jest pusta' : 'Brak wyników dla filtrów'}</div>
+        <div style="margin-top:6px;font-size:12px;">${installedUnitsDb.length === 0 ? 'Dodaj pierwsze zamontowane urządzenie.' : 'Zmień filtry lub wyszukiwarkę.'}</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Zbuduj płaską listę: parent → jego dzieci pod spodem, potem sieroty
+  const flatRows = [];
+  topLevel.forEach(u => {
+    flatRows.push({ ...u, _isChild: false });
+    const kids = childrenByParent[u.id] || [];
+    kids.forEach(k => flatRows.push({ ...k, _isChild: true }));
+  });
+  orphanChildren.forEach(u => flatRows.push({ ...u, _isChild: false, _isOrphan: true }));
+
+  wrap.innerHTML = `
+    <div style="max-height:calc(100vh - 380px);overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;z-index:1;">
+          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Typ</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Klient</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Urządzenie</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">S/N</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Montaż</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Nast. serwis</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Gwarancja</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${flatRows.map(u => {
+            const svc = _iuGetServiceStatus(u);
+            const client = clientsDb.find(c => c.id === u.client_id);
+            const typeColor = IU_DEVICE_COLORS[u.device_type] || '#64748B';
+            const warrantyStatus = u.warranty_end_date ? (new Date(u.warranty_end_date) > new Date() ? 'W gwarancji' : 'Po gwarancji') : '—';
+            const warrantyColor = u.warranty_end_date ? (new Date(u.warranty_end_date) > new Date() ? '#059669' : '#94A3B8') : '#94A3B8';
+            const rowBg = u._isChild ? '#FAFCFF' : (u._isOrphan ? '#FFFBEB' : 'transparent');
+            const indent = u._isChild ? 'padding-left:32px;position:relative;' : '';
+            const branchMarker = u._isChild ? '<span style="position:absolute;left:14px;color:#94A3B8;font-family:monospace;">└─</span>' : '';
+            return `
+              <tr style="border-bottom:1px solid #F1F5F9;cursor:pointer;background:${rowBg};" onclick="openInstalledUnitEditor('${u.id}')" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background='${rowBg}'">
+                <td style="padding:9px 14px;font-size:11px;white-space:nowrap;${indent}">
+                  ${branchMarker}
+                  <span style="padding:2px 8px;background:${typeColor}15;color:${typeColor};border-radius:10px;font-weight:600;">${escapeHtml(IU_DEVICE_LABELS[u.device_type] || u.device_type)}</span>
+                  ${u._isOrphan ? '<span style="margin-left:6px;padding:1px 6px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:9.5px;font-weight:700;">CZĘŚĆ INSTALACJI</span>' : ''}
+                </td>
+                <td style="padding:9px 14px;font-size:12px;color:#0A2647;font-weight:${u._isChild ? '400' : '600'};">${u._isChild ? '' : escapeHtml(client?.name || '—')}${u.location_room ? `<div style="font-size:10.5px;color:#94A3B8;font-weight:400;">${escapeHtml(u.location_room)}</div>` : ''}</td>
+                <td style="padding:9px 14px;font-size:12px;color:#334155;"><strong>${escapeHtml(u.marka)}</strong>${u.model ? ' · ' + escapeHtml(u.model) : ''}${u.power_kw ? ` <span style="color:#64748B;">(${u.power_kw} kW)</span>` : ''}</td>
+                <td style="padding:9px 14px;font-size:11px;color:#64748B;font-family:monospace;">${escapeHtml(u.serial_number || '—')}</td>
+                <td style="padding:9px 14px;font-size:11.5px;text-align:center;color:#64748B;white-space:nowrap;">${u._isChild ? '<span style="color:#CBD5E1;">↑</span>' : _iuFmtDate(u.installation_date)}</td>
+                <td style="padding:9px 14px;font-size:11.5px;text-align:center;white-space:nowrap;">
+                  ${u._isChild ? '<span style="color:#CBD5E1;font-size:10.5px;">wspólny z zew.</span>' : `
+                    <span style="padding:2px 8px;background:${svc.color}15;color:${svc.color};border-radius:5px;font-weight:600;">${svc.label}</span>
+                    ${u.next_service_date && svc.key !== 'none' ? `<div style="font-size:9.5px;color:#94A3B8;margin-top:2px;">${_iuFmtDate(u.next_service_date)}</div>` : ''}
+                  `}
+                </td>
+                <td style="padding:9px 14px;font-size:11px;text-align:center;color:${warrantyColor};font-weight:600;">${u._isChild ? '<span style="color:#CBD5E1;">—</span>' : warrantyStatus + (u.warranty_end_date ? `<div style="font-size:9.5px;color:#94A3B8;font-weight:400;">do ${_iuFmtDate(u.warranty_end_date)}</div>` : '')}</td>
+                <td style="padding:9px 14px;text-align:center;">
+                  ${u._isChild ? '' : `<button onclick="event.stopPropagation(); openServiceVisitEditor(null, {installed_unit_id: '${u.id}', client_id: '${u.client_id || ''}'})" title="Zaplanuj serwis" style="padding:4px 8px;background:#F1F5F9;color:#0F3461;border:none;border-radius:5px;font-size:11px;cursor:pointer;"><i class="ti ti-plus" style="font-size:11px;"></i> Serwis</button>`}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* ==================== SERWISY ==================== */
+
+let _svEditing = null;
+
+function _svBlank() {
+  return {
+    id: null,
+    installed_unit_id: null,
+    client_id: null,
+    scheduled_date: new Date().toISOString().slice(0,10),
+    scheduled_time: null,
+    completed_date: null,
+    service_type: 'przeglad',
+    description: '',
+    notes: '',
+    technician_email: null,
+    technician_name: null,
+    cost_net: null,
+    invoice_no: null,
+    status: 'planned'
+  };
+}
+
+function openServiceVisitEditor(visitId, prefill) {
+  if (visitId) {
+    const v = serviceVisitsDb.find(x => x.id === visitId);
+    if (!v) { showToast('Nie znaleziono serwisu'); return; }
+    _svEditing = JSON.parse(JSON.stringify(v));
+  } else {
+    _svEditing = _svBlank();
+    if (prefill) Object.assign(_svEditing, prefill);
+  }
+  _svRenderEditor();
+}
+
+function _svRenderEditor() {
+  const v = _svEditing;
+  if (!v) return;
+  let mod = document.getElementById('serviceVisitEditorModal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'serviceVisitEditorModal';
+    mod.className = 'modal-backdrop';
+    document.body.appendChild(mod);
+  }
+  const clientList = Array.isArray(clientsDb) ? clientsDb : [];
+  const clientOptions = clientList.sort((a,b) => (a.name || '').localeCompare(b.name || '', 'pl'))
+    .map(c => `<option value="${c.id}"${v.client_id === c.id ? ' selected' : ''}>${escapeHtml(c.name || '')}${c.phone ? ' · ' + escapeHtml(c.phone) : ''}</option>`).join('');
+  const unitsForClient = installedUnitsDb.filter(u => !v.client_id || u.client_id === v.client_id);
+  const unitOptions = unitsForClient.map(u => `<option value="${u.id}"${v.installed_unit_id === u.id ? ' selected' : ''}>${escapeHtml(u.marka)} ${escapeHtml(u.model || '')}${u.location_room ? ' (' + escapeHtml(u.location_room) + ')' : ''}</option>`).join('');
+  const techOptions = (typeof teamMembersDb !== 'undefined' ? teamMembersDb : []).filter(m => m.active !== false).map(m => `<option value="${m.email}"${v.technician_email === m.email ? ' selected' : ''}>${escapeHtml(m.name || m.email)}</option>`).join('');
+  const isNew = !v.id;
+
+  mod.innerHTML = `
+    <div class="modal" style="max-width:640px;">
+      <div class="modal__head" style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0A2647;">${isNew ? 'Nowy serwis' : 'Edycja serwisu'}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">Zaplanowany serwis pojawi się w kalendarzu</div>
+        </div>
+        <button onclick="closeServiceVisitEditor()" style="background:transparent;border:none;color:#64748B;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="modal__body" style="padding:16px 18px;max-height:calc(100vh - 200px);overflow-y:auto;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Klient *</label>
+            ${renderClientSearch({
+              widgetId: 'svClientSearch',
+              selectedClientId: v.client_id,
+              onSelect: (clientId) => { _svSet('client_id', clientId); _svRenderEditor(); }
+            })}
+          </div>
+          <div>
+            <label class="ss-label">Urządzenie (opcjonalne)</label>
+            <select class="ss-input" onchange="_svSet('installed_unit_id', this.value || null)">
+              <option value="">— ogólny serwis / nie dotyczy —</option>
+              ${unitOptions}
+            </select>
+          </div>
+          <div>
+            <label class="ss-label">Data *</label>
+            <input type="date" class="ss-input" value="${v.scheduled_date || ''}" onchange="_svSet('scheduled_date', this.value)">
+          </div>
+          <div>
+            <label class="ss-label">Godzina (opcjonalne)</label>
+            <input type="time" class="ss-input" value="${v.scheduled_time || ''}" onchange="_svSet('scheduled_time', this.value || null)">
+          </div>
+          <div>
+            <label class="ss-label">Typ serwisu *</label>
+            <select class="ss-input" onchange="_svSet('service_type', this.value)">
+              ${Object.entries(SV_TYPE_LABELS).map(([k,l]) => `<option value="${k}"${v.service_type === k ? ' selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="ss-label">Status *</label>
+            <select class="ss-input" onchange="_svSet('status', this.value); _svRenderEditor()">
+              ${Object.entries(SV_STATUS_LABELS).map(([k,l]) => `<option value="${k}"${v.status === k ? ' selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="ss-label">Technik (zespół)</label>
+            <select class="ss-input" onchange="_svSet('technician_email', this.value || null)">
+              <option value="">— brak —</option>
+              ${techOptions}
+            </select>
+          </div>
+          <div>
+            <label class="ss-label">Technik zewnętrzny</label>
+            <input type="text" class="ss-input" value="${escapeHtml(v.technician_name || '')}" onchange="_svSet('technician_name', this.value || null)" placeholder="Imię/firma podwykonawcy (jeśli nie z zespołu)">
+          </div>
+          <div style="grid-column:span 2;">
+            <label class="ss-label">Zakres prac / opis</label>
+            <textarea class="ss-input" rows="2" onchange="_svSet('description', this.value)" placeholder="Co ma być zrobione, na co zwrócić uwagę, dostęp itd.">${escapeHtml(v.description || '')}</textarea>
+          </div>
+          ${v.status === 'completed' ? `
+            <div>
+              <label class="ss-label">Data wykonania</label>
+              <input type="date" class="ss-input" value="${v.completed_date || ''}" onchange="_svSet('completed_date', this.value || null)">
+            </div>
+            <div>
+              <label class="ss-label">Koszt netto (zł)</label>
+              <input type="number" step="0.01" class="ss-input" value="${v.cost_net || ''}" onchange="_svSet('cost_net', this.value === '' ? null : parseFloat(this.value))">
+            </div>
+            <div style="grid-column:span 2;">
+              <label class="ss-label">Notatki po wykonaniu (co zrobiono, co znaleziono)</label>
+              <textarea class="ss-input" rows="3" onchange="_svSet('notes', this.value)">${escapeHtml(v.notes || '')}</textarea>
+            </div>
+            <div style="grid-column:span 2;">
+              <label class="ss-label">Nr faktury / dokumentu</label>
+              <input type="text" class="ss-input" value="${escapeHtml(v.invoice_no || '')}" onchange="_svSet('invoice_no', this.value || null)">
+            </div>
+          ` : `
+            <div style="grid-column:span 2;">
+              <label class="ss-label">Notatki wewnętrzne</label>
+              <textarea class="ss-input" rows="2" onchange="_svSet('notes', this.value)">${escapeHtml(v.notes || '')}</textarea>
+            </div>
+          `}
+        </div>
+      </div>
+      <div class="modal__foot" style="padding:12px 18px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;gap:8px;">
+        <div>
+          ${v.id ? `<button onclick="deleteServiceVisit('${v.id}')" style="padding:8px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-trash"></i> Usuń</button>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          ${v.id && v.status === 'planned' ? `<button onclick="_svMarkCompleted()" style="padding:8px 14px;background:#059669;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-check"></i> Oznacz jako wykonany</button>` : ''}
+          <button onclick="closeServiceVisitEditor()" style="padding:8px 14px;background:transparent;color:#334155;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button onclick="saveServiceVisit()" style="padding:8px 18px;background:#0A2647;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-check"></i> Zapisz</button>
+        </div>
+      </div>
+    </div>
+  `;
+  mod.classList.add('modal-backdrop--open');
+}
+
+function _svSet(field, value) {
+  if (!_svEditing) return;
+  _svEditing[field] = value;
+}
+
+function _svMarkCompleted() {
+  if (!_svEditing) return;
+  _svEditing.status = 'completed';
+  _svEditing.completed_date = new Date().toISOString().slice(0,10);
+  _svRenderEditor();
+}
+
+function closeServiceVisitEditor() {
+  const mod = document.getElementById('serviceVisitEditorModal');
+  if (mod) mod.classList.remove('modal-backdrop--open');
+  _svEditing = null;
+}
+
+async function saveServiceVisit() {
+  if (!_svEditing) return;
+  if (!_svEditing.client_id) { showToast('Wybierz klienta'); return; }
+  if (!_svEditing.scheduled_date) { showToast('Wpisz datę'); return; }
+
+  const payload = { ..._svEditing };
+  delete payload.id;
+  delete payload.created_at;
+  delete payload.updated_at;
+  if (!payload.created_by) payload.created_by = currentUser?.email ? currentUser.email.split('@')[0] : null;
+  if (payload.cost_net === '' || payload.cost_net === undefined) payload.cost_net = null;
+  if (typeof payload.cost_net === 'string') payload.cost_net = payload.cost_net ? parseFloat(payload.cost_net) : null;
+  if (payload.installed_unit_id === '') payload.installed_unit_id = null;
+  if (payload.completed_date === '') payload.completed_date = null;
+  if (payload.scheduled_time === '') payload.scheduled_time = null;
+
+  try {
+    if (_svEditing.id) {
+      await sbFetch('/rest/v1/service_visits?id=eq.' + encodeURIComponent(_svEditing.id), 'PATCH', payload);
+      showToast('Serwis zaktualizowany');
+    } else {
+      await sbFetch('/rest/v1/service_visits', 'POST', payload);
+      showToast('Serwis dodany');
+    }
+    // Jeśli zrealizowano — zaktualizuj urządzenie (last_service_date + przesuń next_service_date)
+    if (payload.status === 'completed' && payload.installed_unit_id) {
+      try {
+        const unit = installedUnitsDb.find(u => u.id === payload.installed_unit_id);
+        if (unit) {
+          const upd = { last_service_date: payload.completed_date || new Date().toISOString().slice(0,10) };
+          // Auto-calc next service
+          const tmp = { ...unit, ...upd };
+          _iuRecalcDates(tmp);
+          upd.next_service_date = tmp.next_service_date;
+          await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(unit.id), 'PATCH', upd);
+        }
+      } catch(e) { console.warn('Update unit failed:', e.message); }
+    }
+    closeServiceVisitEditor();
+    await Promise.all([loadServiceVisits(), loadInstalledUnits()]);
+    renderServicesList();
+    if (document.getElementById('v2-section-installed_units')?.classList.contains('v2-section--active')) renderInstalledUnitsList();
+  } catch(e) {
+    console.error('saveServiceVisit error:', e);
+    showToast('Błąd zapisu: ' + String(e.message || e).slice(0, 100));
+  }
+}
+
+async function deleteServiceVisit(visitId) {
+  if (!confirm('Usunąć wizytę serwisową?')) return;
+  try {
+    await sbFetch('/rest/v1/service_visits?id=eq.' + encodeURIComponent(visitId), 'DELETE');
+    showToast('Usunięto');
+    closeServiceVisitEditor();
+    await loadServiceVisits();
+    renderServicesList();
+  } catch(e) { showToast('Błąd: ' + (e.message || e)); }
+}
+
+function renderServicesList() {
+  const wrap = document.getElementById('svListWrap');
+  if (!wrap) return;
+  const statusF = document.getElementById('svStatusFilter')?.value || 'all';
+  const rangeF  = document.getElementById('svRangeFilter')?.value || 'upcoming';
+  const techF   = document.getElementById('svTechFilter')?.value || 'all';
+  const search  = (document.getElementById('svSearch')?.value || '').toLowerCase().trim();
+
+  // Populate technik filter
+  const techSel = document.getElementById('svTechFilter');
+  if (techSel && techSel.options.length <= 1) {
+    const techs = new Set();
+    serviceVisitsDb.forEach(v => { if (v.technician_email) techs.add(v.technician_email); });
+    Array.from(techs).sort().forEach(t => {
+      const opt = document.createElement('option'); opt.value = t; opt.textContent = t.split('@')[0]; techSel.appendChild(opt);
+    });
+  }
+
+  let list = [...serviceVisitsDb];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = today.toISOString().slice(0,10);
+
+  if (statusF !== 'all') list = list.filter(v => v.status === statusF);
+  if (techF !== 'all') list = list.filter(v => v.technician_email === techF);
+  if (rangeF === 'upcoming') list = list.filter(v => v.scheduled_date >= todayStr && v.status === 'planned');
+  else if (rangeF === 'this_month') {
+    const m = today.toISOString().slice(0,7);
+    list = list.filter(v => (v.scheduled_date || '').startsWith(m));
+  } else if (rangeF === 'next_30') {
+    const end = new Date(today.getTime() + 30*24*3600*1000).toISOString().slice(0,10);
+    list = list.filter(v => v.scheduled_date >= todayStr && v.scheduled_date <= end);
+  } else if (rangeF === 'past') {
+    list = list.filter(v => v.scheduled_date < todayStr || v.status === 'completed');
+  }
+  if (search) {
+    list = list.filter(v => {
+      const client = clientsDb.find(c => c.id === v.client_id);
+      const unit = installedUnitsDb.find(u => u.id === v.installed_unit_id);
+      const blob = [client?.name, client?.phone, unit?.marka, unit?.model, v.description, v.notes, v.technician_name].filter(Boolean).join(' ').toLowerCase();
+      return blob.includes(search);
+    });
+  }
+  list.sort((a,b) => (a.scheduled_date || '').localeCompare(b.scheduled_date || '') || (a.scheduled_time || '').localeCompare(b.scheduled_time || ''));
+
+  // Summary
+  const summary = document.getElementById('svSummary');
+  if (summary) {
+    const planned = serviceVisitsDb.filter(v => v.status === 'planned' && v.scheduled_date >= todayStr).length;
+    const overdue = serviceVisitsDb.filter(v => v.status === 'planned' && v.scheduled_date < todayStr).length;
+    const done30 = serviceVisitsDb.filter(v => v.status === 'completed' && v.completed_date >= new Date(today.getTime() - 30*24*3600*1000).toISOString().slice(0,10)).length;
+    summary.innerHTML = `
+      <div style="padding:8px 14px;background:#EFF6FF;border-radius:7px;font-size:11.5px;color:#1E40AF;font-weight:600;"><i class="ti ti-calendar-event"></i> Zaplanowane: <strong>${planned}</strong></div>
+      ${overdue > 0 ? `<div style="padding:8px 14px;background:#FEF2F2;border-radius:7px;font-size:11.5px;color:#991B1B;font-weight:600;"><i class="ti ti-alert-triangle"></i> Zaległe: <strong>${overdue}</strong></div>` : ''}
+      <div style="padding:8px 14px;background:#F0FDF4;border-radius:7px;font-size:11.5px;color:#166534;font-weight:600;"><i class="ti ti-check"></i> Zrealizowane (30 dni): <strong>${done30}</strong></div>
+    `;
+  }
+
+  if (list.length === 0) {
+    wrap.innerHTML = `
+      <div style="padding:40px 20px;text-align:center;color:#64748B;">
+        <i class="ti ti-tool" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">${serviceVisitsDb.length === 0 ? 'Brak wizyt serwisowych' : 'Brak wyników'}</div>
+        <div style="margin-top:6px;font-size:12px;">Dodaj nowy serwis lub zmień filtry.</div>
+      </div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div style="max-height:calc(100vh - 380px);overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;z-index:1;">
+          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Status</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Data</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Typ</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Klient</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Urządzenie</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Technik</th>
+            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Koszt</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(v => {
+            const client = clientsDb.find(c => c.id === v.client_id);
+            const unit = installedUnitsDb.find(u => u.id === v.installed_unit_id);
+            const isOverdue = v.status === 'planned' && v.scheduled_date < todayStr;
+            const statusColor = v.status === 'completed' ? '#059669' : (v.status === 'cancelled' ? '#94A3B8' : (isOverdue ? '#DC2626' : '#0369A1'));
+            const statusLabel = v.status === 'planned' && isOverdue ? 'Zaległy' : (SV_STATUS_LABELS[v.status] || v.status);
+            return `
+              <tr style="border-bottom:1px solid #F1F5F9;cursor:pointer;" onclick="openServiceVisitEditor('${v.id}')" onmouseover="this.style.background='#FAFCFF'" onmouseout="this.style.background='transparent'">
+                <td style="padding:9px 14px;font-size:11px;white-space:nowrap;">
+                  <span style="padding:2px 8px;background:${statusColor}15;color:${statusColor};border-radius:10px;font-weight:700;">${statusLabel}</span>
+                </td>
+                <td style="padding:9px 14px;font-size:12px;color:#0A2647;font-weight:600;white-space:nowrap;">
+                  ${_iuFmtDate(v.scheduled_date)}${v.scheduled_time ? `<div style="font-size:10.5px;color:#64748B;font-weight:400;">${v.scheduled_time.slice(0,5)}</div>` : ''}
+                </td>
+                <td style="padding:9px 14px;font-size:11.5px;color:#334155;">${SV_TYPE_LABELS[v.service_type] || v.service_type}</td>
+                <td style="padding:9px 14px;font-size:12px;color:#334155;">${escapeHtml(client?.name || '—')}${client?.phone ? `<div style="font-size:10px;color:#94A3B8;">${escapeHtml(client.phone)}</div>` : ''}</td>
+                <td style="padding:9px 14px;font-size:11.5px;color:#334155;">${unit ? `<strong>${escapeHtml(unit.marka)}</strong> ${escapeHtml(unit.model || '')}` : '<span style="color:#94A3B8;">— ogólny —</span>'}</td>
+                <td style="padding:9px 14px;font-size:11px;color:#64748B;">${escapeHtml(v.technician_email ? v.technician_email.split('@')[0] : (v.technician_name || '—'))}</td>
+                <td style="padding:9px 14px;font-size:11.5px;text-align:right;color:#334155;font-weight:600;white-space:nowrap;">${v.cost_net ? fmtPLN(v.cost_net) : '—'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* ============================================================
+   ORYGINALNA WIZJA LOKALNA (site surveys)
+   ============================================================ */
 let siteSurveysDb = [];
 
 const SS_STATUS_LABELS = { draft: 'Szkic', ready: 'Gotowa', sent: 'Wysłana' };
