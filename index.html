@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>4Climat — Generator Ofert</title>
+<title>4Climat CRM</title>
 <meta name="description" content="Generator profesjonalnych ofert handlowych — 4Climat Wrocław">
 <meta name="theme-color" content="#1B4F8C">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -329,8 +329,74 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
 .cal-legend__item { display: inline-flex; align-items: center; gap: 6px; }
 .cal-legend__dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
+/* Taby kalendarz/grafik */
+.v2-cal-tab {
+  padding: 10px 18px; background: transparent; border: none; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: #64748B;
+  display: inline-flex; align-items: center; gap: 6px;
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+}
+.v2-cal-tab:hover { color: #0F3461; }
+.v2-cal-tab--active { color: #0F3461; border-bottom-color: #0F3461; }
+
+/* Grafik pracy (kadromierz) */
+.kd-grid { display: grid; min-width: 800px; }
+.kd-grid__header {
+  display: grid; grid-template-columns: 220px repeat(7, 1fr);
+  background: #F8FAFC; border-bottom: 2px solid #E2E8F0;
+  position: sticky; top: 0; z-index: 2;
+}
+.kd-grid__header > div {
+  padding: 10px 12px; font-size: 11px; font-weight: 700;
+  color: #475569; text-transform: uppercase; letter-spacing: .04em;
+  border-right: 1px solid #E2E8F0;
+}
+.kd-grid__header > div.kd-today { background: #EFF6FF; color: #1E40AF; }
+.kd-grid__header > div.kd-weekend { color: #DC2626; }
+.kd-grid__row {
+  display: grid; grid-template-columns: 220px repeat(7, 1fr);
+  border-bottom: 1px solid #F1F5F9; min-height: 74px;
+}
+.kd-grid__row:hover { background: #FAFCFF; }
+.kd-name-cell {
+  padding: 10px 12px; border-right: 1px solid #E2E8F0;
+  display: flex; align-items: center; gap: 10px;
+}
+.kd-name-avatar {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+.kd-name-info { flex: 1; min-width: 0; }
+.kd-name-title { font-size: 12.5px; font-weight: 700; color: #0A2647; }
+.kd-name-role { font-size: 10.5px; color: #94A3B8; }
+.kd-day-cell {
+  padding: 6px; border-right: 1px solid #F1F5F9;
+  display: flex; flex-direction: column; gap: 3px;
+  cursor: pointer; transition: background .15s;
+}
+.kd-day-cell:hover { background: #F1F5F9; }
+.kd-day-cell.kd-day-today { background: #EFF6FF; }
+.kd-day-cell.kd-day-weekend { background: #FEF9F9; }
+.kd-shift {
+  padding: 5px 7px; border-radius: 5px; font-size: 10.5px;
+  font-weight: 600; line-height: 1.25; cursor: pointer;
+  border-left: 3px solid transparent;
+}
+.kd-shift-hours { font-size: 12px; font-weight: 800; }
+.kd-shift-times { font-size: 9.5px; opacity: .8; }
+.kd-shift-notes { font-size: 9.5px; opacity: .8; margin-top: 2px; font-style: italic; }
+.kd-shift--regular  { background: #EFF6FF; color: #1E40AF; border-left-color: #0369A1; }
+.kd-shift--overtime { background: #FEF3C7; color: #92400E; border-left-color: #D97706; }
+.kd-shift--sick     { background: #FECACA; color: #991B1B; border-left-color: #DC2626; }
+.kd-shift--vacation { background: #DBEAFE; color: #1E3A8A; border-left-color: #2563EB; }
+.kd-shift--off      { background: #F3F4F6; color: #6B7280; border-left-color: #9CA3AF; }
+.kd-shift--training { background: #EDE9FE; color: #5B21B6; border-left-color: #7C3AED; }
+
 .cal-weekdays {
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px; margin-bottom: 6px;
 }
 .cal-weekdays > div {
@@ -341,7 +407,7 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
 .cal-weekdays > .cal-weekend { color: #DC2626; }
 
 .cal-grid {
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -350,6 +416,7 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
   border-radius: 8px; padding: 6px 8px;
   cursor: pointer; transition: all .15s;
   display: flex; flex-direction: column; gap: 3px;
+  min-width: 0; overflow: hidden;
 }
 .cal-day:hover { border-color: #94A3B8; box-shadow: 0 2px 6px rgba(15,52,97,.08); }
 .cal-day--other { background: #F8FAFC; opacity: .55; }
@@ -2069,29 +2136,55 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
 <symbol id="wzn-i-chevron-down" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
 </defs></svg>
 
-<div id="loginScreen" style="display:none; position:fixed; inset:0; background:#F5F8FB; z-index:9999; display:flex; align-items:center; justify-content:center;">
-  <div style="background:white; border-radius:16px; padding:40px; width:100%; max-width:400px; box-shadow:0 8px 40px rgba(27,79,140,0.15);">
-    <div style="text-align:center; margin-bottom:28px;">
-      <img id="loginLogo" src="" alt="4Climat" style="height:64px; object-fit:contain; margin-bottom:12px; display:block; margin-left:auto; margin-right:auto;">
-      <div style="font-size:13px; font-weight:700; color:#1B4F8C; text-transform:uppercase; letter-spacing:.12em; margin-top:4px;">Program Ofertowy</div>
-      <div style="width:40px; height:2px; background:#4FA8D8; margin:8px auto 0;"></div>
+<div id="loginScreen" style="display:none; position:fixed; inset:0; background:linear-gradient(135deg, #0A2647 0%, #1B4F8C 50%, #205295 100%); z-index:9999; align-items:center; justify-content:center; padding:20px; overflow:hidden;">
+  <!-- Dekoracyjne tło -->
+  <div style="position:absolute; inset:0; background-image: radial-gradient(circle at 20% 30%, rgba(79,168,216,0.15) 0%, transparent 40%), radial-gradient(circle at 80% 70%, rgba(79,168,216,0.1) 0%, transparent 40%); pointer-events:none;"></div>
+  <div style="position:absolute; top:-100px; right:-100px; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle, rgba(79,168,216,0.15) 0%, transparent 70%); pointer-events:none;"></div>
+  <div style="position:absolute; bottom:-150px; left:-150px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle, rgba(79,168,216,0.1) 0%, transparent 70%); pointer-events:none;"></div>
+
+  <!-- Karta logowania -->
+  <div style="position:relative; background:white; border-radius:20px; padding:44px 40px 36px; width:100%; max-width:420px; box-shadow:0 30px 80px -20px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);">
+    <!-- Nagłówek -->
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="display:inline-flex; align-items:center; justify-content:center; width:72px; height:72px; background:linear-gradient(135deg, #0F3461 0%, #1B4F8C 100%); border-radius:20px; margin-bottom:16px; box-shadow:0 8px 24px rgba(15,52,97,0.3);">
+        <span style="color:white; font-size:28px; font-weight:800; letter-spacing:-.02em; font-family:'Inter',system-ui,sans-serif;">4C</span>
+      </div>
+      <div style="font-size:24px; font-weight:800; color:#0A2647; letter-spacing:-.02em; font-family:'Inter',system-ui,sans-serif;">4Climat CRM</div>
+      <div style="font-size:12px; font-weight:500; color:#64748B; margin-top:6px; letter-spacing:.02em;">System zarządzania klientami i ofertami</div>
     </div>
-    <div id="loginError" style="display:none; background:#FEE2E2; color:#991B1B; padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:16px;"></div>
+
+    <!-- Ewentualny błąd -->
+    <div id="loginError" style="display:none; background:#FEF2F2; border:1px solid #FECACA; color:#991B1B; padding:10px 14px; border-radius:8px; font-size:12.5px; margin-bottom:16px; display:none;"></div>
+
+    <!-- Formularz -->
     <div style="margin-bottom:14px;">
-      <label style="font-size:12px; font-weight:600; color:#1B4F8C; text-transform:uppercase; letter-spacing:.06em;">E-mail</label>
-      <input id="loginEmail" type="email" placeholder="twoj@email.pl" style="width:100%; margin-top:6px; padding:10px 14px; border:1.5px solid #D8E3EE; border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;">
+      <label style="font-size:11px; font-weight:700; color:#334155; text-transform:uppercase; letter-spacing:.08em; display:block; margin-bottom:6px;">E-mail</label>
+      <div style="position:relative;">
+        <i class="ti ti-mail" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:16px;"></i>
+        <input id="loginEmail" type="email" placeholder="twoj@4climat.pl" style="width:100%; padding:12px 14px 12px 42px; border:1.5px solid #E2E8F0; border-radius:10px; font-size:14px; outline:none; box-sizing:border-box; transition:border-color .15s, box-shadow .15s;" onfocus="this.style.borderColor='#1B4F8C'; this.style.boxShadow='0 0 0 3px rgba(27,79,140,0.1)'" onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'">
+      </div>
     </div>
     <div style="margin-bottom:24px;">
-      <label style="font-size:12px; font-weight:600; color:#1B4F8C; text-transform:uppercase; letter-spacing:.06em;">Hasło</label>
-      <input id="loginPassword" type="password" placeholder="••••••••" style="width:100%; margin-top:6px; padding:10px 14px; border:1.5px solid #D8E3EE; border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
-        onkeydown="if(event.key==='Enter') doLogin()">
+      <label style="font-size:11px; font-weight:700; color:#334155; text-transform:uppercase; letter-spacing:.08em; display:block; margin-bottom:6px;">Hasło</label>
+      <div style="position:relative;">
+        <i class="ti ti-lock" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:16px;"></i>
+        <input id="loginPassword" type="password" placeholder="••••••••" style="width:100%; padding:12px 14px 12px 42px; border:1.5px solid #E2E8F0; border-radius:10px; font-size:14px; outline:none; box-sizing:border-box; transition:border-color .15s, box-shadow .15s;" onkeydown="if(event.key==='Enter') doLogin()" onfocus="this.style.borderColor='#1B4F8C'; this.style.boxShadow='0 0 0 3px rgba(27,79,140,0.1)'" onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'">
+      </div>
     </div>
-    <button onclick="doLogin()" id="loginBtn" style="width:100%; padding:12px; background:#1B4F8C; color:white; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer;">
-      Zaloguj się
+
+    <button onclick="doLogin()" id="loginBtn" style="width:100%; padding:13px; background:linear-gradient(135deg, #0F3461 0%, #1B4F8C 100%); color:white; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; letter-spacing:.02em; box-shadow:0 4px 12px rgba(15,52,97,0.25); transition:transform .15s, box-shadow .15s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 18px rgba(15,52,97,0.35)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(15,52,97,0.25)'">
+      <i class="ti ti-login-2" style="font-size:14px; margin-right:6px;"></i>Zaloguj się
     </button>
-    <div style="text-align:center; margin-top:16px; font-size:12px; color:#94A3B8;">
+
+    <div style="text-align:center; margin-top:20px; padding-top:20px; border-top:1px solid #F1F5F9; font-size:11px; color:#94A3B8;">
+      <i class="ti ti-shield-check" style="font-size:12px; color:#64748B; margin-right:4px;"></i>
       Dostęp tylko dla pracowników 4Climat
     </div>
+  </div>
+
+  <!-- Stopka -->
+  <div style="position:absolute; bottom:20px; left:0; right:0; text-align:center; color:rgba(255,255,255,0.6); font-size:11px; letter-spacing:.04em;">
+    4Climat Sp. z o.o. · Wrocław, ul. Braniborska 14 · <a href="https://4climat.pl" target="_blank" style="color:rgba(255,255,255,0.85); text-decoration:none;">4climat.pl</a>
   </div>
 </div>
 
@@ -2469,6 +2562,17 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         <h1 class="v2-page-title">Kalendarz</h1>
         <p class="v2-page-subtitle">Follow-upy, zadania, montaże, serwisy i wizje lokalne — wszystko w jednym miejscu.</p>
 
+        <!-- Taby: Kalendarz | Grafik (kadromierz) -->
+        <div style="display:flex;gap:2px;border-bottom:2px solid #E2E8F0;margin-bottom:14px;">
+          <button id="calTabCalendar" class="v2-cal-tab v2-cal-tab--active" onclick="_calSwitchTab('calendar')">
+            <i class="ti ti-calendar" style="font-size:14px;"></i> Kalendarz
+          </button>
+          <button id="calTabKadromierz" class="v2-cal-tab" onclick="_calSwitchTab('kadromierz')">
+            <i class="ti ti-clock-hour-8" style="font-size:14px;"></i> Grafik pracy
+          </button>
+        </div>
+
+        <div id="calTabCalendarContent">
         <div class="v2-toolbar">
           <button class="v2-btn v2-btn--ghost" onclick="calendarNavPrev()"><i class="ti ti-chevron-left"></i></button>
           <div id="calMonthLabel" style="font-size:16px;font-weight:700;color:#0A2647;min-width:180px;text-align:center;"></div>
@@ -2498,8 +2602,8 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
           </button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 280px;gap:14px;margin-top:12px;">
-          <div class="v2-panel" style="padding:16px;">
+        <div style="display:grid;grid-template-columns:minmax(0, 1fr) 280px;gap:14px;margin-top:12px;">
+          <div class="v2-panel" style="padding:16px;min-width:0;">
             <div class="cal-legend">
               <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#0369A1;"></span> Follow-up</span>
               <span class="cal-legend__item"><span class="cal-legend__dot" style="background:#0F3461;"></span> Zadanie</span>
@@ -2521,6 +2625,32 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
               <i class="ti ti-clock-hour-3" style="font-size:12px;"></i> Nadchodzące
             </div>
             <div id="calUpcomingList" style="display:flex;flex-direction:column;gap:6px;"></div>
+          </div>
+        </div>
+        </div><!-- /calTabCalendarContent -->
+
+        <!-- Tab: Grafik pracy (kadromierz) -->
+        <div id="calTabKadromierzContent" style="display:none;">
+          <div class="v2-toolbar">
+            <button class="v2-btn v2-btn--ghost" onclick="_kdNavPrev()"><i class="ti ti-chevron-left"></i></button>
+            <div id="kdWeekLabel" style="font-size:14px;font-weight:700;color:#0A2647;min-width:220px;text-align:center;"></div>
+            <button class="v2-btn v2-btn--ghost" onclick="_kdNavNext()"><i class="ti ti-chevron-right"></i></button>
+            <button class="v2-btn v2-btn--ghost" onclick="_kdNavToday()"><i class="ti ti-map-pin"></i> Ten tydzień</button>
+            <div style="width:1px;height:24px;background:#E2E8F0;"></div>
+            <label class="v2-toolbar__label">Widok:</label>
+            <select id="kdViewMode" class="v2-toolbar__select" onchange="_kdRender()">
+              <option value="week">Tygodniowy</option>
+              <option value="month">Miesięczny</option>
+            </select>
+            <div style="flex:1;"></div>
+            <button id="kdAddShiftBtn" class="v2-btn v2-btn--primary" onclick="_kdOpenShiftEditor(null)" style="display:none;">
+              <i class="ti ti-plus"></i> Dodaj zmianę
+            </button>
+          </div>
+
+          <div id="kdSummary" style="margin-top:12px;"></div>
+          <div class="v2-panel" id="kdGrid" style="margin-top:12px;padding:0;overflow:auto;">
+            <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie grafiku…</div>
           </div>
         </div>
       </section>
@@ -4839,7 +4969,15 @@ async function loadClientsDb() {
   try {
     const data = await sbFetch('/rest/v1/clients?select=*&order=updated_at.desc');
     // Zachowujemy user_id z bazy jako _userId — potrzebne do filtra „Handlowiec" w lejku
-    clientsDb = (data||[]).map(r => ({ ...r.data, id: r.id, _sbid: r.id, _userId: r.user_id }));
+    // Zachowujemy też timestampy — potrzebne do sortowania w liście klientów
+    clientsDb = (data||[]).map(r => ({
+      ...r.data,
+      id: r.id,
+      _sbid: r.id,
+      _userId: r.user_id,
+      created_at: r.created_at,
+      updated_at: r.updated_at
+    }));
     updateClientsCount();
   } catch(e) {
     console.warn('Supabase load clients error:', e);
@@ -4938,6 +5076,141 @@ async function fetchOfferById(offerId) {
     const data = await sbFetch('/rest/v1/offers?id=eq.' + encodeURIComponent(offerId) + '&select=*');
     return (Array.isArray(data) && data.length) ? data[0] : null;
   } catch(e) { console.warn('Fetch offer error:', e); return null; }
+}
+
+/* Podgląd PDF oferty bez modyfikacji bieżącego stanu wizarda.
+   Ładuje snapshot do state/DOM, generuje docDefinition, tworzy blob i otwiera
+   w nowej karcie — potem przywraca oryginalny state.
+   Dla ofert bez snapshotu (starsze rekordy) — generuje mini-PDF z podstawowymi danymi. */
+async function previewOfferPdf(offerId) {
+  if (typeof pdfMake === 'undefined') { showToast('Biblioteka pdfMake niedostępna'); return; }
+  if (!offerId) { showToast('Brak ID oferty'); return; }
+  showToast('Wczytuję ofertę…');
+
+  const offer = await fetchOfferById(offerId);
+  if (!offer) { showToast('Nie znaleziono oferty w bazie'); return; }
+
+  // Snapshot może być w polu offer_data (nowa nazwa) LUB data (starsza wersja) — próbujemy oba
+  const snap = offer.offer_data || offer.data || null;
+  const hasFullSnapshot = snap && snap.state;
+
+  // Backup — pełny stan aplikacji: klasyczny state, liczniki, wartości DOM formularza
+  const backup = {
+    state: JSON.parse(JSON.stringify(state)),
+    nextVariantId: typeof nextVariantId !== 'undefined' ? nextVariantId : 1,
+    nextHpVariantId: typeof nextHpVariantId !== 'undefined' ? nextHpVariantId : 1,
+    nextCustomServiceId: typeof nextCustomServiceId !== 'undefined' ? nextCustomServiceId : 1,
+    fields: {}
+  };
+  const fieldIds = ['offerDate','validityDays','salesName','salesRole','salesPhone','salesEmail',
+                    'clientName','clientNip','clientEmail','clientPhone','clientAddress','clientNotes',
+                    'customNote','owsText','customServicesOws','offerNo','owsSelect'];
+  fieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) backup.fields[id] = el.value;
+  });
+
+  let previewUrl = null;
+  try {
+    let docDef;
+
+    if (hasFullSnapshot) {
+      // === PEŁNY SNAPSHOT — regeneracja identycznego PDF przez wizard ===
+      const ok = loadOfferSnapshot(snap, { silent: true });
+      if (!ok) throw new Error('Nie udało się załadować snapshotu');
+      showToast('Generuję podgląd PDF…');
+      docDef = await getOfferDocDefinition();
+      if (!docDef) throw new Error('Brak docDefinition — sprawdź czy oferta jest kompletna');
+    } else {
+      // === STARSZA OFERTA BEZ SNAPSHOTU — mini-PDF z podstawowymi danymi ===
+      showToast('Starsza oferta bez snapshotu — generuję podgląd z podstawowych danych');
+      docDef = _buildLegacyOfferDocDef(offer);
+    }
+
+    // Blob z pdfMake
+    const blob = await new Promise((resolve, reject) => {
+      try { pdfMake.createPdf(docDef).getBlob(b => resolve(b)); }
+      catch(e) { reject(e); }
+    });
+    previewUrl = URL.createObjectURL(blob);
+    const w = window.open(previewUrl, '_blank');
+    if (!w) {
+      showToast('Odblokuj popupy dla tej strony — nie mogę otworzyć podglądu');
+    } else {
+      showToast(hasFullSnapshot ? 'Podgląd otwarty' : 'Podgląd (uproszczony) otwarty — pełne dane oferty nie były zapisane w tej wersji');
+    }
+    setTimeout(() => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, 60000);
+  } catch(e) {
+    console.error('previewOfferPdf error:', e);
+    showToast('Błąd podglądu: ' + String(e.message || e).slice(0, 120));
+  } finally {
+    // Przywróć oryginalny state + DOM (tylko jeśli faktycznie modyfikowaliśmy — dla legacy nie ruszamy)
+    if (hasFullSnapshot) {
+      try {
+        state = backup.state;
+        if (typeof nextVariantId !== 'undefined') nextVariantId = backup.nextVariantId;
+        if (typeof nextHpVariantId !== 'undefined') nextHpVariantId = backup.nextHpVariantId;
+        if (typeof nextCustomServiceId !== 'undefined') nextCustomServiceId = backup.nextCustomServiceId;
+        Object.entries(backup.fields).forEach(([id, v]) => {
+          const el = document.getElementById(id);
+          if (el) el.value = v;
+        });
+        if (typeof renderVariants === 'function') renderVariants();
+        if (typeof updateClientStatusLabel === 'function') updateClientStatusLabel();
+      } catch(re) {
+        console.warn('Restore state error:', re);
+      }
+    }
+  }
+}
+
+/* Mini-PDF dla starszych ofert bez snapshotu — pokazuje co jest w bazie (numer, klient, wartość, data). */
+function _buildLegacyOfferDocDef(offer) {
+  const fmtPl = (x) => Number(x||0).toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmtD = (d) => { try { return new Date(d).toLocaleDateString('pl-PL'); } catch(e) { return d || '—'; } };
+  const scopeLabel = offer.scope === 'hp' ? 'Pompa ciepła'
+                   : offer.scope === 'ac' ? 'Klimatyzacja'
+                   : offer.scope === 'rekuperacja' ? 'Rekuperacja'
+                   : offer.scope || '—';
+  return {
+    pageSize: 'A4',
+    pageMargins: [50, 50, 50, 60],
+    defaultStyle: { font: 'Roboto', fontSize: 10, color: '#1A2332' },
+    content: [
+      { text: 'PODGLĄD OFERTY', style: 'title', margin: [0, 0, 0, 4] },
+      { text: 'Uproszczony widok — oferta zapisana przed wprowadzeniem pełnego snapshotu',
+        italics: true, color: '#94A3B8', fontSize: 10, margin: [0, 0, 0, 24] },
+
+      {
+        table: {
+          widths: ['auto', '*'],
+          body: [
+            [{ text: 'Numer oferty', style: 'lbl' }, { text: offer.offer_no || '—', style: 'val' }],
+            [{ text: 'Data wystawienia', style: 'lbl' }, { text: fmtD(offer.created_at), style: 'val' }],
+            [{ text: 'Klient', style: 'lbl' }, { text: offer.client_name || '—', style: 'val' }],
+            [{ text: 'Zakres', style: 'lbl' }, { text: scopeLabel, style: 'val' }],
+            [{ text: 'Wartość brutto', style: 'lbl' }, { text: fmtPl(offer.total_br) + ' zł', style: 'val', bold: true, color: '#0F3461' }],
+            [{ text: 'Handlowiec', style: 'lbl' }, { text: (offer.user_email || '').split('@')[0] || '—', style: 'val' }],
+            [{ text: 'Plik oryginalny', style: 'lbl' }, { text: offer.file_name || '—', style: 'val', fontSize: 9, color: '#64748B' }]
+          ]
+        },
+        layout: {
+          fillColor: (i) => i % 2 === 0 ? '#F8FBFD' : null,
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0,
+          hLineColor: () => '#E2E8F0'
+        }
+      },
+      { text: '', margin: [0, 30, 0, 0] },
+      { text: 'To jest widok zapisanej pozycji z listy ofert — nie zawiera pełnej treści wariantów, cen jednostkowych ani warunków. Aby uzyskać pełny PDF oferty, użyj pliku który został wygenerowany oryginalnie („' + (offer.file_name || 'plik oferty') + '").',
+        fontSize: 9, italics: true, color: '#64748B', margin: [0, 0, 0, 12] }
+    ],
+    styles: {
+      title: { fontSize: 18, bold: true, color: '#0F3461' },
+      lbl:   { fontSize: 10, color: '#475569', bold: true, margin: [8, 6, 8, 6] },
+      val:   { fontSize: 11, color: '#1A2332',            margin: [8, 6, 8, 6] }
+    }
+  };
 }
 
 /* Lista wszystkich ofert bieżącego użytkownika. */
@@ -12001,18 +12274,21 @@ function renderClientsList() {
       return blob.includes(search);
     });
   }
-  // Sortowanie z toolbara
+  // Sortowanie z toolbara — fallback: Supabase używa created_at/updated_at (snake),
+  // lokalne obiekty JS używają createdAt/updatedAt (camel). Bierzemy pierwszą znalezioną.
+  const getCreated = c => c.created_at || c.createdAt || '';
+  const getUpdated = c => c.updated_at || c.updatedAt || c.created_at || c.createdAt || '';
   const sortMode = document.getElementById('clientsSort')?.value || 'newest';
   if (sortMode === 'newest') {
-    list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    list.sort((a, b) => getCreated(b).localeCompare(getCreated(a)));
   } else if (sortMode === 'oldest') {
-    list.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+    list.sort((a, b) => getCreated(a).localeCompare(getCreated(b)));
   } else if (sortMode === 'name_asc') {
     list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pl'));
   } else if (sortMode === 'name_desc') {
     list.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'pl'));
   } else if (sortMode === 'updated') {
-    list.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+    list.sort((a, b) => getUpdated(b).localeCompare(getUpdated(a)));
   }
 
   if (list.length === 0) {
@@ -12083,9 +12359,12 @@ function recordOfferForClient(offerNo, totalBr, fileName) {
   if (!state.linkedClientId) return;
   const c = clientsDb.find(c => c.id === state.linkedClientId);
   if (!c) return;
-  // Zapisz ofertę do Supabase
+  // Zapisz ofertę do Supabase — Z snapshotem żeby podgląd PDF działał w karcie klienta
   const clientName = document.getElementById('clientName')?.value?.trim() || c.name || '';
-  recordOfferToSupabase(offerNo, clientName, state.linkedClientId, totalBr, fileName, state.scope);
+  let snapshot = null;
+  try { snapshot = (typeof buildOfferSnapshot === 'function') ? buildOfferSnapshot() : null; }
+  catch(e) { console.warn('buildOfferSnapshot in recordOfferForClient failed:', e); }
+  recordOfferToSupabase(offerNo, clientName, state.linkedClientId, totalBr, fileName, state.scope, snapshot);
   c.offers = c.offers || [];
   c.offers.push({
     offerNo,
@@ -17253,6 +17532,506 @@ function _clientSearchClear(widgetId) {
   if (wrap) wrap.dataset.selectedId = '';
   const cb = window._clientSearchCallbacks[widgetId];
   if (typeof cb === 'function') cb(null);
+}
+
+/* ============================================================
+   KADROMIERZ — grafiki pracy i przepracowane godziny
+   ============================================================ */
+
+let shiftsDb = [];
+let _kdCurrentWeekStart = null;    // Data poniedziałku aktualnie wyświetlanego tygodnia
+let _kdEditing = null;             // Zmiana aktualnie edytowana w modalu
+
+const KD_SHIFT_TYPE_LABELS = {
+  regular:  'Praca',
+  overtime: 'Nadgodziny',
+  sick:     'Zwolnienie',
+  vacation: 'Urlop',
+  off:      'Wolne',
+  training: 'Szkolenie'
+};
+
+/* Owner grafiku — może tworzyć/edytować. Sprawdzane po emailu z team_members (role=owner) */
+function _kdCanEdit() {
+  if (!currentUser?.email) return false;
+  if (typeof teamMembersDb === 'undefined' || !Array.isArray(teamMembersDb)) return false;
+  const m = teamMembersDb.find(x => (x.email || '').toLowerCase() === currentUser.email.toLowerCase());
+  return m && m.role === 'owner' && m.active !== false;
+}
+
+/* Poniedziałek tygodnia zawierającego datę */
+function _kdMondayOf(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();       // 0=nd, 1=pn, ..., 6=sob
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function _kdDateStr(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function _kdFmtDate(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleDateString('pl-PL'); } catch(e) { return iso; }
+}
+
+async function loadShifts(rangeStart, rangeEnd) {
+  if (!currentUser) return;
+  try {
+    let q = '/rest/v1/shifts?select=*&order=shift_date.asc,team_member_email.asc';
+    if (rangeStart) q += '&shift_date=gte.' + rangeStart;
+    if (rangeEnd)   q += '&shift_date=lte.' + rangeEnd;
+    const data = await sbFetch(q);
+    shiftsDb = data || [];
+  } catch(e) {
+    console.info('shifts unavailable:', e.message);
+    shiftsDb = [];
+    if (String(e.message).includes('42P01')) {
+      showToast('Brak tabeli shifts — wykonaj SQL migration_shifts.sql');
+    }
+  }
+}
+
+/* Przełącznik tabów w sekcji kalendarza */
+async function _calSwitchTab(tab) {
+  document.getElementById('calTabCalendar')?.classList.toggle('v2-cal-tab--active', tab === 'calendar');
+  document.getElementById('calTabKadromierz')?.classList.toggle('v2-cal-tab--active', tab === 'kadromierz');
+  document.getElementById('calTabCalendarContent').style.display    = tab === 'calendar' ? '' : 'none';
+  document.getElementById('calTabKadromierzContent').style.display = tab === 'kadromierz' ? '' : 'none';
+  if (tab === 'kadromierz') {
+    if (!_kdCurrentWeekStart) _kdCurrentWeekStart = _kdMondayOf(new Date());
+    // Upewnij się że mamy zespół załadowany — bez tego grid jest pusty
+    if (!Array.isArray(teamMembersDb) || teamMembersDb.length === 0) {
+      if (typeof loadTeamMembers === 'function') {
+        try { await loadTeamMembers(); } catch(e) { console.warn('loadTeamMembers failed:', e); }
+      }
+    }
+    _kdRender();
+  }
+}
+
+/* Nawigacja tygodniowa */
+function _kdNavPrev() {
+  if (!_kdCurrentWeekStart) _kdCurrentWeekStart = _kdMondayOf(new Date());
+  const mode = document.getElementById('kdViewMode')?.value || 'week';
+  const step = mode === 'month' ? 28 : 7;
+  const d = new Date(_kdCurrentWeekStart);
+  d.setDate(d.getDate() - step);
+  _kdCurrentWeekStart = d;
+  _kdRender();
+}
+function _kdNavNext() {
+  if (!_kdCurrentWeekStart) _kdCurrentWeekStart = _kdMondayOf(new Date());
+  const mode = document.getElementById('kdViewMode')?.value || 'week';
+  const step = mode === 'month' ? 28 : 7;
+  const d = new Date(_kdCurrentWeekStart);
+  d.setDate(d.getDate() + step);
+  _kdCurrentWeekStart = d;
+  _kdRender();
+}
+function _kdNavToday() {
+  _kdCurrentWeekStart = _kdMondayOf(new Date());
+  _kdRender();
+}
+
+/* Renderuje siatkę grafiku */
+async function _kdRender() {
+  const grid = document.getElementById('kdGrid');
+  if (!grid) { console.warn('_kdRender: #kdGrid not found'); return; }
+  try {
+    if (!_kdCurrentWeekStart) _kdCurrentWeekStart = _kdMondayOf(new Date());
+
+    const mode = document.getElementById('kdViewMode')?.value || 'week';
+    const daysCount = mode === 'month' ? 28 : 7;
+
+    // Zakres dat
+    const rangeStart = _kdDateStr(_kdCurrentWeekStart);
+    const endDate = new Date(_kdCurrentWeekStart);
+    endDate.setDate(endDate.getDate() + daysCount - 1);
+    const rangeEnd = _kdDateStr(endDate);
+
+    // Wczytaj shifts dla tego okresu
+    await loadShifts(rangeStart, rangeEnd);
+
+    // Toolbar: pokaż przycisk „Dodaj zmianę" tylko dla ownera
+    const addBtn = document.getElementById('kdAddShiftBtn');
+    if (addBtn) addBtn.style.display = _kdCanEdit() ? 'inline-flex' : 'none';
+
+    // Label okresu
+    const label = document.getElementById('kdWeekLabel');
+    if (label) {
+      const s = _kdCurrentWeekStart;
+      const e = endDate;
+      const opts = { day: 'numeric', month: 'long' };
+      const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+      label.textContent = sameMonth
+        ? `${s.getDate()}–${e.getDate()} ${s.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}`
+        : `${s.toLocaleDateString('pl-PL', opts)} – ${e.toLocaleDateString('pl-PL', opts)} ${e.getFullYear()}`;
+    }
+
+    // Członkowie zespołu — kto ma być w grafiku (aktywni)
+    const members = (Array.isArray(teamMembersDb) ? teamMembersDb : []).filter(m => m.active !== false);
+
+    // Jeśli brak zespołu w bazie — komunikat naprowadzający
+    if (members.length === 0) {
+      grid.innerHTML = `
+        <div style="padding:40px 20px;text-align:center;color:#64748B;">
+          <i class="ti ti-users-off" style="font-size:32px;color:#CBD5E1;"></i>
+          <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">Brak zespołu w bazie</div>
+          <div style="margin-top:6px;font-size:12px;">Wykonaj SQL <code>migration_full_team_and_tasks.sql</code> żeby dodać zespół 4Climat, potem SQL <code>migration_shifts.sql</code> dla grafiku.</div>
+        </div>
+      `;
+      const summary = document.getElementById('kdSummary');
+      if (summary) summary.innerHTML = '';
+      return;
+    }
+
+    // Jeśli nie jestem ownerem — pokazuj tylko siebie
+    const canEdit = _kdCanEdit();
+    const visibleMembers = canEdit
+      ? members
+      : members.filter(m => (m.email || '').toLowerCase() === (currentUser?.email || '').toLowerCase());
+
+    if (visibleMembers.length === 0) {
+      grid.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#64748B;"><i class="ti ti-user-off" style="font-size:32px;color:#CBD5E1;"></i><div style="margin-top:10px;font-size:13px;color:#334155;">Twój email nie jest jeszcze przypisany do zespołu — poproś właściciela o dodanie.</div></div>';
+      return;
+    }
+
+    // Dni w widoku
+    const days = [];
+    for (let i = 0; i < daysCount; i++) {
+      const d = new Date(_kdCurrentWeekStart);
+      d.setDate(d.getDate() + i);
+      days.push(d);
+    }
+    const todayStr = _kdDateStr(new Date());
+
+    // Nagłówek kolumn: pusta komórka + dni
+    const dayNames = ['pon','wt','śr','czw','pt','sob','ndz'];
+    const monthNames = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
+
+    let html = `<div class="kd-grid">`;
+
+    if (mode === 'week') {
+      html += `<div class="kd-grid__header">`;
+      html += `<div>Pracownik</div>`;
+      days.forEach((d, i) => {
+        const isToday = _kdDateStr(d) === todayStr;
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        const cls = isToday ? 'kd-today' : (isWeekend ? 'kd-weekend' : '');
+        html += `<div class="${cls}">
+          ${dayNames[i]}<br>
+          <span style="font-size:14px;font-weight:800;color:#0A2647;text-transform:none;letter-spacing:0;">${d.getDate()}</span>
+          <span style="font-size:10px;color:#94A3B8;font-weight:500;text-transform:none;">${monthNames[d.getMonth()]}</span>
+        </div>`;
+      });
+      html += `</div>`;
+
+      visibleMembers.forEach(m => {
+        const memberEmail = (m.email || '').toLowerCase();
+        const memberShifts = shiftsDb.filter(s => (s.team_member_email || '').toLowerCase() === memberEmail);
+        const totalHours = memberShifts.reduce((sum, s) => sum + (Number(s.actual_hours) || Number(s.planned_hours) || 0), 0);
+
+        html += `<div class="kd-grid__row">`;
+        html += `<div class="kd-name-cell">
+          <div class="kd-name-avatar" style="background:${m.color || '#0F3461'};">${escapeHtml((m.name || m.email || '?').slice(0,2).toUpperCase())}</div>
+          <div class="kd-name-info">
+            <div class="kd-name-title">${escapeHtml(m.name || m.email.split('@')[0])}</div>
+            <div class="kd-name-role">${m.role === 'owner' ? 'Właściciel' : (m.role === 'sales' ? 'Handlowiec' : 'Pracownik')} · <strong style="color:#0F3461;">${totalHours.toFixed(1)}h</strong></div>
+          </div>
+        </div>`;
+
+        days.forEach(d => {
+          const dStr = _kdDateStr(d);
+          const dayShifts = memberShifts.filter(s => s.shift_date === dStr);
+          const isToday = dStr === todayStr;
+          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          const cellClass = 'kd-day-cell ' + (isToday ? 'kd-day-today' : (isWeekend ? 'kd-day-weekend' : ''));
+          const cellClickable = canEdit ? `onclick="_kdOpenShiftEditor(null, {team_member_email: '${memberEmail}', shift_date: '${dStr}'})"` : '';
+          html += `<div class="${cellClass}" ${cellClickable}>`;
+          dayShifts.forEach(s => {
+            const hoursNum = Number(s.actual_hours ?? s.planned_hours ?? 0);
+            const hoursStr = hoursNum > 0 ? hoursNum.toFixed(1) + 'h' : '';
+            const timesStr = (s.planned_start && s.planned_end) ? `${s.planned_start.slice(0,5)}–${s.planned_end.slice(0,5)}` : '';
+            html += `<div class="kd-shift kd-shift--${s.shift_type || 'regular'}" onclick="event.stopPropagation(); _kdOpenShiftEditor('${s.id}')">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;">
+                ${hoursStr ? `<span class="kd-shift-hours">${hoursStr}</span>` : `<span class="kd-shift-hours">${KD_SHIFT_TYPE_LABELS[s.shift_type] || s.shift_type}</span>`}
+                ${timesStr ? `<span class="kd-shift-times">${timesStr}</span>` : ''}
+              </div>
+              ${(hoursStr && s.shift_type !== 'regular') ? `<div style="font-size:9.5px;opacity:.85;">${KD_SHIFT_TYPE_LABELS[s.shift_type] || s.shift_type}</div>` : ''}
+              ${s.notes ? `<div class="kd-shift-notes">${escapeHtml(s.notes.slice(0, 24))}</div>` : ''}
+            </div>`;
+          });
+          html += `</div>`;
+        });
+        html += `</div>`;
+      });
+    } else {
+      html += `<div style="padding:14px;text-align:center;color:#64748B;font-size:12px;">Widok miesięczny — implementacja w kolejnej iteracji. Użyj widoku tygodniowego (wybierz z listy powyżej).</div>`;
+    }
+
+    html += `</div>`;
+    grid.innerHTML = html;
+
+    _kdRenderSummary(visibleMembers, days);
+  } catch(e) {
+    console.error('_kdRender error:', e);
+    grid.innerHTML = `
+      <div style="padding:30px 20px;text-align:center;color:#991B1B;background:#FEF2F2;">
+        <i class="ti ti-alert-triangle" style="font-size:24px;"></i>
+        <div style="margin-top:8px;font-size:13px;font-weight:600;">Błąd ładowania grafiku</div>
+        <div style="margin-top:4px;font-size:11.5px;color:#7F1D1D;font-family:monospace;">${escapeHtml(String(e.message || e).slice(0, 200))}</div>
+      </div>
+    `;
+  }
+}
+
+function _kdRenderSummary(members, days) {
+  const wrap = document.getElementById('kdSummary');
+  if (!wrap) return;
+  const todayStr = _kdDateStr(new Date());
+  let totalPlannedH = 0, totalActualH = 0;
+  members.forEach(m => {
+    const memberEmail = (m.email || '').toLowerCase();
+    shiftsDb.forEach(s => {
+      if ((s.team_member_email || '').toLowerCase() !== memberEmail) return;
+      totalPlannedH += Number(s.planned_hours) || 0;
+      totalActualH  += Number(s.actual_hours)  || 0;
+    });
+  });
+  wrap.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="padding:8px 14px;background:#EFF6FF;border-radius:7px;font-size:11.5px;color:#1E40AF;font-weight:600;">
+        <i class="ti ti-users"></i> Pracowników: <strong>${members.length}</strong>
+      </div>
+      <div style="padding:8px 14px;background:#F0FDF4;border-radius:7px;font-size:11.5px;color:#166534;font-weight:600;">
+        <i class="ti ti-calendar-time"></i> Zaplanowane: <strong>${totalPlannedH.toFixed(1)}h</strong>
+      </div>
+      <div style="padding:8px 14px;background:#FEF3C7;border-radius:7px;font-size:11.5px;color:#92400E;font-weight:600;">
+        <i class="ti ti-clock-check"></i> Przepracowane: <strong>${totalActualH.toFixed(1)}h</strong>
+      </div>
+      ${!_kdCanEdit() ? '<div style="padding:8px 14px;background:#F1F5F9;border-radius:7px;font-size:11.5px;color:#475569;"><i class="ti ti-info-circle"></i> Widzisz tylko swój grafik — tworzyć zmiany może właściciel</div>' : ''}
+    </div>
+  `;
+}
+
+/* Modal — edycja/tworzenie zmiany */
+function _kdOpenShiftEditor(shiftId, prefill) {
+  const isOwner = _kdCanEdit();
+  if (shiftId) {
+    const s = shiftsDb.find(x => x.id === shiftId);
+    if (!s) { showToast('Nie znaleziono zmiany'); return; }
+    _kdEditing = JSON.parse(JSON.stringify(s));
+    // Pracownik może edytować tylko actual_start/actual_end/actual_hours swojej zmiany
+    _kdEditing._canFullEdit = isOwner;
+  } else {
+    if (!isOwner) { showToast('Tylko właściciel może tworzyć zmiany'); return; }
+    _kdEditing = {
+      id: null,
+      team_member_email: prefill?.team_member_email || '',
+      shift_date: prefill?.shift_date || _kdDateStr(new Date()),
+      shift_type: 'regular',
+      planned_start: '08:00',
+      planned_end: '16:00',
+      planned_hours: 8,
+      actual_start: null,
+      actual_end: null,
+      actual_hours: null,
+      location: '',
+      notes: '',
+      _canFullEdit: true
+    };
+  }
+  _kdRenderShiftEditor();
+}
+
+function _kdRenderShiftEditor() {
+  const s = _kdEditing;
+  if (!s) return;
+  let mod = document.getElementById('kdShiftEditorModal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'kdShiftEditorModal';
+    mod.className = 'modal-backdrop';
+    document.body.appendChild(mod);
+  }
+  const members = (Array.isArray(teamMembersDb) ? teamMembersDb : []).filter(m => m.active !== false);
+  const memberOptions = members.map(m => `<option value="${m.email}"${s.team_member_email === m.email ? ' selected' : ''}>${escapeHtml(m.name || m.email)}</option>`).join('');
+  const isNew = !s.id;
+  const canFull = s._canFullEdit !== false;
+
+  mod.innerHTML = `
+    <div class="modal" style="max-width:560px;">
+      <div class="modal__head" style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0A2647;">${isNew ? 'Nowa zmiana' : (canFull ? 'Edycja zmiany' : 'Wpisz przepracowane godziny')}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">${canFull ? 'Grafik pracy — dostępny w kalendarzu każdego pracownika' : 'Możesz edytować tylko rzeczywiste godziny pracy'}</div>
+        </div>
+        <button onclick="_kdCloseShiftEditor()" style="background:transparent;border:none;color:#64748B;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="modal__body" style="padding:16px 18px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Pracownik *</label>
+            <select class="ss-input" onchange="_kdSet('team_member_email', this.value)" ${canFull ? '' : 'disabled'}>
+              ${memberOptions}
+            </select>
+          </div>
+          <div>
+            <label class="ss-label">Data *</label>
+            <input type="date" class="ss-input" value="${s.shift_date || ''}" onchange="_kdSet('shift_date', this.value)" ${canFull ? '' : 'disabled'}>
+          </div>
+          <div style="grid-column:span 2;">
+            <label class="ss-label">Typ zmiany</label>
+            <select class="ss-input" onchange="_kdSet('shift_type', this.value)" ${canFull ? '' : 'disabled'}>
+              ${Object.entries(KD_SHIFT_TYPE_LABELS).map(([k,l]) => `<option value="${k}"${s.shift_type === k ? ' selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="ss-section-h" style="margin:16px 0 8px;">Grafik (planowany)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Od</label>
+            <input type="time" class="ss-input" value="${s.planned_start || ''}" onchange="_kdSet('planned_start', this.value || null); _kdRecalcPlannedHours()" ${canFull ? '' : 'disabled'}>
+          </div>
+          <div>
+            <label class="ss-label">Do</label>
+            <input type="time" class="ss-input" value="${s.planned_end || ''}" onchange="_kdSet('planned_end', this.value || null); _kdRecalcPlannedHours()" ${canFull ? '' : 'disabled'}>
+          </div>
+          <div>
+            <label class="ss-label">Godziny (auto)</label>
+            <input type="number" step="0.25" class="ss-input" id="kdPlannedHoursInput" value="${s.planned_hours || ''}" onchange="_kdSet('planned_hours', this.value === '' ? null : parseFloat(this.value))" ${canFull ? '' : 'disabled'}>
+          </div>
+        </div>
+
+        <div class="ss-section-h" style="margin:16px 0 8px;">Rzeczywiście przepracowane</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Od</label>
+            <input type="time" class="ss-input" value="${s.actual_start || ''}" onchange="_kdSet('actual_start', this.value || null); _kdRecalcActualHours()">
+          </div>
+          <div>
+            <label class="ss-label">Do</label>
+            <input type="time" class="ss-input" value="${s.actual_end || ''}" onchange="_kdSet('actual_end', this.value || null); _kdRecalcActualHours()">
+          </div>
+          <div>
+            <label class="ss-label">Godziny (auto)</label>
+            <input type="number" step="0.25" class="ss-input" id="kdActualHoursInput" value="${s.actual_hours || ''}" onchange="_kdSet('actual_hours', this.value === '' ? null : parseFloat(this.value))">
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label class="ss-label">Lokalizacja / opis</label>
+          <input type="text" class="ss-input" value="${escapeHtml(s.location || '')}" onchange="_kdSet('location', this.value)" placeholder="np. biuro, montaż u klienta X, serwis..." ${canFull ? '' : 'disabled'}>
+        </div>
+        <div style="margin-top:12px;">
+          <label class="ss-label">Notatki</label>
+          <textarea class="ss-input" rows="2" onchange="_kdSet('notes', this.value)" placeholder="Uwagi do zmiany, ustalenia, wyjątki...">${escapeHtml(s.notes || '')}</textarea>
+        </div>
+      </div>
+      <div class="modal__foot" style="padding:12px 18px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;gap:8px;">
+        <div>
+          ${(!isNew && canFull) ? `<button onclick="_kdDeleteShift('${s.id}')" style="padding:8px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-trash"></i> Usuń</button>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="_kdCloseShiftEditor()" style="padding:8px 14px;background:transparent;color:#334155;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button onclick="_kdSaveShift()" style="padding:8px 18px;background:#0A2647;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-check"></i> Zapisz</button>
+        </div>
+      </div>
+    </div>
+  `;
+  mod.classList.add('modal-backdrop--open');
+}
+
+function _kdSet(field, value) {
+  if (!_kdEditing) return;
+  _kdEditing[field] = value;
+}
+
+function _kdRecalcPlannedHours() {
+  if (!_kdEditing?.planned_start || !_kdEditing?.planned_end) return;
+  const [h1, m1] = _kdEditing.planned_start.split(':').map(Number);
+  const [h2, m2] = _kdEditing.planned_end.split(':').map(Number);
+  let mins = (h2*60 + m2) - (h1*60 + m1);
+  if (mins < 0) mins += 24*60;
+  const hours = Math.round((mins / 60) * 4) / 4;   // krok 0.25h
+  _kdEditing.planned_hours = hours;
+  const el = document.getElementById('kdPlannedHoursInput');
+  if (el) el.value = hours;
+}
+
+function _kdRecalcActualHours() {
+  if (!_kdEditing?.actual_start || !_kdEditing?.actual_end) return;
+  const [h1, m1] = _kdEditing.actual_start.split(':').map(Number);
+  const [h2, m2] = _kdEditing.actual_end.split(':').map(Number);
+  let mins = (h2*60 + m2) - (h1*60 + m1);
+  if (mins < 0) mins += 24*60;
+  const hours = Math.round((mins / 60) * 4) / 4;
+  _kdEditing.actual_hours = hours;
+  const el = document.getElementById('kdActualHoursInput');
+  if (el) el.value = hours;
+}
+
+function _kdCloseShiftEditor() {
+  const mod = document.getElementById('kdShiftEditorModal');
+  if (mod) mod.classList.remove('modal-backdrop--open');
+  _kdEditing = null;
+}
+
+async function _kdSaveShift() {
+  if (!_kdEditing) return;
+  if (!_kdEditing.team_member_email) { showToast('Wybierz pracownika'); return; }
+  if (!_kdEditing.shift_date) { showToast('Wpisz datę'); return; }
+
+  const payload = { ..._kdEditing };
+  delete payload.id;
+  delete payload.created_at;
+  delete payload.updated_at;
+  delete payload._canFullEdit;
+  if (!payload.created_by) payload.created_by = currentUser?.email ? currentUser.email.split('@')[0] : null;
+
+  // Sanityzacja
+  ['planned_hours', 'actual_hours'].forEach(k => {
+    if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
+    if (typeof payload[k] === 'string') payload[k] = payload[k] ? parseFloat(payload[k]) : null;
+  });
+  ['planned_start', 'planned_end', 'actual_start', 'actual_end'].forEach(k => {
+    if (payload[k] === '') payload[k] = null;
+  });
+
+  try {
+    if (_kdEditing.id) {
+      await sbFetch('/rest/v1/shifts?id=eq.' + encodeURIComponent(_kdEditing.id), 'PATCH', payload);
+      showToast('Zmiana zaktualizowana');
+    } else {
+      await sbFetch('/rest/v1/shifts', 'POST', payload);
+      showToast('Zmiana dodana');
+    }
+    _kdCloseShiftEditor();
+    await _kdRender();
+  } catch(e) {
+    console.error('save shift error:', e);
+    const msg = String(e.message || e);
+    if (msg.includes('42501') || msg.includes('policy')) {
+      showToast('Brak uprawnień do tej operacji — tylko właściciel może tworzyć/edytować zmiany');
+    } else {
+      showToast('Błąd zapisu: ' + msg.slice(0, 100));
+    }
+  }
+}
+
+async function _kdDeleteShift(shiftId) {
+  if (!confirm('Usunąć tę zmianę z grafiku?')) return;
+  try {
+    await sbFetch('/rest/v1/shifts?id=eq.' + encodeURIComponent(shiftId), 'DELETE');
+    showToast('Usunięto');
+    _kdCloseShiftEditor();
+    await _kdRender();
+  } catch(e) { showToast('Błąd: ' + (e.message || e)); }
 }
 
 /* ============================================================
