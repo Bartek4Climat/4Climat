@@ -8430,6 +8430,12 @@ function variantNetTotal(v) {
   if (v.type === 'install') {
     return parseFloat(v.priceNet) || 0;
   }
+  if (v.type === 'hp_kit') {
+    // Wariant z wizarda HP — priceNet = suma pozycji, installPrice = montaż
+    let s = parseFloat(v.priceNet) || 0;
+    if (v.includeInstall !== false) s += parseFloat(v.installPrice) || 0;
+    return s;
+  }
   if (v.type === 'split') {
     let s = 0;
     v.units.forEach(u => {
@@ -8440,9 +8446,10 @@ function variantNetTotal(v) {
     // Systemy multisplit dodane do wariantu (tryb mixed)
     if (v.multiSystems) {
       v.multiSystems.forEach(ms => {
+        if (!ms || !ms.outdoor) return;  // uszkodzony wpis — pomiń
         const out = getProductFromPool('multi_zew', ms.outdoor.productIdx) || {cena:0};
         s += ms.outdoorPriceOverride != null ? ms.outdoorPriceOverride : (out.cena||0);
-        ms.indoor.forEach(u => {
+        (ms.indoor || []).forEach(u => {
           const p2 = getProductFromPool('multi_wew', u.productIdx) || {cena:0};
           s += (u.priceOverride!=null ? u.priceOverride : (p2.cena||0)) * (u.qty||1);
         });
@@ -8451,6 +8458,7 @@ function variantNetTotal(v) {
     }
     return s;
   } else {
+    if (!v.outdoor) return 0;    // uszkodzony wariant multi — nie zawalaj sumowania
     const out = getProductFromPool('multi_zew', v.outdoor.productIdx) || DB.multi_zew[v.outdoor.productIdx] || {cena:0};
     const outPrice = (v.outdoorPriceOverride != null) ? v.outdoorPriceOverride : (out.cena || 0);
     let s = outPrice;
@@ -11651,9 +11659,10 @@ function openDayModal(dateStr) {
         ? `<button style="background:transparent; border:none; color:var(--c-primary); font-size:11px; cursor:pointer; padding:0; text-decoration:underline;" onclick="closeDayModal(); openFunnelDetail('${e.clientId}')"><i class="ti ti-user" style="font-size:11px;"></i> ${escapeHtml(e.clientName || '')}</button>`
         : '';
       const iconHtml = e.icon.startsWith('<') ? e.icon : `<i class="ti ${e.icon}" style="color:${e.color};"></i>`;
-      const deleteBtn = e.type === 'custom' && e.customEventId
-        ? `<div class="day-event-item__actions"><button onclick="handleDeleteCustomEvent('${e.customEventId}')" title="Usuń"><i class="ti ti-trash"></i></button></div>`
-        : '';
+
+      // Zbudowana lista akcji (usuń / zmień datę) — zależy od typu wydarzenia
+      const actions = _buildEventActions(e, dateStr);
+
       html += `
         <div class="day-event-item day-event-item--${e.type}">
           <span class="day-event-item__icon">${iconHtml}</span>
@@ -11666,7 +11675,7 @@ function openDayModal(dateStr) {
             </div>
             ${locationStr}
           </div>
-          ${deleteBtn}
+          ${actions}
         </div>
       `;
     });
@@ -11737,6 +11746,183 @@ async function handleAddCustomEvent() {
     renderCalendar();
     if (typeof renderInlineCalendar === 'function') renderInlineCalendar();
     openDayModal(_calendarSelectedDate); // przeładuj widok dnia
+  }
+}
+
+/* ============================================================
+   AKCJE NA WYDARZENIACH KALENDARZA — usuwanie i przesuwanie
+   Każdy typ wydarzenia ma inne miejsce w bazie:
+     - followup       → clients (legacy) lub followups (nowa tabela)
+     - task           → tasks
+     - installation   → clients.purchases[].installDate
+     - service        → service_visits albo clients.purchases[].nextServiceDate albo installed_units
+     - survey         → site_surveys
+     - custom         → calendar_events
+   ============================================================ */
+
+/* Buduje HTML z guzikami akcji dla danego wydarzenia — zwraca <div class="day-event-item__actions">... */
+function _buildEventActions(e, currentDateStr) {
+  // Serializuj event do string żeby dało się przekazać do onclick (unikamy stringify JSON w atrybucie)
+  const payloadJson = JSON.stringify({
+    type: e.type,
+    date: e.date,
+    clientId: e.clientId || null,
+    purchaseIdx: (typeof e.purchaseIdx === 'number') ? e.purchaseIdx : null,
+    taskId: e.taskId || null,
+    surveyId: e.surveyId || null,
+    serviceVisitId: e.serviceVisitId || null,
+    installedUnitId: e.installedUnitId || null,
+    customEventId: e.customEventId || null,
+    title: e.title || ''
+  }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  return `
+    <div class="day-event-item__actions">
+      <button onclick="_rescheduleEvent('${payloadJson}')" title="Zmień datę" style="color:#0F3461;">
+        <i class="ti ti-calendar-event"></i>
+      </button>
+      <button onclick="_deleteEvent('${payloadJson}')" title="Usuń" style="color:#DC2626;">
+        <i class="ti ti-trash"></i>
+      </button>
+    </div>
+  `;
+}
+
+/* Parsuje payload z onclick + prompt o nową datę */
+async function _rescheduleEvent(payloadStr) {
+  let p;
+  try { p = JSON.parse(payloadStr); } catch(e) { showToast('Błąd akcji'); return; }
+  const newDate = prompt(`Nowa data dla „${p.title}":\n(format: YYYY-MM-DD, np. 2026-08-15)`, p.date);
+  if (!newDate || newDate === p.date) return;
+  // Walidacja daty
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate) || isNaN(new Date(newDate).getTime())) {
+    showToast('Nieprawidłowy format daty (użyj YYYY-MM-DD)');
+    return;
+  }
+  await _applyEventReschedule(p, newDate);
+}
+
+async function _applyEventReschedule(p, newDate) {
+  try {
+    if (p.type === 'custom' && p.customEventId) {
+      // calendar_events.event_date
+      await sbFetch('/rest/v1/calendar_events?id=eq.' + encodeURIComponent(p.customEventId), 'PATCH', { event_date: newDate });
+      if (typeof loadCustomCalendarEvents === 'function') await loadCustomCalendarEvents();
+
+    } else if (p.type === 'task' && p.taskId) {
+      // tasks.due_at (datetime) — zmieniamy tylko datę, zachowujemy godzinę
+      const t = (Array.isArray(tasksDb) ? tasksDb : []).find(x => x.id === p.taskId);
+      let due;
+      if (t?.due_at) {
+        const orig = new Date(t.due_at);
+        const [y,m,d] = newDate.split('-').map(Number);
+        orig.setFullYear(y, m-1, d);
+        due = orig.toISOString();
+      } else {
+        due = new Date(newDate + 'T09:00:00').toISOString();
+      }
+      await sbFetch('/rest/v1/tasks?id=eq.' + encodeURIComponent(p.taskId), 'PATCH', { due_at: due });
+      if (typeof loadTasks === 'function') await loadTasks();
+
+    } else if (p.type === 'survey' && p.surveyId) {
+      await sbFetch('/rest/v1/site_surveys?id=eq.' + encodeURIComponent(p.surveyId), 'PATCH', { survey_date: newDate });
+      if (typeof loadSiteSurveys === 'function') await loadSiteSurveys();
+
+    } else if (p.type === 'service' && p.serviceVisitId) {
+      await sbFetch('/rest/v1/service_visits?id=eq.' + encodeURIComponent(p.serviceVisitId), 'PATCH', { scheduled_date: newDate });
+      if (typeof loadServiceVisits === 'function') await loadServiceVisits();
+
+    } else if (p.type === 'service' && p.installedUnitId) {
+      // Serwis wynikający z next_service_date urządzenia — zmiana daty pod urządzeniem
+      await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(p.installedUnitId), 'PATCH', { next_service_date: newDate });
+      if (typeof loadInstalledUnits === 'function') await loadInstalledUnits();
+
+    } else if ((p.type === 'installation' || p.type === 'service') && p.clientId && p.purchaseIdx !== null) {
+      // Instalacje/serwisy z clients.purchases[]
+      const client = clientsDb.find(c => c.id === p.clientId);
+      if (!client || !Array.isArray(client.purchases) || !client.purchases[p.purchaseIdx]) {
+        throw new Error('Nie znaleziono zakupu w karcie klienta');
+      }
+      const purchase = client.purchases[p.purchaseIdx];
+      if (p.type === 'installation') purchase.installDate = newDate;
+      else purchase.nextServiceDate = newDate;
+      if (typeof saveClientToSupabase === 'function') await saveClientToSupabase(client);
+
+    } else if (p.type === 'followup' && p.clientId) {
+      // Legacy followup z clients.followUpDate
+      const client = clientsDb.find(c => c.id === p.clientId);
+      if (client) {
+        client.followUpDate = newDate;
+        if (typeof saveClientToSupabase === 'function') await saveClientToSupabase(client);
+      }
+
+    } else {
+      throw new Error('Ten typ wydarzenia nie obsługuje przenoszenia');
+    }
+
+    showToast('Przeniesiono na ' + newDate);
+    if (typeof renderInlineCalendar === 'function') renderInlineCalendar();
+    if (_calendarSelectedDate) openDayModal(newDate);
+  } catch(e) {
+    console.error('_applyEventReschedule error:', e);
+    showToast('Błąd przenoszenia: ' + String(e.message || e).slice(0, 120));
+  }
+}
+
+async function _deleteEvent(payloadStr) {
+  let p;
+  try { p = JSON.parse(payloadStr); } catch(e) { showToast('Błąd akcji'); return; }
+  if (!confirm(`Usunąć „${p.title}" z kalendarza?`)) return;
+
+  try {
+    if (p.type === 'custom' && p.customEventId) {
+      if (typeof deleteCustomCalendarEvent === 'function') await deleteCustomCalendarEvent(p.customEventId);
+
+    } else if (p.type === 'task' && p.taskId) {
+      await sbFetch('/rest/v1/tasks?id=eq.' + encodeURIComponent(p.taskId), 'DELETE');
+      if (typeof loadTasks === 'function') await loadTasks();
+
+    } else if (p.type === 'survey' && p.surveyId) {
+      if (!confirm('To całkowicie usunie wizję lokalną z bazy (nie tylko z kalendarza). Kontynuować?')) return;
+      await sbFetch('/rest/v1/site_surveys?id=eq.' + encodeURIComponent(p.surveyId), 'DELETE');
+      if (typeof loadSiteSurveys === 'function') await loadSiteSurveys();
+
+    } else if (p.type === 'service' && p.serviceVisitId) {
+      await sbFetch('/rest/v1/service_visits?id=eq.' + encodeURIComponent(p.serviceVisitId), 'DELETE');
+      if (typeof loadServiceVisits === 'function') await loadServiceVisits();
+
+    } else if (p.type === 'service' && p.installedUnitId) {
+      // Wyczyść tylko datę następnego serwisu (nie usuwaj urządzenia)
+      await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(p.installedUnitId), 'PATCH', { next_service_date: null });
+      if (typeof loadInstalledUnits === 'function') await loadInstalledUnits();
+
+    } else if ((p.type === 'installation' || p.type === 'service') && p.clientId && p.purchaseIdx !== null) {
+      const client = clientsDb.find(c => c.id === p.clientId);
+      if (!client || !Array.isArray(client.purchases) || !client.purchases[p.purchaseIdx]) {
+        throw new Error('Nie znaleziono zakupu w karcie klienta');
+      }
+      const purchase = client.purchases[p.purchaseIdx];
+      if (p.type === 'installation') purchase.installDate = null;
+      else purchase.nextServiceDate = null;
+      if (typeof saveClientToSupabase === 'function') await saveClientToSupabase(client);
+
+    } else if (p.type === 'followup' && p.clientId) {
+      const client = clientsDb.find(c => c.id === p.clientId);
+      if (client) {
+        client.followUpDate = null;
+        client.followUpNote = null;
+        if (typeof saveClientToSupabase === 'function') await saveClientToSupabase(client);
+      }
+
+    } else {
+      throw new Error('Ten typ wydarzenia nie obsługuje usuwania z tego widoku');
+    }
+
+    showToast('Usunięto');
+    if (typeof renderInlineCalendar === 'function') renderInlineCalendar();
+    if (_calendarSelectedDate) openDayModal(_calendarSelectedDate);
+  } catch(e) {
+    console.error('_deleteEvent error:', e);
+    showToast('Błąd usuwania: ' + String(e.message || e).slice(0, 120));
   }
 }
 
@@ -12953,7 +13139,12 @@ function generatePdf() {
     // wycinamy stary prefix i wstawiamy aktualny.
     const cleanVariantName = (raw) => {
       if (!raw) return '';
-      return String(raw).replace(/^\s*(?:Wariant|Opcja|Konfiguracja)\s*\d+\s*[—\-–:]\s*/i, '').trim();
+      let s = String(raw);
+      // Prefix: "Wariant 1 — X" / "Opcja 2 - X" / "Konfiguracja 3: X"
+      s = s.replace(/^\s*(?:Wariant|Opcja|Konfiguracja)\s*\d+\s*[—\-–:]\s*/i, '');
+      // Suffix: "X — wariant 1" / "X - wariant 2" (występuje w nazwach z wizarda HP)
+      s = s.replace(/\s*[—\-–:]\s*(?:wariant|opcja|konfiguracja)\s*\d+\s*$/i, '');
+      return s.trim();
     };
     const baseName = cleanVariantName(v.name) || `Konfiguracja ${vIdx + 1}`;
     const variantHeaderText = `Wariant ${vIdx + 1} — ${baseName}`;
@@ -13200,6 +13391,10 @@ function generatePdf() {
         }
       });
     } else if (v.type === 'multi') {
+      if (!v.outdoor) {
+        // Uszkodzony wariant — pomiń w PDF zamiast się wywalać
+        return { table: { widths: ['*'], body: [[{ text: 'Wariant uszkodzony — brak jednostki zewnętrznej', italics: true, color: '#94A3B8', fontSize: 9 }]] } };
+      }
       const out = getProductFromPool('multi_zew', v.outdoor.productIdx) || DB.multi_zew[v.outdoor.productIdx] || { marka: '', model: '', cena: 0, link: '' };
       const outNet = (v.outdoorPriceOverride != null ? v.outdoorPriceOverride : out.cena);
       const outBr = roundUp(outNet * vatMultLocal);
@@ -14975,6 +15170,25 @@ function loadOfferSnapshot(snap, opts) {
     if (state.customOfferTitle === undefined) state.customOfferTitle = '';
     if (state.realizationsUrl === undefined) state.realizationsUrl = 'https://4climat.pl/realizacja/';
     if (!Array.isArray(state.attachments)) state.attachments = [];
+
+    // Sanityzacja: usuń uszkodzone warianty AC (multi bez outdoor / indoor bez tablicy)
+    // które spowodowałyby wywalenie renderowania z „Cannot read properties of undefined (reading 'productIdx')"
+    if (Array.isArray(state.variants)) {
+      state.variants = state.variants.filter(v => {
+        if (!v || !v.type) return false;
+        if (v.type === 'split') return Array.isArray(v.units);
+        if (v.type === 'multi') return v.outdoor && typeof v.outdoor.productIdx !== 'undefined' && Array.isArray(v.indoor);
+        return true;
+      });
+      // Wyczyść też multiSystems w splitach jeśli mają śmieci
+      state.variants.forEach(v => {
+        if (Array.isArray(v.multiSystems)) {
+          v.multiSystems = v.multiSystems.filter(ms => ms && ms.outdoor && typeof ms.outdoor.productIdx !== 'undefined' && Array.isArray(ms.indoor));
+        }
+      });
+    } else {
+      state.variants = [];
+    }
     if (state.extrasShowPrice === undefined) state.extrasShowPrice = true;
     if (!state.owsKey) state.owsKey = 'split_multi';
 
@@ -17603,13 +17817,33 @@ async function _calSwitchTab(tab) {
   document.getElementById('calTabKadromierzContent').style.display = tab === 'kadromierz' ? '' : 'none';
   if (tab === 'kadromierz') {
     if (!_kdCurrentWeekStart) _kdCurrentWeekStart = _kdMondayOf(new Date());
-    // Upewnij się że mamy zespół załadowany — bez tego grid jest pusty
-    if (!Array.isArray(teamMembersDb) || teamMembersDb.length === 0) {
-      if (typeof loadTeamMembers === 'function') {
-        try { await loadTeamMembers(); } catch(e) { console.warn('loadTeamMembers failed:', e); }
+    // Natychmiast pokaż wskaźnik zmiany placeholder → cokolwiek żeby było widać że coś się dzieje
+    const grid = document.getElementById('kdGrid');
+    if (grid) grid.innerHTML = '<div style="padding:30px;text-align:center;color:#0F3461;font-size:12px;"><i class="ti ti-loader" style="font-size:20px;"></i><br>Ładowanie grafiku pracy…</div>';
+    // Zespół — załaduj jeśli brak; NIGDY nie blokuj tego kroku
+    try {
+      if ((!Array.isArray(teamMembersDb) || teamMembersDb.length === 0) && typeof loadTeamMembers === 'function') {
+        await loadTeamMembers();
+      }
+    } catch(e) {
+      console.warn('loadTeamMembers in tab switch failed:', e);
+    }
+    // Render — nawet jeśli zespół się nie załadował, _kdRender pokaże diagnostyczny komunikat
+    try {
+      await _kdRender();
+    } catch(e) {
+      console.error('_kdRender crashed:', e);
+      if (grid) {
+        grid.innerHTML = `
+          <div style="padding:30px 20px;text-align:center;color:#991B1B;background:#FEF2F2;border-radius:8px;">
+            <i class="ti ti-alert-triangle" style="font-size:24px;"></i>
+            <div style="margin-top:8px;font-size:13px;font-weight:600;">Nie udało się załadować grafiku</div>
+            <div style="margin-top:6px;font-size:11.5px;font-family:monospace;color:#7F1D1D;">${escapeHtml(String(e.message || e).slice(0, 250))}</div>
+            <div style="margin-top:10px;font-size:11px;color:#64748B;">Otwórz konsolę przeglądarki (F12) — pełny błąd jest tam. Prawdopodobnie brak wykonanego SQL <code>migration_shifts.sql</code>.</div>
+          </div>
+        `;
       }
     }
-    _kdRender();
   }
 }
 
