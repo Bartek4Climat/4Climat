@@ -2234,11 +2234,6 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         <i class="ti ti-map-pin v2-sidebar__item-icon" aria-hidden="true"></i>
         <span class="v2-sidebar__item-label">Wizja lokalna</span>
       </button>
-      <button class="v2-sidebar__item v2-sidebar__item--disabled" data-section="contracts" onclick="v2ShowSection('contracts')">
-        <i class="ti ti-file-certificate v2-sidebar__item-icon" aria-hidden="true"></i>
-        <span class="v2-sidebar__item-label">Umowy i protokoły</span>
-        <span class="v2-sidebar__item-soon">Wkrótce</span>
-      </button>
       <button class="v2-sidebar__item" data-section="warehouse" onclick="v2ShowSection('warehouse')">
         <i class="ti ti-package v2-sidebar__item-icon" aria-hidden="true"></i>
         <span class="v2-sidebar__item-label">Magazyn</span>
@@ -2252,10 +2247,9 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         <span class="v2-sidebar__item-label">Serwisy</span>
         <span class="v2-sidebar__item-badge" id="servicesSidebarBadge" style="display:none;background:#DC2626;color:#fff;padding:1px 6px;border-radius:9px;font-size:9.5px;font-weight:700;margin-left:auto;"></span>
       </button>
-      <button class="v2-sidebar__item v2-sidebar__item--disabled" data-section="contractors" onclick="v2ShowSection('contractors')">
-        <i class="ti ti-tools v2-sidebar__item-icon" aria-hidden="true"></i>
-        <span class="v2-sidebar__item-label">Podwykonawcy</span>
-        <span class="v2-sidebar__item-soon">Wkrótce</span>
+      <button class="v2-sidebar__item" data-section="contracts" onclick="v2ShowSection('contracts')">
+        <i class="ti ti-file-text v2-sidebar__item-icon" aria-hidden="true"></i>
+        <span class="v2-sidebar__item-label">Dokumenty</span>
       </button>
 
       <div class="v2-sidebar__group-label">Baza wiedzy</div>
@@ -2687,17 +2681,6 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         </div>
       </section>
 
-      <!-- SEKCJA: UMOWY (Wkrótce) -->
-      <section id="v2-section-contracts" class="v2-section">
-        <h1 class="v2-page-title">Umowy i protokoły</h1>
-        <p class="v2-page-subtitle">Generowanie umów montażu, protokołów odbioru, uruchomienia i serwisu.</p>
-        <div class="v2-placeholder">
-          <div class="v2-placeholder__icon"><i class="ti ti-file-certificate" aria-hidden="true"></i></div>
-          <div class="v2-placeholder__title">Moduł w trakcie budowy</div>
-          <div class="v2-placeholder__text">Moduł umów i protokołów pojawi się w kolejnej iteracji. Będzie generował umowy montażu, protokoły odbioru i uruchomienia — z podpisem klienta na ekranie.</div>
-        </div>
-      </section>
-
       <!-- SEKCJA: MAGAZYN (Wkrótce) -->
       <section id="v2-section-warehouse" class="v2-section">
         <h1 class="v2-page-title">Magazyn</h1>
@@ -2806,14 +2789,41 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         </div>
       </section>
 
-      <!-- SEKCJA: PODWYKONAWCY (Wkrótce) -->
-      <section id="v2-section-contractors" class="v2-section">
-        <h1 class="v2-page-title">Podwykonawcy</h1>
-        <p class="v2-page-subtitle">Karty zleceń dla ekip montażowych z informacjami z wizji lokalnej.</p>
-        <div class="v2-placeholder">
-          <div class="v2-placeholder__icon"><i class="ti ti-tools" aria-hidden="true"></i></div>
-          <div class="v2-placeholder__title">Moduł w trakcie budowy</div>
-          <div class="v2-placeholder__text">Moduł podwykonawców pojawi się w kolejnej iteracji. Będzie generował PDF-y montażowe z adresem, kontaktem do klienta, urządzeniami, trasą instalacji i zdjęciami z wizji.</div>
+      <!-- SEKCJA: DOKUMENTY (Umowy, aneksy, protokoły) -->
+      <section id="v2-section-contracts" class="v2-section">
+        <h1 class="v2-page-title">Dokumenty</h1>
+        <p class="v2-page-subtitle">Umowy, aneksy i protokoły odbiorcze — z automatyczną numeracją i archiwum snapshotów PDF.</p>
+
+        <div class="v2-toolbar">
+          <label class="v2-toolbar__label">Typ:</label>
+          <select id="ctrFilterType" class="v2-toolbar__select" onchange="renderContractsList()">
+            <option value="all">Wszystkie</option>
+            <option value="umowa">Umowa</option>
+            <option value="umowa_serwisowa">Umowa serwisowa</option>
+            <option value="aneks">Aneks</option>
+            <option value="protokol_prac">Protokół zakończenia prac</option>
+            <option value="protokol_etapu">Protokół zakończenia etapu</option>
+          </select>
+          <label class="v2-toolbar__label">Status:</label>
+          <select id="ctrFilterStatus" class="v2-toolbar__select" onchange="renderContractsList()">
+            <option value="all">Wszystkie</option>
+            <option value="draft">Szkic</option>
+            <option value="active">Aktywna</option>
+            <option value="completed">Zakończona</option>
+            <option value="terminated">Rozwiązana</option>
+          </select>
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input id="ctrSearch" type="text" placeholder="Szukaj po numerze, kliencie, przedmiocie..." oninput="renderContractsList()">
+          </div>
+          <button class="v2-btn v2-btn--primary" onclick="openContractCreator()">
+            <i class="ti ti-plus" aria-hidden="true"></i>
+            Nowy dokument
+          </button>
+        </div>
+
+        <div class="v2-panel" id="contractsListWrap" style="margin-top:12px;padding:0;">
+          <div style="padding:40px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
         </div>
       </section>
 
@@ -7086,6 +7096,7 @@ function init() {
   // Załaduj serwisy i urządzenia (dla sidebar badge + kalendarza)
   if (typeof loadServiceVisits === 'function') loadServiceVisits();
   if (typeof loadInstalledUnits === 'function') loadInstalledUnits();
+  if (typeof loadContracts === 'function') loadContracts();
   updateClientStatusLabel();
   const showPriceEl = document.getElementById('extrasShowPrice');
   if (showPriceEl) showPriceEl.checked = state.extrasShowPrice !== false;
@@ -15835,11 +15846,10 @@ const V2_SECTION_LABELS = {
   'funnel': 'Lejek sprzedażowy',
   'calendar': 'Kalendarz',
   'site-survey': 'Wizja lokalna',
-  'contracts': 'Umowy i protokoły',
+  'contracts': 'Dokumenty',
   'warehouse': 'Magazyn',
   'installed_units': 'Zamontowane urządzenia',
   'services': 'Serwisy',
-  'contractors': 'Podwykonawcy',
   'products': 'Produkty klimatyzacji',
   'hp_products': 'Produkty pomp ciepła',
   'tasks': 'Zadania',
@@ -15909,6 +15919,13 @@ function v2ShowSection(id) {
     setTimeout(async () => {
       await Promise.all([loadServiceVisits(), loadInstalledUnits()]);
       renderServicesList();
+    }, 50);
+  }
+  // Hook: Dokumenty (umowy, aneksy, protokoły)
+  if (id === 'contracts' && typeof loadContracts === 'function') {
+    setTimeout(async () => {
+      await loadContracts();
+      renderContractsList();
     }, 50);
   }
   // Hook: Wizja lokalna — załaduj listę wizji
@@ -18269,6 +18286,1419 @@ async function _kdDeleteShift(shiftId) {
 }
 
 /* ============================================================
+   DOKUMENTY: umowy, aneksy, protokoły
+   Jedna tabela `contracts` z polem `contract_type`.
+   Snapshot w JSON żeby móc regenerować PDF w dowolnym momencie.
+   ============================================================ */
+
+let contractsDb = [];
+let _ctrEditing = null;
+
+const CTR_TYPE_LABELS = {
+  umowa:            'Umowa',
+  umowa_serwisowa:  'Umowa serwisowa',
+  aneks:            'Aneks',
+  protokol_prac:    'Protokół zakończenia prac',
+  protokol_etapu:   'Protokół zakończenia etapu'
+};
+const CTR_TYPE_COLORS = {
+  umowa:            '#0F3461',
+  umowa_serwisowa:  '#7C3AED',
+  aneks:            '#D97706',
+  protokol_prac:    '#059669',
+  protokol_etapu:   '#0891B2'
+};
+const CTR_STATUS_LABELS = {
+  draft:      'Szkic',
+  active:     'Aktywna',
+  completed:  'Zakończona',
+  terminated: 'Rozwiązana'
+};
+const CTR_STATUS_COLORS = {
+  draft:      '#94A3B8',
+  active:     '#059669',
+  completed:  '#0F3461',
+  terminated: '#DC2626'
+};
+
+/* Domyślne dane firmy 4Climat (z ust. #4 — z możliwością zmiany w formularzu) */
+const CTR_COMPANY_DEFAULT = {
+  name:      '4Climat Tomasz Dobryniewski Consulting',
+  short:     '4Climat',
+  city:      'Wrocław',
+  address:   'ul. Braniborska 14, 53-680 Wrocław',
+  nip:       '8970001240',
+  regon:     '529540675',
+  representedBy: 'Tomasz Dobryniewski'
+};
+
+function _ctrFmtDate(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleDateString('pl-PL'); } catch(e) { return iso; }
+}
+function _ctrFmtPln(n) {
+  const v = Number(n || 0);
+  return v.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
+}
+
+/* Defensywny helper — usuwa prefix "Firma " z nazwy (case-insensitive), żeby przy
+   dodawaniu "Firmą " / "Firma " nie było duplikacji. Obsługuje snapshoty starych
+   umów gdzie nazwa firmy była zapisana z prefixem. */
+function _ctrCleanCompanyName(name) {
+  return String(name || CTR_COMPANY_DEFAULT.name).replace(/^\s*Firma\s+/i, '').trim();
+}
+
+/* Ładowanie listy dokumentów z Supabase */
+async function loadContracts() {
+  if (!currentUser) return;
+  try {
+    const data = await sbFetch('/rest/v1/contracts?select=*&order=contract_date.desc,created_at.desc');
+    contractsDb = data || [];
+  } catch(e) {
+    console.warn('contracts load error:', e.message);
+    contractsDb = [];
+    if (String(e.message).includes('42P01')) {
+      showToast('Brak tabeli contracts — wykonaj SQL migration_contracts.sql');
+    }
+  }
+}
+
+/* Rezerwacja kolejnego numeru z counter'a (RPC) */
+async function _ctrNextNumber(contractType) {
+  const year = new Date().getFullYear();
+  try {
+    const res = await sbFetch('/rest/v1/rpc/next_contract_number', 'POST', {
+      p_year: year,
+      p_type: contractType || 'umowa'
+    });
+    // sbFetch dla RPC zwraca liczbę bezpośrednio
+    const n = Array.isArray(res) ? res[0] : res;
+    return parseInt(n) || 1;
+  } catch(e) {
+    console.warn('next_contract_number RPC failed:', e);
+    // Fallback lokalny — wyszukaj w contractsDb największy numer dla tego roku
+    const yearStr = String(year);
+    const nums = contractsDb
+      .filter(c => c.contract_type === 'umowa' && c.contract_number && c.contract_number.endsWith('/' + yearStr))
+      .map(c => parseInt((c.contract_number.split('/')[0]) || '0'))
+      .filter(n => !isNaN(n));
+    return (nums.length ? Math.max(...nums) : 0) + 1;
+  }
+}
+
+/* Format numeru: N/MM/RRRR (roczna numeracja) */
+function _ctrFormatNumber(n, date) {
+  const d = date ? new Date(date) : new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${n}/${mm}/${d.getFullYear()}`;
+}
+
+/* Renderowanie listy dokumentów */
+function renderContractsList() {
+  const wrap = document.getElementById('contractsListWrap');
+  if (!wrap) return;
+  const typeF   = document.getElementById('ctrFilterType')?.value || 'all';
+  const statusF = document.getElementById('ctrFilterStatus')?.value || 'all';
+  const search  = (document.getElementById('ctrSearch')?.value || '').toLowerCase().trim();
+
+  let list = [...contractsDb];
+  if (typeF !== 'all')   list = list.filter(c => c.contract_type === typeF);
+  if (statusF !== 'all') list = list.filter(c => c.status === statusF);
+  if (search) {
+    list = list.filter(c => {
+      const client = clientsDb.find(x => x.id === c.client_id);
+      const blob = [c.contract_number, client?.name, JSON.stringify(c.data || {})].filter(Boolean).join(' ').toLowerCase();
+      return blob.includes(search);
+    });
+  }
+
+  if (list.length === 0) {
+    wrap.innerHTML = `
+      <div style="padding:40px 20px;text-align:center;color:#64748B;">
+        <i class="ti ti-file-off" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">${contractsDb.length === 0 ? 'Brak dokumentów' : 'Brak wyników dla filtrów'}</div>
+        <div style="margin-top:6px;font-size:12px;">${contractsDb.length === 0 ? 'Kliknij „Nowy dokument" aby utworzyć pierwszą umowę lub protokół.' : 'Zmień filtry lub wyszukiwanie.'}</div>
+      </div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div style="max-height:calc(100vh - 380px);overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;z-index:1;">
+          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Typ</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Numer</th>
+            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Klient</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Data</th>
+            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Kwota brutto</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Status</th>
+            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map(c => {
+            const client = clientsDb.find(x => x.id === c.client_id);
+            const typeColor = CTR_TYPE_COLORS[c.contract_type] || '#64748B';
+            const statusColor = CTR_STATUS_COLORS[c.status] || '#94A3B8';
+            return `
+              <tr style="border-bottom:1px solid #F1F5F9;">
+                <td style="padding:9px 14px;font-size:11px;white-space:nowrap;">
+                  <span style="padding:2px 8px;background:${typeColor}15;color:${typeColor};border-radius:10px;font-weight:600;">${escapeHtml(CTR_TYPE_LABELS[c.contract_type] || c.contract_type)}</span>
+                </td>
+                <td style="padding:9px 14px;font-size:12px;color:#0A2647;font-weight:700;font-family:monospace;">${escapeHtml(c.contract_number || '—')}</td>
+                <td style="padding:9px 14px;font-size:12px;color:#334155;">${escapeHtml(client?.name || '—')}</td>
+                <td style="padding:9px 14px;font-size:11.5px;text-align:center;color:#64748B;white-space:nowrap;">${_ctrFmtDate(c.contract_date)}</td>
+                <td style="padding:9px 14px;font-size:12px;text-align:right;color:#0F3461;font-weight:600;white-space:nowrap;">${c.total_gross ? _ctrFmtPln(c.total_gross) : '—'}</td>
+                <td style="padding:9px 14px;font-size:11px;text-align:center;">
+                  <span style="padding:2px 8px;background:${statusColor}15;color:${statusColor};border-radius:5px;font-weight:600;">${escapeHtml(CTR_STATUS_LABELS[c.status] || c.status)}</span>
+                </td>
+                <td style="padding:9px 14px;text-align:center;white-space:nowrap;">
+                  <button onclick="previewContractPdf('${c.id}')" title="Podgląd PDF" style="padding:5px 8px;background:#0F3461;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px;">
+                    <i class="ti ti-eye" style="font-size:11px;"></i> PDF
+                  </button>
+                  <button onclick="openContractEditor('${c.id}')" title="Edytuj" style="padding:5px 8px;background:#F1F5F9;color:#0F3461;border:none;border-radius:5px;font-size:11px;cursor:pointer;margin-right:4px;">
+                    <i class="ti ti-pencil" style="font-size:11px;"></i>
+                  </button>
+                  <button onclick="deleteContract('${c.id}')" title="Usuń" style="padding:5px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;">
+                    <i class="ti ti-trash" style="font-size:11px;"></i>
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* Otwiera modal wyboru typu dokumentu (kreator start) */
+function openContractCreator(prefillClientId) {
+  let mod = document.getElementById('ctrCreatorModal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'ctrCreatorModal';
+    mod.className = 'modal-backdrop';
+    document.body.appendChild(mod);
+  }
+  const types = ['umowa', 'umowa_serwisowa', 'aneks', 'protokol_prac', 'protokol_etapu'];
+  const descriptions = {
+    umowa:            'Umowa na wykonanie instalacji klimatyzacji, pomp ciepła lub wentylacji. Zawiera tabelę urządzeń, warunki płatności, terminy.',
+    umowa_serwisowa:  'Umowa abonamentowa lub jednorazowa na świadczenie usług serwisowych i naprawczych.',
+    aneks:            'Modyfikacja istniejącej umowy — zmiana terminu, zakresu, ceny, dopisanie etapów. Wymaga wskazania umowy nadrzędnej.',
+    protokol_prac:    'Odbiór końcowy — potwierdzenie wykonania wszystkich prac z danej umowy.',
+    protokol_etapu:   'Odbiór częściowy — potwierdzenie wykonania jednego etapu (etap I, II itd.).'
+  };
+  const availableTypes = types.filter(t => {
+    // W Etapie 1 aktywne są tylko umowa i protokol_prac (odpowiedź na plan implementacji)
+    return t === 'umowa' || t === 'protokol_prac';
+  });
+
+  mod.innerHTML = `
+    <div class="modal" style="max-width:720px;">
+      <div class="modal__head" style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#0A2647;">Nowy dokument</div>
+          <div style="font-size:11.5px;color:#64748B;margin-top:2px;">Wybierz typ dokumentu który chcesz utworzyć</div>
+        </div>
+        <button onclick="_ctrCloseCreator()" style="background:transparent;border:none;color:#64748B;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="modal__body" style="padding:16px 18px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          ${types.map(t => {
+            const enabled = availableTypes.includes(t);
+            const color = CTR_TYPE_COLORS[t];
+            return `
+              <button ${enabled ? `onclick="_ctrStartCreation('${t}', ${prefillClientId ? `'${prefillClientId}'` : 'null'})"` : 'disabled'}
+                style="text-align:left;padding:16px;background:#fff;border:1.5px solid ${enabled ? '#E2E8F0' : '#F1F5F9'};border-radius:10px;cursor:${enabled ? 'pointer' : 'not-allowed'};font-family:inherit;opacity:${enabled ? '1' : '.5'};position:relative;transition:border-color .15s, transform .15s;"
+                ${enabled ? `onmouseover="this.style.borderColor='${color}'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='#E2E8F0'; this.style.transform='none'"` : ''}>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                  <div style="width:36px;height:36px;background:${color}15;border-radius:8px;display:flex;align-items:center;justify-content:center;color:${color};"><i class="ti ti-file-text" style="font-size:18px;"></i></div>
+                  <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:700;color:#0A2647;">${CTR_TYPE_LABELS[t]}</div>
+                    ${!enabled ? '<div style="font-size:10px;color:#94A3B8;font-weight:500;">Wkrótce</div>' : ''}
+                  </div>
+                </div>
+                <div style="font-size:11px;color:#64748B;line-height:1.4;">${descriptions[t]}</div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  mod.classList.add('modal-backdrop--open');
+}
+
+function _ctrCloseCreator() {
+  const mod = document.getElementById('ctrCreatorModal');
+  if (mod) mod.classList.remove('modal-backdrop--open');
+}
+
+/* Inicjalizuje pustą strukturę contract w zależności od typu i otwiera edytor */
+async function _ctrStartCreation(contractType, prefillClientId) {
+  _ctrCloseCreator();
+  const today = new Date().toISOString().slice(0, 10);
+  const nextNum = await _ctrNextNumber(contractType);
+  const contractNumber = _ctrFormatNumber(nextNum, today);
+
+  _ctrEditing = {
+    id: null,
+    contract_type: contractType,
+    contract_number: contractNumber,
+    client_id: prefillClientId || null,
+    parent_contract_id: null,
+    offer_id: null,
+    contract_date: today,
+    place_signed: 'Wrocław',
+    status: 'draft',
+    total_net: null,
+    total_gross: null,
+    vat_rate: 23,
+    data: _ctrBlankData(contractType)
+  };
+  _ctrRenderEditor();
+}
+
+function _ctrBlankData(type) {
+  // Domyślne pola danych per typ dokumentu
+  if (type === 'umowa') {
+    return {
+      company: { ...CTR_COMPANY_DEFAULT },
+      scopeType: 'klimatyzacja',   // 'klimatyzacja' | 'pompa_ciepla' | 'wentylacja' | 'inne'
+      scopeOther: '',
+      buildingAddress: '',
+      buildingDescription: '',      // § 1 ust. 2 — "Lokal mieszkalny znajdujący się we Wrocławiu..."
+      items: [],                    // [{ name, unit: 'szt.', qty: 1, priceNet: 0 }]
+
+      // Warunki firmowe (można zmienić w formularzu, domyślnie 4Climat)
+      advancePercent: 50,           // procent zaliczki
+      bankName: 'Erste Bank Polski',
+      bankAccount: '88 1090 2402 0000 0001 5962 4054',
+      extraWorkRate: 230,           // stawka za roboczogodzinę prac dodatkowych (netto)
+      warrantyEmail: 'kontakt@4climat.pl',
+      penaltyNoAccess: 600,         // kara umowna za nieudostępnienie miejsca (zł)
+      withdrawalPercent: 20,        // odstępne w % Wynagrodzenia Prognozowanego
+
+      // Postanowienia szczegółowe (opcjonalne, § 9 ust. 7)
+      specialTerms: '',
+
+      // Harmonogram realizacji — [{stage: 'I', description: '...', plannedDate: '2026-09-15'}]
+      scheduleItems: [],
+
+      notes: ''
+    };
+  }
+  if (type === 'protokol_prac') {
+    return {
+      company: { ...CTR_COMPANY_DEFAULT },
+      relatedContractRef: '',      // "Umowa 4/07/2026 z dn. 20.07.2026"
+      buildingAddress: '',         // gdzie wykonano prace
+      workDescription: '',         // rodzaj wykonanych prac
+      completionDate: new Date().toISOString().slice(0, 10),
+      reservations: 'NIE ZGŁOSZONO ŻADNYCH ZASTRZEŻEŃ',
+      notes: ''
+    };
+  }
+  return {};
+}
+
+/* Modal edycji dokumentu — formularz per typ */
+function openContractEditor(contractId) {
+  if (contractId) {
+    const c = contractsDb.find(x => x.id === contractId);
+    if (!c) { showToast('Nie znaleziono dokumentu'); return; }
+    _ctrEditing = JSON.parse(JSON.stringify(c));
+    // Uzupełnij brakujące pola
+    if (!_ctrEditing.data) _ctrEditing.data = _ctrBlankData(_ctrEditing.contract_type);
+    if (!_ctrEditing.data.company) _ctrEditing.data.company = { ...CTR_COMPANY_DEFAULT };
+  }
+  _ctrRenderEditor();
+}
+
+function _ctrRenderEditor() {
+  const c = _ctrEditing;
+  if (!c) return;
+  let mod = document.getElementById('ctrEditorModal');
+  if (!mod) {
+    mod = document.createElement('div');
+    mod.id = 'ctrEditorModal';
+    mod.className = 'modal-backdrop';
+    document.body.appendChild(mod);
+  }
+  const isNew = !c.id;
+  const typeLabel = CTR_TYPE_LABELS[c.contract_type] || c.contract_type;
+
+  mod.innerHTML = `
+    <div class="modal" style="max-width:900px;">
+      <div class="modal__head" style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0A2647;">${isNew ? 'Nowy dokument: ' : 'Edycja: '}${typeLabel} <span style="font-family:monospace;color:${CTR_TYPE_COLORS[c.contract_type]};margin-left:6px;">nr ${escapeHtml(c.contract_number || '—')}</span></div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">Wypełnij dane, zapisz, wygeneruj PDF</div>
+        </div>
+        <button onclick="_ctrCloseEditor()" style="background:transparent;border:none;color:#64748B;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="modal__body" style="padding:16px 18px;max-height:calc(100vh - 200px);overflow-y:auto;">
+        ${_ctrRenderCommonHeader(c)}
+        ${c.contract_type === 'umowa' ? _ctrRenderUmowaFields(c) : ''}
+        ${c.contract_type === 'protokol_prac' ? _ctrRenderProtokolPracFields(c) : ''}
+      </div>
+      <div class="modal__foot" style="padding:12px 18px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;gap:8px;">
+        <div>
+          ${!isNew ? `<button onclick="deleteContract('${c.id}')" style="padding:8px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-trash"></i> Usuń</button>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="_ctrCloseEditor()" style="padding:8px 14px;background:transparent;color:#334155;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button onclick="_ctrSaveOnly()" style="padding:8px 14px;background:#F1F5F9;color:#0F3461;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-device-floppy"></i> Zapisz</button>
+          <button onclick="_ctrSaveAndPreview()" style="padding:8px 18px;background:#0A2647;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;"><i class="ti ti-file-export"></i> Zapisz i podgląd PDF</button>
+        </div>
+      </div>
+    </div>
+  `;
+  mod.classList.add('modal-backdrop--open');
+}
+
+function _ctrCloseEditor() {
+  const mod = document.getElementById('ctrEditorModal');
+  if (mod) mod.classList.remove('modal-backdrop--open');
+  _ctrEditing = null;
+}
+
+function _ctrSet(field, value) { if (_ctrEditing) _ctrEditing[field] = value; }
+function _ctrSetData(field, value) {
+  if (!_ctrEditing) return;
+  if (!_ctrEditing.data) _ctrEditing.data = {};
+  _ctrEditing.data[field] = value;
+}
+function _ctrSetCompany(field, value) {
+  if (!_ctrEditing) return;
+  if (!_ctrEditing.data) _ctrEditing.data = {};
+  if (!_ctrEditing.data.company) _ctrEditing.data.company = { ...CTR_COMPANY_DEFAULT };
+  _ctrEditing.data.company[field] = value;
+}
+
+/* Wspólne pola: klient, data, miejsce, status, dane firmy 4Climat */
+function _ctrRenderCommonHeader(c) {
+  return `
+    <div class="ss-section-h" style="margin-bottom:8px;">1. Podstawowe dane</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div style="grid-column:span 3;">
+        <label class="ss-label">Klient (Zamawiający) *</label>
+        ${renderClientSearch({
+          widgetId: 'ctrClientSearch',
+          selectedClientId: c.client_id,
+          onSelect: (cid) => _ctrSet('client_id', cid)
+        })}
+      </div>
+      <div>
+        <label class="ss-label">Numer dokumentu</label>
+        <input type="text" class="ss-input" value="${escapeHtml(c.contract_number || '')}" onchange="_ctrSet('contract_number', this.value)" style="font-family:monospace;">
+      </div>
+      <div>
+        <label class="ss-label">Data zawarcia *</label>
+        <input type="date" class="ss-input" value="${c.contract_date || ''}" onchange="_ctrSet('contract_date', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">Miejsce zawarcia</label>
+        <input type="text" class="ss-input" value="${escapeHtml(c.place_signed || 'Wrocław')}" onchange="_ctrSet('place_signed', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">Status</label>
+        <select class="ss-input" onchange="_ctrSet('status', this.value)">
+          ${Object.entries(CTR_STATUS_LABELS).map(([k, l]) => `<option value="${k}"${c.status === k ? ' selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">2. Dane Wykonawcy (4Climat) — z możliwością zmiany</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Nazwa firmy</label>
+        <input type="text" class="ss-input" value="${escapeHtml(c.data?.company?.name || CTR_COMPANY_DEFAULT.name)}" onchange="_ctrSetCompany('name', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">Reprezentowana przez</label>
+        <input type="text" class="ss-input" value="${escapeHtml(c.data?.company?.representedBy || CTR_COMPANY_DEFAULT.representedBy)}" onchange="_ctrSetCompany('representedBy', this.value)">
+      </div>
+      <div style="grid-column:span 2;">
+        <label class="ss-label">Adres</label>
+        <input type="text" class="ss-input" value="${escapeHtml(c.data?.company?.address || CTR_COMPANY_DEFAULT.address)}" onchange="_ctrSetCompany('address', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">NIP</label>
+        <input type="text" class="ss-input" value="${escapeHtml(c.data?.company?.nip || CTR_COMPANY_DEFAULT.nip)}" onchange="_ctrSetCompany('nip', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">REGON</label>
+        <input type="text" class="ss-input" value="${escapeHtml(c.data?.company?.regon || CTR_COMPANY_DEFAULT.regon)}" onchange="_ctrSetCompany('regon', this.value)">
+      </div>
+    </div>
+  `;
+}
+
+/* Pola specyficzne dla umowy głównej — 1:1 z wzorem 4Climat */
+function _ctrRenderUmowaFields(c) {
+  const d = c.data || {};
+  const items = Array.isArray(d.items) ? d.items : [];
+
+  // Pobierz oferty tego klienta żeby móc autofillować
+  const clientOffers = c.client_id
+    ? (typeof offersDb !== 'undefined' ? offersDb.filter(o => o.client_id === c.client_id) : [])
+    : [];
+
+  return `
+    <div class="ss-section-h" style="margin:16px 0 8px;">3. Przedmiot umowy (§ 1)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Typ instalacji *</label>
+        <select class="ss-input" onchange="_ctrSetData('scopeType', this.value); _ctrRenderEditor()">
+          <option value="klimatyzacja"${d.scopeType === 'klimatyzacja' ? ' selected' : ''}>Klimatyzacja</option>
+          <option value="pompa_ciepla"${d.scopeType === 'pompa_ciepla' ? ' selected' : ''}>Pompa ciepła</option>
+          <option value="wentylacja"${d.scopeType === 'wentylacja' ? ' selected' : ''}>Wentylacja</option>
+          <option value="inne"${d.scopeType === 'inne' ? ' selected' : ''}>Inne</option>
+        </select>
+      </div>
+      ${d.scopeType === 'inne' ? `
+        <div>
+          <label class="ss-label">Doprecyzuj (co za instalacja)</label>
+          <input type="text" class="ss-input" value="${escapeHtml(d.scopeOther || '')}" onchange="_ctrSetData('scopeOther', this.value)" placeholder="np. rekuperacja">
+        </div>
+      ` : '<div></div>'}
+      <div style="grid-column:span 2;">
+        <label class="ss-label">Miejsce wykonania przedmiotu umowy (§ 1 ust. 2) *</label>
+        <textarea class="ss-input" rows="2" onchange="_ctrSetData('buildingAddress', this.value)" placeholder="np. Lokal mieszkalny znajdujący się we Wrocławiu, przy ul. Rafała Wojaczka 11/44">${escapeHtml(d.buildingAddress || '')}</textarea>
+      </div>
+      <div style="grid-column:span 2;">
+        <label class="ss-label">Opis parametrów budynku (opcjonalnie)</label>
+        <textarea class="ss-input" rows="2" onchange="_ctrSetData('buildingDescription', this.value)" placeholder="Powierzchnia, kubatura, izolacja, itp. — pojawi się pod adresem w § 1 ust. 2">${escapeHtml(d.buildingDescription || '')}</textarea>
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">4. Wykaz urządzeń i prac (§ 1 ust. 1)</div>
+    ${clientOffers.length > 0 ? `
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#1E40AF;">
+        <i class="ti ti-info-circle"></i> Ten klient ma ${clientOffers.length} ofert(y). Możesz zaimportować pozycje z jednej z nich:
+        <select onchange="if(this.value) _ctrImportFromOffer(this.value); this.value=''" style="margin-left:8px;padding:4px 8px;border:1px solid #93C5FD;border-radius:5px;font-size:12px;background:#fff;">
+          <option value="">— wybierz ofertę —</option>
+          ${clientOffers.map(o => `<option value="${o.id}">${escapeHtml(o.offer_no || '—')} · ${_ctrFmtDate(o.created_at)} · ${_ctrFmtPln(o.total_br)}</option>`).join('')}
+        </select>
+      </div>
+    ` : ''}
+    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#EEF2F7;">
+            <th style="padding:6px 8px;text-align:left;font-size:10.5px;font-weight:700;color:#475569;width:36px;">Lp.</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10.5px;font-weight:700;color:#475569;">Wyszczególnienie</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10.5px;font-weight:700;color:#475569;width:60px;">j.m.</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10.5px;font-weight:700;color:#475569;width:70px;">Ilość</th>
+            <th style="padding:6px 8px;text-align:right;font-size:10.5px;font-weight:700;color:#475569;width:120px;">Cena netto</th>
+            <th style="width:36px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.length === 0
+            ? '<tr><td colspan="6" style="padding:14px;text-align:center;color:#94A3B8;font-style:italic;">Brak pozycji. Kliknij „+ Dodaj pozycję" lub zaimportuj z oferty.</td></tr>'
+            : items.map((it, i) => `
+              <tr style="border-bottom:1px solid #F1F5F9;">
+                <td style="padding:5px 8px;font-size:11px;color:#64748B;">${i + 1}</td>
+                <td style="padding:5px 8px;">
+                  <input type="text" value="${escapeHtml(it.name || '')}" onchange="_ctrEditItem(${i}, 'name', this.value)" style="width:100%;padding:5px 8px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;">
+                </td>
+                <td style="padding:5px 8px;">
+                  <input type="text" value="${escapeHtml(it.unit || 'szt.')}" onchange="_ctrEditItem(${i}, 'unit', this.value)" style="width:100%;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;text-align:center;">
+                </td>
+                <td style="padding:5px 8px;">
+                  <input type="number" step="1" min="1" value="${it.qty || 1}" onchange="_ctrEditItem(${i}, 'qty', parseFloat(this.value) || 1); _ctrRecalcTotals()" style="width:100%;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;text-align:center;">
+                </td>
+                <td style="padding:5px 8px;">
+                  <input type="number" step="0.01" min="0" value="${it.priceNet || 0}" onchange="_ctrEditItem(${i}, 'priceNet', parseFloat(this.value) || 0); _ctrRecalcTotals()" style="width:100%;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;text-align:right;">
+                </td>
+                <td style="padding:5px 4px;text-align:center;">
+                  <button onclick="_ctrRemoveItem(${i})" title="Usuń" style="background:transparent;border:none;color:#991B1B;cursor:pointer;padding:4px;"><i class="ti ti-trash" style="font-size:13px;"></i></button>
+                </td>
+              </tr>
+            `).join('')
+          }
+        </tbody>
+      </table>
+      <button onclick="_ctrAddItem()" style="margin-top:8px;width:100%;padding:8px;background:#fff;color:#0F3461;border:1px dashed #0F3461;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+        <i class="ti ti-plus" style="font-size:12px;"></i> Dodaj pozycję
+      </button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px;">
+      <div style="background:#EEF2F7;padding:10px 12px;border-radius:7px;">
+        <div style="font-size:10.5px;color:#64748B;font-weight:600;">Razem netto</div>
+        <div style="font-size:15px;font-weight:800;color:#0A2647;margin-top:2px;">${_ctrFmtPln(c.total_net || 0)}</div>
+      </div>
+      <div style="background:#EEF2F7;padding:10px 12px;border-radius:7px;">
+        <div style="font-size:10.5px;color:#64748B;font-weight:600;">VAT ${c.vat_rate || 23}%</div>
+        <div style="font-size:15px;font-weight:800;color:#0A2647;margin-top:2px;">${_ctrFmtPln((c.total_gross || 0) - (c.total_net || 0))}</div>
+      </div>
+      <div style="background:#0F3461;color:#fff;padding:10px 12px;border-radius:7px;">
+        <div style="font-size:10.5px;opacity:.85;font-weight:600;">Razem brutto</div>
+        <div style="font-size:15px;font-weight:800;margin-top:2px;">${_ctrFmtPln(c.total_gross || 0)}</div>
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">5. Warunki firmowe (§ 1-§ 8, § 3 ust. 3, § 5 ust. 4, § 8 ust. 1)</div>
+    <div style="background:#FEF9E6;border:1px solid #FCE293;border-radius:7px;padding:10px 12px;margin-bottom:10px;font-size:11.5px;color:#92400E;">
+      <i class="ti ti-info-circle"></i> Domyślne wartości firmowe 4Climat — zwykle nie edytujesz. Zmieniaj tylko jeśli warunki są inne dla tej konkretnej umowy.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Zaliczka (% wynagrodzenia)</label>
+        <input type="number" step="1" min="0" max="100" class="ss-input" value="${d.advancePercent || 50}" onchange="_ctrSetData('advancePercent', parseInt(this.value) || 50)">
+      </div>
+      <div>
+        <label class="ss-label">Nazwa banku</label>
+        <input type="text" class="ss-input" value="${escapeHtml(d.bankName || 'Erste Bank Polski')}" onchange="_ctrSetData('bankName', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">VAT %</label>
+        <input type="number" step="1" class="ss-input" value="${c.vat_rate || 23}" onchange="_ctrSet('vat_rate', parseFloat(this.value) || 23); _ctrRecalcTotals()">
+      </div>
+      <div style="grid-column:span 3;">
+        <label class="ss-label">Numer rachunku bankowego (do § 1 ust. 4)</label>
+        <input type="text" class="ss-input" value="${escapeHtml(d.bankAccount || '88 1090 2402 0000 0001 5962 4054')}" onchange="_ctrSetData('bankAccount', this.value)" style="font-family:monospace;">
+      </div>
+      <div>
+        <label class="ss-label">Roboczogodzina prac dodatk. (zł netto)</label>
+        <input type="number" step="1" class="ss-input" value="${d.extraWorkRate || 230}" onchange="_ctrSetData('extraWorkRate', parseFloat(this.value) || 230)">
+      </div>
+      <div>
+        <label class="ss-label">Kara umowna za nieudostępnienie (zł)</label>
+        <input type="number" step="1" class="ss-input" value="${d.penaltyNoAccess || 600}" onchange="_ctrSetData('penaltyNoAccess', parseFloat(this.value) || 600)">
+      </div>
+      <div>
+        <label class="ss-label">Odstępne (% Wynagrodzenia)</label>
+        <input type="number" step="1" class="ss-input" value="${d.withdrawalPercent || 20}" onchange="_ctrSetData('withdrawalPercent', parseInt(this.value) || 20)">
+      </div>
+      <div style="grid-column:span 3;">
+        <label class="ss-label">E-mail do zgłoszeń gwarancyjnych (§ 6 ust. 5)</label>
+        <input type="email" class="ss-input" value="${escapeHtml(d.warrantyEmail || 'kontakt@4climat.pl')}" onchange="_ctrSetData('warrantyEmail', this.value)">
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">6. Harmonogram realizacji (§ 1 ust. 7 — opcjonalne)</div>
+    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px;">
+      <div style="font-size:11.5px;color:#64748B;margin-bottom:8px;">
+        Etapy realizacji z planowanymi datami. Zostawiając pustą tabelę — sekcja się nie pojawia w PDF.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#EEF2F7;">
+            <th style="padding:6px 8px;text-align:center;font-size:10.5px;font-weight:700;color:#475569;width:60px;">Etap</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10.5px;font-weight:700;color:#475569;">Opis prac</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10.5px;font-weight:700;color:#475569;width:150px;">Termin planowany</th>
+            <th style="width:36px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(d.scheduleItems || []).length === 0
+            ? '<tr><td colspan="4" style="padding:14px;text-align:center;color:#94A3B8;font-style:italic;">Brak etapów. Kliknij „+ Dodaj etap" żeby dodać terminy realizacji.</td></tr>'
+            : (d.scheduleItems || []).map((s, i) => `
+              <tr style="border-bottom:1px solid #F1F5F9;">
+                <td style="padding:5px 8px;">
+                  <input type="text" value="${escapeHtml(s.stage || '')}" onchange="_ctrEditSchedule(${i}, 'stage', this.value)" style="width:100%;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;text-align:center;font-weight:700;" placeholder="np. I">
+                </td>
+                <td style="padding:5px 8px;">
+                  <input type="text" value="${escapeHtml(s.description || '')}" onchange="_ctrEditSchedule(${i}, 'description', this.value)" style="width:100%;padding:5px 8px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;" placeholder="np. Dostawa urządzeń, montaż instalacji zewnętrznej">
+                </td>
+                <td style="padding:5px 8px;">
+                  <input type="date" value="${s.plannedDate || ''}" onchange="_ctrEditSchedule(${i}, 'plannedDate', this.value)" style="width:100%;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;">
+                </td>
+                <td style="padding:5px 4px;text-align:center;">
+                  <button onclick="_ctrRemoveSchedule(${i})" title="Usuń etap" style="background:transparent;border:none;color:#991B1B;cursor:pointer;padding:4px;"><i class="ti ti-trash" style="font-size:13px;"></i></button>
+                </td>
+              </tr>
+            `).join('')
+          }
+        </tbody>
+      </table>
+      <button onclick="_ctrAddSchedule()" style="margin-top:8px;width:100%;padding:8px;background:#fff;color:#0F3461;border:1px dashed #0F3461;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+        <i class="ti ti-plus" style="font-size:12px;"></i> Dodaj etap
+      </button>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">7. Postanowienia szczegółowe (§ 9 ust. 7)</div>
+    <div>
+      <label class="ss-label">Postanowienia szczegółowe (opcjonalnie — nadpisują postanowienia umowy)</label>
+      <textarea class="ss-input" rows="3" onchange="_ctrSetData('specialTerms', this.value)" placeholder="Dodatkowe ustalenia szczególne, jeśli występują. Zostawiając puste — sekcja się nie pojawia w PDF.">${escapeHtml(d.specialTerms || '')}</textarea>
+    </div>
+
+    <div style="margin-top:12px;">
+      <label class="ss-label">Uwagi wewnętrzne (nie pojawią się w PDF)</label>
+      <textarea class="ss-input" rows="2" onchange="_ctrSetData('notes', this.value)">${escapeHtml(d.notes || '')}</textarea>
+    </div>
+  `;
+}
+
+/* Pola specyficzne dla protokołu zakończenia prac */
+function _ctrRenderProtokolPracFields(c) {
+  const d = c.data || {};
+  // Pobierz istniejące umowy tego klienta do wyboru odniesienia
+  const clientContracts = c.client_id
+    ? contractsDb.filter(x => x.client_id === c.client_id && x.contract_type === 'umowa' && x.id !== c.id)
+    : [];
+
+  return `
+    <div class="ss-section-h" style="margin:16px 0 8px;">3. Odniesienie do umowy</div>
+    ${clientContracts.length > 0 ? `
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#1E40AF;">
+        <i class="ti ti-info-circle"></i> Ten klient ma ${clientContracts.length} umowę/umów. Wybierz jedną żeby wypełnić pole odniesienia:
+        <select onchange="if(this.value) _ctrLinkParentContract(this.value); this.value=''" style="margin-left:8px;padding:4px 8px;border:1px solid #93C5FD;border-radius:5px;font-size:12px;background:#fff;">
+          <option value="">— wybierz umowę —</option>
+          ${clientContracts.map(x => `<option value="${x.id}">nr ${escapeHtml(x.contract_number || '—')} z dn. ${_ctrFmtDate(x.contract_date)}</option>`).join('')}
+        </select>
+      </div>
+    ` : ''}
+    <div>
+      <label class="ss-label">Odniesienie do umowy (opis)</label>
+      <input type="text" class="ss-input" value="${escapeHtml(d.relatedContractRef || '')}" onchange="_ctrSetData('relatedContractRef', this.value)" placeholder="np. Umowa nr 4/07/2026 z dn. 20.07.2026">
+    </div>
+    <div style="margin-top:12px;">
+      <label class="ss-label">Adres wykonania prac</label>
+      <input type="text" class="ss-input" value="${escapeHtml(d.buildingAddress || '')}" onchange="_ctrSetData('buildingAddress', this.value)" placeholder="Wrocław, ul. Braniborska 14">
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">4. Wykonane prace</div>
+    <div>
+      <label class="ss-label">Rodzaj wykonanych prac, typ zamontowanych urządzeń, stan pomieszczeń</label>
+      <textarea class="ss-input" rows="6" onchange="_ctrSetData('workDescription', this.value)" placeholder="Wykonano montaż klimatyzacji multisplit Daikin 3MXM52A8 wraz z 3 jednostkami wewnętrznymi FTXA25/20/20. Pomieszczenia po pracach czyste, brak uszkodzeń.">${escapeHtml(d.workDescription || '')}</textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div>
+        <label class="ss-label">Data zakończenia prac *</label>
+        <input type="date" class="ss-input" value="${d.completionDate || new Date().toISOString().slice(0,10)}" onchange="_ctrSetData('completionDate', this.value)">
+      </div>
+      <div></div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">5. Zastrzeżenia i uwagi</div>
+    <div>
+      <label class="ss-label">Zastrzeżenia Zamawiającego</label>
+      <textarea class="ss-input" rows="3" onchange="_ctrSetData('reservations', this.value)">${escapeHtml(d.reservations || 'NIE ZGŁOSZONO ŻADNYCH ZASTRZEŻEŃ')}</textarea>
+      <div style="font-size:10.5px;color:#94A3B8;margin-top:4px;">Jeśli klient nie zgłasza zastrzeżeń — zostaw domyślny tekst.</div>
+    </div>
+    <div style="margin-top:12px;">
+      <label class="ss-label">Uwagi wewnętrzne (nie pojawią się w PDF)</label>
+      <textarea class="ss-input" rows="2" onchange="_ctrSetData('notes', this.value)">${escapeHtml(d.notes || '')}</textarea>
+    </div>
+  `;
+}
+
+/* Helpery dla pozycji w umowie */
+function _ctrAddItem() {
+  if (!_ctrEditing) return;
+  if (!_ctrEditing.data) _ctrEditing.data = {};
+  if (!Array.isArray(_ctrEditing.data.items)) _ctrEditing.data.items = [];
+  _ctrEditing.data.items.push({ name: '', unit: 'szt.', qty: 1, priceNet: 0 });
+  _ctrRenderEditor();
+}
+function _ctrRemoveItem(idx) {
+  if (!_ctrEditing?.data?.items) return;
+  _ctrEditing.data.items.splice(idx, 1);
+  _ctrRecalcTotals();
+  _ctrRenderEditor();
+}
+function _ctrEditItem(idx, field, value) {
+  if (!_ctrEditing?.data?.items?.[idx]) return;
+  _ctrEditing.data.items[idx][field] = value;
+}
+
+/* Helpery dla harmonogramu etapów */
+function _ctrAddSchedule() {
+  if (!_ctrEditing) return;
+  if (!_ctrEditing.data) _ctrEditing.data = {};
+  if (!Array.isArray(_ctrEditing.data.scheduleItems)) _ctrEditing.data.scheduleItems = [];
+  const nextIdx = _ctrEditing.data.scheduleItems.length + 1;
+  const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+  _ctrEditing.data.scheduleItems.push({
+    stage: romans[nextIdx - 1] || String(nextIdx),
+    description: '',
+    plannedDate: ''
+  });
+  _ctrRenderEditor();
+}
+function _ctrRemoveSchedule(idx) {
+  if (!_ctrEditing?.data?.scheduleItems) return;
+  _ctrEditing.data.scheduleItems.splice(idx, 1);
+  _ctrRenderEditor();
+}
+function _ctrEditSchedule(idx, field, value) {
+  if (!_ctrEditing?.data?.scheduleItems?.[idx]) return;
+  _ctrEditing.data.scheduleItems[idx][field] = value;
+}
+function _ctrRecalcTotals() {
+  if (!_ctrEditing) return;
+  const items = _ctrEditing.data?.items || [];
+  const net = items.reduce((s, it) => s + (parseFloat(it.priceNet) || 0) * (parseFloat(it.qty) || 1), 0);
+  const vat = _ctrEditing.vat_rate || 23;
+  _ctrEditing.total_net = Math.round(net * 100) / 100;
+  _ctrEditing.total_gross = Math.round(net * (1 + vat / 100) * 100) / 100;
+  // Odśwież tylko sekcję sum (małe re-render całego edytora)
+  _ctrRenderEditor();
+}
+
+/* Import pozycji z oferty tego klienta */
+function _ctrImportFromOffer(offerId) {
+  if (!_ctrEditing || !offerId) return;
+  const offer = (typeof offersDb !== 'undefined' ? offersDb : []).find(o => o.id === offerId);
+  if (!offer) { showToast('Nie znaleziono oferty'); return; }
+  if (!offer.offer_data && !offer.data) {
+    // Brak snapshotu — dodaj jedną zbiorczą pozycję
+    if (!confirm('Ta oferta nie ma pełnego snapshotu. Utworzyć jedną zbiorczą pozycję z sumaryczną wartością?')) return;
+    if (!Array.isArray(_ctrEditing.data.items)) _ctrEditing.data.items = [];
+    const label = 'Instalacja wg oferty nr ' + (offer.offer_no || '—');
+    const priceNet = (offer.total_br || 0) / (1 + (offer.vat_rate || 23) / 100);
+    _ctrEditing.data.items.push({ name: label, unit: 'kpl.', qty: 1, priceNet: Math.round(priceNet * 100) / 100 });
+    _ctrEditing.offer_id = offerId;
+    _ctrRecalcTotals();
+    return;
+  }
+  // Pełny snapshot — importuj poszczególne warianty jako pozycje
+  const snap = offer.offer_data || offer.data;
+  const st = snap.state || {};
+  if (!Array.isArray(_ctrEditing.data.items)) _ctrEditing.data.items = [];
+  // Warianty AC
+  (st.variants || []).forEach(v => {
+    if (v.type === 'hp_kit') {
+      const priceNet = (parseFloat(v.priceNet) || 0) + (v.includeInstall !== false ? (parseFloat(v.installPrice) || 0) : 0);
+      _ctrEditing.data.items.push({
+        name: (v.name || 'Wariant') + ' — pompa ciepła wraz z montażem',
+        unit: 'kpl.', qty: 1, priceNet: Math.round(priceNet * 100) / 100
+      });
+    } else if (v.type === 'install') {
+      _ctrEditing.data.items.push({
+        name: v.name || 'Wycena instalacji',
+        unit: 'kpl.', qty: 1, priceNet: parseFloat(v.priceNet) || 0
+      });
+    } else {
+      const total = (typeof variantNetTotal === 'function') ? variantNetTotal(v) : (v.priceNet || 0);
+      _ctrEditing.data.items.push({
+        name: (v.name || 'Wariant') + ' — instalacja klimatyzacji wraz z montażem',
+        unit: 'kpl.', qty: 1, priceNet: Math.round(total * 100) / 100
+      });
+    }
+  });
+  // Warianty HP (klasyczne — nie z wizarda)
+  (st.hpVariants || []).forEach(v => {
+    const total = (typeof hpVariantNetTotal === 'function') ? hpVariantNetTotal(v) : 0;
+    _ctrEditing.data.items.push({
+      name: (v.name || 'Wariant pompy') + (v.model ? ' — ' + v.model : ''),
+      unit: 'kpl.', qty: 1, priceNet: Math.round(total * 100) / 100
+    });
+  });
+  _ctrEditing.offer_id = offerId;
+  _ctrRecalcTotals();
+  showToast('Zaimportowano pozycje z oferty');
+}
+
+function _ctrLinkParentContract(contractId) {
+  if (!_ctrEditing) return;
+  const parent = contractsDb.find(x => x.id === contractId);
+  if (!parent) return;
+  _ctrEditing.parent_contract_id = contractId;
+  const ref = `Umowa nr ${parent.contract_number || '—'} z dn. ${_ctrFmtDate(parent.contract_date)}`;
+  _ctrSetData('relatedContractRef', ref);
+  // Autofill adresu jeśli pusty
+  if (!_ctrEditing.data.buildingAddress && parent.data?.buildingAddress) {
+    _ctrEditing.data.buildingAddress = parent.data.buildingAddress;
+  }
+  _ctrRenderEditor();
+}
+
+/* Zapis do bazy */
+async function _ctrSaveOnly() {
+  const saved = await _ctrPersist();
+  if (saved) {
+    showToast('Zapisano');
+    _ctrCloseEditor();
+    await loadContracts();
+    renderContractsList();
+  }
+}
+async function _ctrSaveAndPreview() {
+  const saved = await _ctrPersist();
+  if (saved) {
+    _ctrCloseEditor();
+    await loadContracts();
+    renderContractsList();
+    setTimeout(() => previewContractPdf(saved.id), 200);
+  }
+}
+
+async function _ctrPersist() {
+  if (!_ctrEditing) return null;
+  if (!_ctrEditing.client_id) { showToast('Wybierz klienta'); return null; }
+  if (!_ctrEditing.contract_date) { showToast('Wpisz datę'); return null; }
+
+  // Zbuduj snapshot pełnych danych do regeneracji PDF (kopia całego _ctrEditing)
+  const snapshot = JSON.parse(JSON.stringify(_ctrEditing));
+
+  const payload = { ..._ctrEditing };
+  delete payload.id;
+  delete payload.created_at;
+  delete payload.updated_at;
+  payload.snapshot = snapshot;
+  if (!payload.created_by) payload.created_by = currentUser?.email ? currentUser.email.split('@')[0] : null;
+  if (!payload.user_id && currentUser?.id) payload.user_id = currentUser.id;
+
+  // Sanityzacja
+  ['total_net', 'total_gross', 'vat_rate'].forEach(k => {
+    if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
+    if (typeof payload[k] === 'string') payload[k] = payload[k] ? parseFloat(payload[k]) : null;
+  });
+  ['parent_contract_id', 'offer_id'].forEach(k => {
+    if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
+  });
+
+  try {
+    if (_ctrEditing.id) {
+      await sbFetch('/rest/v1/contracts?id=eq.' + encodeURIComponent(_ctrEditing.id), 'PATCH', payload);
+      return { id: _ctrEditing.id };
+    } else {
+      const created = await sbFetch('/rest/v1/contracts', 'POST', payload);
+      const id = (Array.isArray(created) && created[0]) ? created[0].id : null;
+      return { id };
+    }
+  } catch(e) {
+    console.error('save contract error:', e);
+    showToast('Błąd zapisu: ' + String(e.message || e).slice(0, 100));
+    return null;
+  }
+}
+
+async function deleteContract(contractId) {
+  if (!confirm('Usunąć ten dokument? Operacja jest nieodwracalna.')) return;
+  try {
+    await sbFetch('/rest/v1/contracts?id=eq.' + encodeURIComponent(contractId), 'DELETE');
+    showToast('Usunięto');
+    _ctrCloseEditor();
+    await loadContracts();
+    renderContractsList();
+  } catch(e) {
+    showToast('Błąd usuwania: ' + (e.message || e));
+  }
+}
+
+/* ============================================================
+   PDF — generator dokumentów w spójnej stylistyce 4Climat
+   ============================================================ */
+
+async function previewContractPdf(contractId) {
+  // === WIDOCZNY MARKER — jeśli tego alertu nie widzisz, funkcja się nie wywołuje (cache przeglądarki?) ===
+  console.log('[previewContractPdf] CALLED with id:', contractId);
+  console.log('[previewContractPdf] pdfMake exists?', typeof pdfMake);
+  console.log('[previewContractPdf] contractsDb length:', contractsDb.length);
+
+  if (typeof pdfMake === 'undefined') {
+    alert('BŁĄD: biblioteka pdfMake nie jest załadowana. Sprawdź połączenie z internetem i odśwież stronę (Ctrl+Shift+R).');
+    return;
+  }
+  if (!pdfMake.vfs) {
+    alert('BŁĄD: czcionki pdfMake jeszcze się nie załadowały. Poczekaj chwilę i spróbuj ponownie.');
+    return;
+  }
+  const c = contractsDb.find(x => x.id === contractId);
+  if (!c) {
+    alert('BŁĄD: nie znaleziono dokumentu w bazie. ID=' + contractId + '\nLista w pamięci: ' + contractsDb.length + ' dokumentów.');
+    return;
+  }
+  console.log('[previewContractPdf] contract found:', c);
+  showToast('Generuję PDF…');
+  try {
+    const src = c.snapshot || c;
+    console.log('[previewContractPdf] source (snapshot or record):', src);
+    if (!src.data) throw new Error('Snapshot bez pola data — dokument niekompletny. Spróbuj otworzyć i zapisać ponownie.');
+    const docDef = _ctrBuildDocDef(src, c);
+    if (!docDef) throw new Error('Ten typ dokumentu (' + c.contract_type + ') nie ma jeszcze generatora PDF');
+
+    window._lastContractDocDef = docDef;
+    console.log('[previewContractPdf] docDef built. content items:', docDef.content?.length);
+    console.log('[previewContractPdf] full docDef in window._lastContractDocDef');
+    console.log('[previewContractPdf] calling pdfMake.createPdf().getBlob() now...');
+
+    const blob = await new Promise((resolve, reject) => {
+      // Timeout — jeśli pdfMake nie wywoła callbacku w 10s, rzuć błąd
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Timeout — pdfMake nie odpowiedział w 10 sekund. Prawdopodobnie błąd w strukturze dokumentu (nieprawidłowy typ elementu, zagnieżdżone tablice w content).'));
+      }, 10000);
+      try {
+        pdfMake.createPdf(docDef).getBlob(b => {
+          clearTimeout(timeoutId);
+          if (!b) reject(new Error('pdfMake zwrócił pusty blob'));
+          else resolve(b);
+        });
+      } catch(e) {
+        clearTimeout(timeoutId);
+        reject(e);
+      }
+    });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if (!w) {
+      showToast('Popup zablokowany — zezwól na wyskakujące okna');
+    } else {
+      showToast('Podgląd otwarty');
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch(e) {
+    console.error('previewContractPdf error:', e);
+    // Pełny błąd do konsoli + skrócony toast
+    const msg = String(e.message || e);
+    showToast('Błąd PDF: ' + msg.slice(0, 150));
+    // Dla developera — alert z pełnym stack traceem
+    alert('BŁĄD generowania PDF umowy:\n\n' + msg + '\n\nPełny stack trace w konsoli (F12).');
+  }
+}
+
+function _ctrBuildDocDef(src, rec) {
+  if (rec.contract_type === 'umowa') return _ctrDocDefUmowa(src, rec);
+  if (rec.contract_type === 'protokol_prac') return _ctrDocDefProtokolPrac(src, rec);
+  return null;
+}
+
+/* PDF: Umowa główna — TEKST 1:1 z wzoru 4Climat */
+function _ctrDocDefUmowa(src, rec) {
+  const client = clientsDb.find(x => x.id === src.client_id) || {};
+  const d = src.data || {};
+  const company = (d.company && typeof d.company === 'object') ? d.company : CTR_COMPANY_DEFAULT;
+  const items = Array.isArray(d.items) ? d.items : [];
+  const vatRate = parseFloat(src.vat_rate) || 23;
+
+  const totalNet = parseFloat(src.total_net) || 0;
+  const totalGross = parseFloat(src.total_gross) || 0;
+  const advancePct = parseInt(d.advancePercent) || 50;
+  const advanceGross = Math.round(totalGross * advancePct) / 100;
+  const bankName = d.bankName || 'Erste Bank Polski';
+  const bankAccount = d.bankAccount || '88 1090 2402 0000 0001 5962 4054';
+  const extraRate = parseFloat(d.extraWorkRate) || 230;
+  const warrantyEmail = d.warrantyEmail || 'kontakt@4climat.pl';
+  const penaltyAccess = parseFloat(d.penaltyNoAccess) || 600;
+  const withdrawalPct = parseInt(d.withdrawalPercent) || 20;
+
+  // Checkboxy typu instalacji
+  const chk = (isActive) => isActive ? '[X]' : '[  ]';
+  const isKl = d.scopeType === 'klimatyzacja';
+  const isHp = d.scopeType === 'pompa_ciepla';
+  const isWn = d.scopeType === 'wentylacja';
+  const isIn = d.scopeType === 'inne';
+
+  // Tabela wykazu urządzeń
+  const tableBody = [];
+  tableBody.push([
+    { text: 'Lp.', bold: true, alignment: 'center', fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] },
+    { text: 'Wyszczególnienie', bold: true, fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] },
+    { text: 'j.m.', bold: true, alignment: 'center', fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] },
+    { text: 'ilość', bold: true, alignment: 'center', fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] },
+    { text: 'Cena netto', bold: true, alignment: 'right', fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] }
+  ]);
+  items.forEach((it, i) => {
+    tableBody.push([
+      { text: String(i + 1), alignment: 'center', margin: [4, 4, 4, 4] },
+      { text: String(it.name || ''), margin: [4, 4, 4, 4] },
+      { text: String(it.unit || 'szt.'), alignment: 'center', margin: [4, 4, 4, 4] },
+      { text: String(it.qty || 1), alignment: 'center', margin: [4, 4, 4, 4] },
+      { text: _ctrFmtPln((parseFloat(it.qty)||1) * (parseFloat(it.priceNet)||0)), alignment: 'right', margin: [4, 4, 4, 4] }
+    ]);
+  });
+  tableBody.push([
+    { text: 'Suma', colSpan: 4, alignment: 'right', bold: true, margin: [4, 6, 4, 6] },
+    { text: '' }, { text: '' }, { text: '' },
+    { text: _ctrFmtPln(totalNet), alignment: 'right', bold: true, margin: [4, 6, 4, 6] }
+  ]);
+
+  const content = [];
+
+  // NAGŁÓWEK
+  content.push({ text: 'UMOWA nr ' + (src.contract_number || '—'), fontSize: 16, bold: true, alignment: 'center', margin: [0, 0, 0, 12] });
+  content.push({ text: 'zawarta w dniu ' + _ctrFmtDate(src.contract_date) + ' pomiędzy:', margin: [0, 0, 0, 14] });
+
+  // STRONA 1 — Zamawiający
+  content.push({ text: '1.  ' + (client.name || '(imię i nazwisko / nazwa)'), bold: true, margin: [0, 0, 0, 4] });
+  if (client.address) content.push({ text: client.address, margin: [16, 0, 0, 2] });
+  content.push({ text: 'NIP: ' + (client.nip || '…………………………………………………'), margin: [16, 0, 0, 2] });
+  content.push({ text: 'REGON: ' + (client.regon || '…………………………………………'), margin: [16, 0, 0, 2] });
+  content.push({ text: 'telefon: ' + (client.phone || '…………………………………'), margin: [16, 0, 0, 2] });
+  content.push({ text: 'e-mail: ' + (client.email || '…………………………………'), margin: [16, 0, 0, 6] });
+  content.push({ text: 'zwanym/ą dalej Zamawiającym;', margin: [16, 0, 0, 10] });
+
+  content.push({ text: 'a,', margin: [0, 0, 0, 10] });
+
+  // STRONA 2 — Wykonawca
+  content.push({ text: '2.  Firmą ' + _ctrCleanCompanyName(company.name) + ' z siedzibą we Wrocławiu', bold: true, margin: [0, 0, 0, 4] });
+  content.push({ text: company.address || CTR_COMPANY_DEFAULT.address, margin: [16, 0, 0, 2] });
+  content.push({ text: 'NIP: ' + (company.nip || CTR_COMPANY_DEFAULT.nip), margin: [16, 0, 0, 2] });
+  content.push({ text: 'REGON: ' + (company.regon || CTR_COMPANY_DEFAULT.regon), margin: [16, 0, 0, 2] });
+  content.push({ text: 'reprezentowaną przez ' + (company.representedBy || 'Tomasz Dobryniewski'), margin: [16, 0, 0, 6] });
+  content.push({ text: 'zwaną dalej Wykonawcą.', margin: [16, 0, 0, 16] });
+
+  // § 1 PRZEDMIOT UMOWY
+  content.push({ text: '§ 1', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Przedmiot umowy', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  content.push({ text: '1.  Zamawiający zleca Wykonawcy wykonanie przedmiotu umowy, tj. wykonanie instalacji:', margin: [0, 0, 0, 6] });
+  content.push({ text: chk(isHp) + '  pompy ciepła;', margin: [16, 0, 0, 3] });
+  content.push({ text: chk(isKl) + '  klimatyzacji;', margin: [16, 0, 0, 3] });
+  content.push({ text: chk(isWn) + '  wentylacji;', margin: [16, 0, 0, 3] });
+  content.push({ text: chk(isIn) + '  inne' + (isIn && d.scopeOther ? ': ' + d.scopeOther : '') + ';', margin: [16, 0, 0, 8] });
+  content.push({ text: 'w budynku wskazanym w ust. 2 Umowy, składającej się z:', margin: [16, 0, 0, 8] });
+
+  content.push({
+    table: { headerRows: 1, widths: [24, '*', 40, 40, 80], body: tableBody },
+    layout: {
+      hLineColor: function() { return '#C7D8E8'; },
+      vLineColor: function() { return '#C7D8E8'; },
+      hLineWidth: function() { return 0.5; },
+      vLineWidth: function() { return 0.5; }
+    },
+    margin: [0, 0, 0, 10]
+  });
+
+  // § 1 ust. 2 — miejsce wykonania
+  content.push({ text: '2.  Miejscem wykonania przedmiotu umowy jest: ' + (d.buildingAddress || '……………………………………………………………………………………………………………………'), margin: [0, 8, 0, 4] });
+  if (d.buildingDescription) content.push({ text: d.buildingDescription, italics: true, margin: [16, 0, 0, 4] });
+  content.push({ text: '(opis parametrów budynku)', italics: true, fontSize: 9, color: '#94A3B8', alignment: 'center', margin: [0, 0, 0, 8] });
+
+  // § 1 ust. 3 — wynagrodzenie prognozowane
+  content.push({ text: '3.  Wykonawca oświadcza, że dokonał wyliczenia wynagrodzenia za wykonanie przedmiotu umowy z uwzględnieniem cen wynikających z katalogu producenta materiałów/urządzeń wymaganych do wykonania przedmiotu umowy obowiązującego w dniu zawarcia niniejszej umowy, które wynosi ' + _ctrFmtPln(totalNet) + ' netto, ' + _ctrFmtPln(totalGross) + ' brutto (Wynagrodzenie Prognozowane). Wykonawca oświadcza, że producent ma prawo do zmiany cen materiałów/urządzeń i ustalenia ich według cennika zmienionego, także po złożeniu na nie zamówienia przez Wykonawcę, w związku z czym kwota Wynagrodzenia Prognozowanego może ulec zmianie, co stanowi okoliczność niezależną od Wykonawcy. Katalog cen, o który oparto wyliczenie kwoty Wynagrodzenia Podstawowego znajduje się na stronie internetowej producenta. Zamawiający jest zobowiązany zapłacić Wykonawcy wynagrodzenie, odpowiadające wysokości Wynagrodzenia Prognozowanego, które może ulec zmianie z uwzględnieniem § 3 ust. 10 Umowy (Wynagrodzenie ostateczne). Wynagrodzenie płatne jest w dwóch ratach: ' + advancePct + '% w formie zaliczki (zgodnie z ust. 4 poniżej) oraz pozostałe ' + (100 - advancePct) + '% w dniu odbioru prac (podpisania końcowego protokołu zakończenia prac), na podstawie wystawionej faktury VAT. Stawka podatku VAT zostanie ustalona według obowiązujących przepisów prawa. W przypadku, gdy zgodnie z § 1 ust. 6 Umowy, realizacja przedmiotu umowy nastąpi w etapach, Zamawiający zobowiązuje się do zapłaty Wykonawcy wynagrodzenia za zrealizowanie każdego etapu w dniu sporządzenia protokołu zakończenia etapu, na podstawie wystawionej faktury VAT.', margin: [0, 0, 0, 8] });
+
+  // § 1 ust. 4 — zaliczka
+  content.push({ text: '4.  Zamawiający zobowiązuje się zapłacić Wykonawcy zaliczkę w wysokości ' + advancePct + ' % wysokości Wynagrodzenia prognozowanego określonego w § 1 ust. 4 Umowy, tj. kwotę ' + _ctrFmtPln(advanceGross) + ', na rachunek bankowy Wykonawcy prowadzony przez ' + bankName + ' pod numerem: ' + bankAccount + '. Wpłata zaliczki jest warunkiem przystąpienia do prac przez Wykonawcę oraz podstawą wystawienia faktury zaliczkowej. W tytule przelewu zaliczki Zamawiający wskaże numer umowy oraz dane Wykonawcy tj. Firma ' + _ctrCleanCompanyName(company.name) + ' z siedzibą we Wrocławiu, ' + (company.address || CTR_COMPANY_DEFAULT.address) + ', NIP:' + (company.nip || CTR_COMPANY_DEFAULT.nip) + '.', margin: [0, 0, 0, 8] });
+
+  // § 1 ust. 5-6
+  content.push({ text: '5.  Jeżeli Zamawiający nie udostępni terenu wykonania przedmiotu umowy w ustalonym przez Strony terminie, Wykonawca jest uprawniony do obciążenia Zamawiającego poniesionymi kosztami, w szczególności przechowywania i magazynowania elementów instalacji potrzebnych do wykonania przedmiotu umowy, a także kosztów przygotowania się Wykonawcy do wykonania umowy.', margin: [0, 0, 0, 8] });
+  content.push({ text: '6.  W przypadku, gdy zapłata wynagrodzenia Wykonawcy przez Zamawiającego następować będzie ze środków pochodzących z kredytu lub pożyczki udzielonej przez osobę trzecią, za dzień zapłaty uważa się dzień wpływu środków na konto Wykonawcy. Wykonawca nie ponosi odpowiedzialności za odmowę finansowania jego wynagrodzenia przez osobę trzecią, w tym odmowę udzielenia kredytu lub pożyczki przez osobę trzecią. Środki, które wpłynęły na konto Wykonawcy stanowią zaliczkę na poczet wynagrodzenia. Wpłata zostanie objęta wystawioną przez Wykonawcę fakturą zaliczkową.', margin: [0, 0, 0, 12] });
+
+  // § 1 ust. 7 — Harmonogram realizacji (tylko jeśli są etapy)
+  const schedule = Array.isArray(d.scheduleItems) ? d.scheduleItems.filter(s => s.stage || s.description || s.plannedDate) : [];
+  if (schedule.length > 0) {
+    content.push({ text: '7.  Strony ustalają następujący harmonogram realizacji przedmiotu umowy:', margin: [0, 0, 0, 6] });
+    const scheduleTableBody = [[
+      { text: 'Etap', bold: true, alignment: 'center', fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] },
+      { text: 'Zakres prac', bold: true, fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] },
+      { text: 'Termin planowany', bold: true, alignment: 'center', fillColor: '#EEF2F7', color: '#0F3461', margin: [4, 5, 4, 5] }
+    ]];
+    schedule.forEach(s => {
+      scheduleTableBody.push([
+        { text: String(s.stage || '—'), alignment: 'center', bold: true, margin: [4, 5, 4, 5] },
+        { text: String(s.description || '—'), margin: [4, 5, 4, 5] },
+        { text: s.plannedDate ? _ctrFmtDate(s.plannedDate) : '—', alignment: 'center', margin: [4, 5, 4, 5] }
+      ]);
+    });
+    content.push({
+      table: { headerRows: 1, widths: [50, '*', 100], body: scheduleTableBody },
+      layout: {
+        hLineColor: function() { return '#C7D8E8'; },
+        vLineColor: function() { return '#C7D8E8'; },
+        hLineWidth: function() { return 0.5; },
+        vLineWidth: function() { return 0.5; }
+      },
+      margin: [0, 0, 0, 12]
+    });
+  }
+
+  // § 2 SPOSÓB WYKONANIA UMOWY
+  content.push({ text: '§ 2', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Sposób wykonania umowy', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  const p2 = [
+    'Wykonawca zobowiązuje się wykonać przedmiot umowy z należytą starannością i rzetelnością, zgodnie z przedłożonym przez Zamawiającego projektem, przepisami prawa budowlanego, normami technicznymi, normami prawa ochrony środowiska i innymi obowiązującymi regulacjami prawnymi, a także zaleceniami i wskazaniami Zamawiającego oraz odpowiednich organów państwa lub samorządu terytorialnego.',
+    'Wykonawca nie ponosi odpowiedzialności za niezachowanie terminu realizacji umowy z przyczyn leżących po stronie producenta lub dostawcy materiałów użytych do realizacji przedmiotu umowy. W przypadku opóźnienia w dostawie materiałów, strony podejmą negocjacje w celu wydłużenia terminu realizacji umowy o czas trwania opóźnienia w dostawie oraz zawarcia stosownego aneksu do niniejszej umowy. W przypadku nie zawarcia aneksu w sytuacji opisanej w zdaniu poprzednim, każdej ze stron przysługuje prawo odstąpienia od umowy.',
+    'Jeżeli termin realizacji umowy przedłuża się z przyczyn leżących po stronie producenta lub dostawcy materiałów, niezależnych od Wykonawcy, a Wykonawca dokonał już zamówienia przedmiotu umowy u producenta lub dostawcy, tak aby terminowa realizacja przedmiotu umowy była możliwa, Zamawiający ma prawo odstąpienia od umowy, w przypadku nie zawarcia aneksu wydłużającego okres realizacji umowy zgodnie z § 2 ust. 2, jednakże w tym przypadku Wykonawca jest uprawniony do zatrzymania wpłaconej zaliczki do 70% jej wartości.',
+    'Termin realizacji przedmiotu umowy ulega przedłużeniu o czas trwania przeszkody niezależnej od Wykonawcy tj. m. in. siła wyższa, wojna, stan nadzwyczajny, stan epidemii lub stan zagrożenia epidemicznego, niekorzystne warunki atmosferyczne, pożar, powódź itp.',
+    'W dniu zakończenia realizacji przedmiotu umowy zostanie sporządzony końcowy protokół zakończenia prac. W dniu zakończenia realizacji etapu zostanie sporządzony protokół zakończenia etapu. W treści protokołów uwzględnia się zakres wykonanych prac oraz ewentualne uwagi stron.',
+    'Wykonawca ponosi odpowiedzialność za ewentualne zniszczenia i uszkodzenia przedmiotu umowy i szkody powstałe na terenie budowy/prac na skutek działania pracowników Wykonawcy w czasie wykonywania przedmiotu umowy, na zasadach ogólnych.',
+    'Wykonawca nie odpowiada za ewentualne zniszczenia i uszkodzenia przedmiotu umowy lub szkody powstałe na terenie budowy, na skutek siły wyższej lub działania, a także zaniechania osób trzecich za które odpowiedzialności nie ponosi.',
+    'Wykonawca nie odpowiada za ewentualne uszkodzenia lub zniszczenia instalacji (m.in. instalacje gazowe, elektryczne, wodociągowe, światłowodowe i inne) lub przedmiotów w nieruchomości, powstałe w trakcie robót, o których nie został poinformowany przez Zamawiającego lub które nie zostały odpowiednio zabezpieczone przez Zamawiającego.',
+    'Komunikacja między Wykonawcą i Zamawiającym może odbywać się również przez środki komunikacji elektronicznej, w szczególności poprzez komunikację mailową. Dla potrzeb stosowania środków komunikacji elektronicznej Zamawiający oświadcza, że adres mailowy wskazany przez niego w komparycji umowy jest przez niego bieżąco używany.',
+    'Wykonawca nie jest zobowiązany do utylizacji odpadów powstałych na skutek wykonania przedmiotu umowy - Zamawiający jest zobowiązany do utylizacji odpadów we własnym zakresie.',
+    'Wykonawca nie jest zobowiązany do dokonywania jakichkolwiek czynności administracyjnych oraz uzyskania zgód, decyzji, zezwoleń lub innych dokumentów w imieniu Zamawiającego, wymaganych do wykonania przedmiotu umowy. Zamawiający zobowiązuje się dopełnić wszelkich czynności formalnych we własnym zakresie.'
+  ];
+  p2.forEach((t, i) => content.push({ text: (i + 1) + '.  ' + t, margin: [0, 0, 0, 6] }));
+
+  // § 3 PRAWA I OBOWIĄZKI WYKONAWCY
+  content.push({ text: '§ 3', bold: true, alignment: 'center', margin: [0, 10, 0, 4] });
+  content.push({ text: 'Prawa i obowiązki Wykonawcy', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  content.push({ text: '1.  W przypadku odmowy lub uniemożliwienia przez Zamawiającego sporządzenia protokołu zakończenia prac lub protokołu zakończenia etapu, Wykonawca może jednostronnie sporządzić w/w protokoły. Fakt odmowy lub uniemożliwienia sporządzenia protokołu Wykonawca odnotowuje na jednostronnym protokole zakończenia prac lub protokole zakończenia etapu.', margin: [0, 0, 0, 6] });
+  content.push({ text: '2.  Wykonawca może zlecić wykonanie części lub całości przedmiotu umowy podwykonawcom na co Zleceniodawca wyraża zgodę. Wykonawca odpowiada za działanie i zaniechanie podwykonawców jak za własne działanie i zaniechanie.', margin: [0, 0, 0, 6] });
+  content.push({ text: '3.  W przypadku konieczności przeprowadzenia dodatkowych prac, których Strony nie przewidziały w dniu zawierania umowy i zostały ujawnione w trakcie wykonywania niniejszej umowy, a które powodować będą dodatkowe koszty, Wykonawca ma obowiązek poinformowania Zamawiającego o zakresie prac dodatkowych. W takim wypadku Zamawiający może:', margin: [0, 0, 0, 4] });
+  content.push({ text: 'a.  zlecić wykonanie prac dodatkowych Wykonawcy za odrębnym wynagrodzeniem obejmującym koszt materiałów oraz robociznę w wysokości ' + extraRate + ' zł netto za roboczogodzinę;', margin: [24, 0, 0, 3] });
+  content.push({ text: 'b.  zlecić wykonanie prac dodatkowych osobie trzeciej;', margin: [24, 0, 0, 3] });
+  content.push({ text: 'c.  polecić Wykonawcy wykonanie przedmiotu umowy zgodnie z niniejszą umową bez zlecania wykonania prac dodatkowych na własne ryzyko.', margin: [24, 0, 0, 3] });
+  content.push({ text: 'd.  zlecenie wykonania prac dodatkowych lub polecenie Wykonawcy wykonania przedmiotu umowy bez zlecenia wykonania prac dodatkowych może być udzielone jedynie w formie pisemnej.', margin: [24, 0, 0, 6] });
+  content.push({ text: '4.  W przypadku o którym mowa w § 3 ust. 3 pkt a Umowy, Wykonawca przedstawi Zamawiającemu ofertę na wykonanie prac dodatkowych. Wynagrodzenie za wykonanie prac dodatkowych będzie płatne w terminie 7 dni od dnia sporządzenia protokołu odbioru prac dodatkowych na podstawie wystawionej przez Wykonawcę faktury VAT.', margin: [0, 0, 0, 6] });
+  content.push({ text: '5.  W przypadku o którym mowa w § 3 ust. 3 pkt b Umowy, termin realizacji niniejszej umowy lub etapu przez Wykonawcę ulega zawieszeniu do czasu wykonania prac dodatkowych przez osobę trzecią. Wykonawca ma prawo wyznaczyć Zamawiającemu termin do wykonania prac dodatkowych. W przypadku niezakończenia wykonywania prac dodatkowych w wyznaczonym terminie Wykonawca ma prawo odstąpić od niniejszej umowy z winy Zamawiającego.', margin: [0, 0, 0, 6] });
+  content.push({ text: '6.  Wykonawca ma prawo do odstąpienia od umowy z winy Zamawiającego w przypadku opóźnienia przekazania miejsca wykonania przedmiotu umowy lub nieudzielenia oraz zatajenia niezbędnych informacji koniecznych do realizacji umowy, w ten sposób, że dotrzymanie terminu realizacji umowy jest niemożliwe.', margin: [0, 0, 0, 6] });
+  content.push({ text: '7.  Wykonawca ma prawo odstąpić od umowy z winy Zamawiającego, w przypadku, gdy Zamawiający uporczywie odmawia współdziałania przy realizacji umowy po wcześniejszym pisemnym poinformowaniu o zamiarze odstąpienia i wyznaczeniu dodatkowego 3 dniowego terminu do podjęcia współdziałania. W sytuacji braku reakcji na pisemne wezwanie, Wykonawca może odstąpić od umowy w terminie 30 dni od upływu ww. terminu.', margin: [0, 0, 0, 6] });
+  content.push({ text: '8.  Wykonawca ma prawo do wykonania fotografii ukończonego przedmiotu umowy. Zamawiający przenosi na Wykonawcę wszelkie prawa autorskie (majątkowe i niemajątkowe) do utworu (dzieła) w postaci zdjęć przedmiotu umowy. Zamawiający upoważnia Wykonawcę do ich wykorzystywania na wszystkich polach eksploatacji:', margin: [0, 0, 0, 4] });
+  [
+    'wytwarzania egzemplarzy utworu techniką drukarską, reprograficzną, cyfrową (np. płyty CD i DVD);',
+    'wprowadzania oryginału lub egzemplarzy utworu do obrotu, użyczenia oryginałów lub egzemplarzy utworu, publicznego wystawanie utworu (np. w galerii);',
+    'rozpowszechniania utworu w drukowanych i elektronicznych materiałach marketingowych, nośnikach cyfrowych oraz optycznych, a także fotografiach;',
+    'publicznego wyświetlania utworu;',
+    'publicznego udostepnienia utworu w taki sposób, aby każdy mógł mieć do niego dostęp w miejscu i w czasie przez siebie wybranym;',
+    'udostępniania utworu za pośrednictwem Internetu;'
+  ].forEach(t => content.push({ text: '–  ' + t, margin: [24, 0, 0, 3] }));
+  content.push({ text: 'w sposób nieumożliwiający identyfikację Zamawiającego.', margin: [16, 4, 0, 6] });
+  content.push({ text: '9.  W przypadku wycofania przez producenta ze sprzedaży któregokolwiek z elementów instalacji opisanych w § 1 ust. 1 Umowy, Wykonawca niezwłocznie poinformuje o tym fakcie Zamawiającego. Strony podejmą negocjacje w celu zawarcia aneksu do niniejszej umowy, w którym zastąpią element wycofany ze sprzedaży zamiennikiem o takich samych lub wyższych parametrach. W przypadku, gdy cena zamiennika różnić się będzie ceną od elementu wycofanego ze sprzedaży, Strony podejmą negocjacje w celu aktualizacji wynagrodzenia Wykonawcy i zawarcia aneksu do umowy. W sytuacjach określonych w niniejszym punkcie, w przypadku niezawarcia aneksu, każdej ze stron przysługuje prawo odstąpienia od niniejszej Umowy.', margin: [0, 0, 0, 6] });
+  content.push({ text: '10. W przypadku wystąpienia konieczności zmiany Wynagrodzenia Prognozowanego wskazanego w § 1 ust. 3 Umowy na skutek zmian cen katalogowych materiałów/urządzeń potrzebnych dla wykonania przedmiotu umowy, Wykonawca przedstawi Zamawiającemu w formie pisemnej Zawiadomienie o ponownym wyliczeniu Wynagrodzenia Prognozowanego. Oświadczenie zawierać będzie:', margin: [0, 0, 0, 4] });
+  content.push({ text: 'a.  zestawienie materiałów/urządzeń, których cena uległa zmianie z uwzględnieniem cen dotychczasowych oraz cen aktualnych na dzień sporządzania zawiadomienia;', margin: [24, 0, 0, 3] });
+  content.push({ text: 'b.  ponowne wyliczenie Wynagrodzenia Prognozowanego z uwzględnieniem nowych cen materiałów;', margin: [24, 0, 0, 3] });
+  content.push({ text: 'c.  wskazanie miejsca opublikowania nowego katalogu cen.', margin: [24, 0, 0, 6] });
+  content.push({ text: 'Zamawiający po otrzymaniu zawiadomienia Wykonawcy ma prawo w terminie 14 dni w formie pisemnej albo nowe wyliczenie Wynagrodzenia przyjąć z obowiązkiem zapłaty wynagrodzenia wskazanego w Zawiadomieniu albo odstąpić od niniejszej umowy. Nieudzielenie odpowiedzi w terminie wskazanym powyżej uprawnia Wykonawcę do odstąpienia od umowy bez obowiązku zapłaty odstępnego oraz z prawem zatrzymania zaliczki. Przyjęte przez Zamawiającego nowe wyliczenie Wynagrodzenia Prognozowanego jest dla Stron wiążące i zostanie uwzględnione w wystawionej przez Wykonawcę fakturze VAT. Niniejszy punkt stosuje się odpowiednio do wynagrodzenia za wykonanie etapu, w przypadku etapowej realizacji przedmiotu umowy.', margin: [0, 0, 0, 8] });
+
+  // § 4 PRAWA I OBOWIĄZKI ZAMAWIAJĄCEGO
+  content.push({ text: '§ 4', bold: true, alignment: 'center', margin: [0, 10, 0, 4] });
+  content.push({ text: 'Prawa i obowiązki Zamawiającego', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  const p4 = [
+    'Zamawiający jest zobowiązany do udostępnienia terenu budowy lub terenu prac Wykonawcy na czas wykonywania obmiaru, montażu, wykonywania prac i sporządzania protokołów zakończenia prac lub etapu, a także dokonania zapłaty należności tytułem wynagrodzenia, materiałów dodatkowych oraz pokrycia kosztów dodatkowych. Zamawiający zobowiązuje się do odpowiedniego przygotowania miejsca wykonania prac przed ich udostępnieniem, w sposób umożliwiający wykonanie przedmiotu umowy. Zamawiający oświadcza, że instalacja elektryczna w miejscu wykonywania przedmiotu umowy została wykonana i podłączona zgodnie z obowiązującymi normami i przepisami prawa.',
+    'Zamawiający ponosi odpowiedzialność za ewentualne uszkodzenia przedmiotu umowy i materiałów użytych do realizacji umowy spowodowane działaniem osób trzecich, w tym innych pracowników niebędących pracownikami Wykonawcy znajdujących się w miejscu wykonania przedmiotu umowy.',
+    'Zamawiający jest zobowiązany do uczestnictwa przy sporządzaniu protokołów zakończenia prac lub etapu. Przy sporządzaniu protokołu może być reprezentowany także przez pełnomocnika na podstawie pełnomocnictwa szczególnego do dokonania takiej czynności.',
+    'Zamawiający ma prawo do odstąpienia od umowy z winy Wykonawcy, kiedy zwłoka w realizacji umowy przez Wykonawcę przekracza 6 miesięcy.',
+    'W przypadku konieczności przekazania przez Wykonawcę Zamawiającemu danych osobowych pracowników, podwykonawców, pracowników podwykonawców lub innych osób, którym Wykonawca powierzy wykonanie niniejszej umowy w całości lub w części, Zamawiający zobowiązuje się do zachowania w tajemnicy wszelkich przekazanych danych osobowych oraz ich zabezpieczenia. Zamawiający nie ma prawa przetwarzania oraz wykorzystywania przekazanych danych osobowych z wyjątkiem zakresu koniecznego dla realizacji niniejszej umowy. Zamawiający ponosi wobec Wykonawcy odpowiedzialność odszkodowawczą za naruszenie niniejszego postanowienia.',
+    'W przypadku konieczności udostępnienia przez Zamawiającego danych osobowych przekazanych w związku z treścią § 4 ust. 5 niniejszej umowy osobom trzecim, Zamawiający zobowiązuje się do udostępnienia tych danych wyłącznie podmiotom gwarantującym prawidłową realizację postanowień Rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia 27 kwietnia 2016 r. w sprawie ochrony osób fizycznych w związku z przetwarzaniem danych osobowych i w sprawie swobodnego przepływu takich danych oraz uchylenia dyrektywy 95/46/WE.'
+  ];
+  p4.forEach((t, i) => content.push({ text: (i + 1) + '.  ' + t, margin: [0, 0, 0, 6] }));
+
+  // § 5 KARY UMOWNE
+  content.push({ text: '§ 5', bold: true, alignment: 'center', margin: [0, 10, 0, 4] });
+  content.push({ text: 'Kary umowne', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  const p5 = [
+    'W przypadku zwłoki w realizacji umowy, Wykonawca zobowiązuje się do zapłaty kary umownej w wysokości 1% Wynagrodzenia Prognozowanego określonego w § 1 ust. 3 lub wartości etapu prac, którego zwłoka dotyczy, za każdy pełny tydzień zwłoki. Zamawiający nie jest uprawniony do naliczenia Wykonawcy kary umownej, jeżeli niezachowanie terminu realizacji przedmiotu umowy wynika z opóźnienia w dostawie materiałów przez producenta lub dostawcę oraz w przypadku, gdy opóźnienie nie nastąpiło z winy Wykonawcy.',
+    'W przypadku zasadnego odstąpienia od umowy przez Zamawiającego na podstawie § 4 ust. 4 Umowy, Wykonawca zobowiązuje się do zapłaty kary umownej w wysokości 10% Wynagrodzenia Prognozowanego określonego w § 1 ust. 3 Umowy.',
+    'W przypadku nieuzasadnionej odmowy sporządzenia końcowego lub etapowego protokołu zakończenia prac lub nieumożliwienia ich sporządzenia przez Zamawiającego, Wykonawca ma prawo obciążyć Zamawiającego karą umowną w wysokości do 10% Wynagrodzenia Prognozowanego określonego w § 1 ust. 3 lub wartości etapu prac, którego protokół dotyczy, w przypadku realizacji etapowej.',
+    'W przypadku nieudostępnienia miejsca wykonania przedmiotu umowy, Zamawiający zobowiązuje się do zapłaty na rzecz Wykonawcy kary umownej w kwocie ' + penaltyAccess + ' zł. Niniejsze postanowienie stosuje się odpowiednio w sytuacji udostępnienia Wykonawcy miejsca wykonania umowy w stanie uniemożliwiającym lub znacznie utrudniającym wykonanie prac przez Wykonawcę.',
+    'W przypadku skutecznego odstąpienia od umowy przez Wykonawcę na podstawie § 3 ust. 5 Umowy, Zamawiający zobowiązuje się do zapłaty na rzecz Wykonawcy kary umownej w wysokości 5% Wynagrodzenia Prognozowanego określonego w § 1 ust. 3 Umowy.',
+    'W przypadku skutecznego odstąpienia od umowy przez Wykonawcę na podstawie § 3 ust. 6 Umowy, Zamawiający zobowiązuje się do zapłaty na rzecz Wykonawcy kary umownej w wysokości 10 % Wynagrodzenia Prognozowanego określonego w § 1 ust. 3 Umowy.',
+    'Naliczenie kar umownych określonych w niniejszym paragrafie następuje poprzez wystawienie noty obciążeniowej określającej podstawę naliczenia kary umownej oraz 7 dniowy termin zapłaty.'
+  ];
+  p5.forEach((t, i) => content.push({ text: (i + 1) + '.  ' + t, margin: [0, 0, 0, 6] }));
+
+  // § 6 GWARANCJA
+  content.push({ text: '§ 6', bold: true, alignment: 'center', margin: [0, 10, 0, 4] });
+  content.push({ text: 'Gwarancja', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  content.push({ text: '1.  Wykonawca udziela gwarancji na przedmiot umowy na okres, który odpowiada okresowi gwarancji wskazanej w karcie gwarancyjnej wystawionej przez producenta materiałów wykorzystanych do realizacji przedmiotu umowy.', margin: [0, 0, 0, 6] });
+  content.push({ text: '2.  Potwierdzeniem udzielenia przez Wykonawcę gwarancji jest karta gwarancyjna przekazana Zamawiającemu.', margin: [0, 0, 0, 6] });
+  content.push({ text: '3.  Zamawiający zobowiązuje się do dokonywania przeglądów technicznych zgodnie z zaleceniami producenta materiałów wykorzystanych do wykonania przedmiotu umowy. W przypadku niezachowania terminów i zakresu przeglądów zgodnie z zaleceniami producenta gwarancja Wykonawcy wygasa.', margin: [0, 0, 0, 6] });
+  content.push({ text: '4.  Gwarancja nie obejmuje wad materiałowych, jeżeli materiał użyty do realizacji przedmiotu umowy został nabyty przez Zamawiającego we własnym zakresie. W tej sytuacji roszczenia gwarancyjne Zamawiający kieruje bezpośrednio do producenta lub dostawcy. W przypadku wyrażenia zgody przez Wykonawcę, Zamawiający może skierować roszczenie gwarancyjne do producenta lub dostawcy, za jego pośrednictwem.', margin: [0, 0, 0, 6] });
+  content.push({ text: '5.  W przypadku ujawnienia w okresie gwarancji wad lub usterek, Zamawiający poinformuje o tym Wykonawcę na piśmie lub drogą mailową na adres ' + warrantyEmail + ' niezwłocznie, jednak w terminie nie dłuższym niż 7 dni od dnia stwierdzenia wady lub usterki. W sytuacji uznania przez Wykonawcę, że 7 dniowy termin na zgłoszenie wady lub usterki nie został dochowany, Wykonawca może odmówić uznania roszczenia gwarancyjnego.', margin: [0, 0, 0, 6] });
+  content.push({ text: '6.  Gwarancja nie obejmuje uszkodzeń przedmiotu umowy spowodowanych działaniem osób trzecich oraz czynników zewnętrznych tj. nieszczęśliwych wypadków, siły wyższej, uszkodzeń wyrządzonych przez zwierzęta, czynników atmosferycznych.', margin: [0, 0, 0, 6] });
+  content.push({ text: '7.  Wykonawca w przypadku spełnienia warunków gwarancji usunie wady lub usterki bez zbędnej zwłoki w terminie nie dłuższym niż 45 dni od dnia poinformowania o wadach lub usterkach.', margin: [0, 0, 0, 6] });
+  content.push({ text: '8.  W przypadku ingerencji osób trzecich w przedmiot umowy w okresie gwarancji, Zamawiający traci uprawnienia gwarancyjne. Wykonawca może w tej sytuacji odmówić naprawy gwarancyjnej.', margin: [0, 0, 0, 6] });
+  content.push({ text: '9.  Gwarancja nie obejmuje:', margin: [0, 0, 0, 4] });
+  [
+    ['a.', 'uszkodzeń mechanicznych, termicznych lub celowego uszkodzenia sprzętu i wywołania w nim wady,'],
+    ['b.', 'uszkodzeń i wad wynikłych na skutek niewłaściwej lub niezgodnej z instrukcją użytkownika konserwacji, samowolnych (dokonywanych przez użytkownika lub nieupoważnione osoby) napraw, przeróbek lub zmian w konstrukcji, działania zjawisk atmosferycznych, przepięć w sieci, czy wyładowań atmosferycznych'],
+    ['c.', 'nieprawidłowego działania urządzenia spowodowanego złym stanem sieci, łączy czy zakłóceń zewnętrznych,'],
+    ['d.', 'uszkodzeń spowodowanych wpływem czynników zewnętrznych lub nadmiernego obciążenia,'],
+    ['e.', 'uszkodzeń spowodowanych niezgodnymi z instrukcją uruchomieniem, obsługą i przechowywaniem urządzeń,'],
+    ['f.', 'uszkodzeń mechanicznych lub elektrycznych sprzętu powstałych w wyniku niewłaściwej instalacji, konfiguracji, użytkowania i innych działań sprzecznych z właściwościami i przeznaczeniem sprzętu lub instrukcją obsługi/warunkami technicznymi sprzętu;'],
+    ['g.', 'części i akcesoriów zużywających się podczas eksploatacji oraz materiałów eksploatacyjnych;'],
+    ['h.', 'uszkodzeń sprzętu spowodowanych zdarzeniami losowymi, powodziami, pożarami, wyładowaniami atmosferycznymi i innymi klęskami żywiołowymi, wojną, nieprzewidzianymi wypadkami, niewłaściwym napięciem zasilania oraz wadliwością materiałów eksploatacyjnych lub innych czynników zewnętrznych,'],
+    ['i.', 'wad powstałych w wyniku podłączania niewłaściwych urządzeń peryferyjnych,'],
+    ['j.', 'sprzętu ze zniszczonymi lub nieczytelnymi numerami seryjnymi i/lub plombami,'],
+    ['k.', 'uszkodzeń powstałych z winy lub niewiedzy użytkownika, bądź wskutek innych zdarzeń go obciążających,'],
+    ['l.', 'wadliwego działania urządzeń spowodowanego konfliktem lub niezgodnością pomiędzy zainstalowanymi aplikacjami na uszkodzonym sprzęcie oraz na sprzęcie, z którym on w sposób stały współpracuje zgodnie ze swoim przeznaczeniem.']
+  ].forEach(([letter, t]) => content.push({ text: letter + '  ' + t, margin: [24, 0, 0, 3] }));
+  content.push({ text: '10. Szczegółowe warunki gwarancji i serwisu określa karta gwarancyjna.', margin: [0, 6, 0, 6] });
+
+  // § 7 KLAUZULA INFORMACYJNA RODO
+  content.push({ text: '§ 7', bold: true, alignment: 'center', margin: [0, 10, 0, 4] });
+  content.push({ text: 'Klauzula informacyjna RODO', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  content.push({ text: '1.  Zgodnie z art. 13 ust. 1 i 2 Rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia 27 kwietnia 2016 r. w sprawie ochrony osób fizycznych w związku z przetwarzaniem danych osobowych i w sprawie swobodnego przepływu takich danych oraz uchylenia dyrektywy 95/46/WE (ogólne rozporządzenie o ochronie danych), tzw. Firma 4Climat z siedzibą we Wrocławiu informuje, że:', margin: [0, 0, 0, 4] });
+  [
+    'administratorem danych osobowych Zamawiających jest firma 4Climat Tomasz Dobryniewski Consulting z siedzibą we Wrocławiu, ul.Braniborska 14, 53-680 Wrocław, o numerze NIP: 8970001240;',
+    'przetwarzanie danych osobowych odbywa się wyłącznie w celu wykonywania przedmiotu umowy oraz realizacji postanowień gwarancyjnych, a także w celu przedstawienia oferty na usługi związane z przedmiotem umowy.'
+  ].forEach(t => content.push({ text: '–  ' + t, margin: [24, 0, 0, 3] }));
+  content.push({ text: '2.  Dane osobowe są przetwarzane na podstawie art. 6 ust 1 lit. b, c, f RODO:', margin: [0, 6, 0, 4] });
+  [
+    'przetwarzanie jest niezbędne do wykonania umowy, której stroną jest osoba, której dane dotyczą, lub do podjęcia działań na żądanie osoby, której dane dotyczą, przed zawarciem umowy;',
+    'przetwarzanie jest niezbędne do wypełnienia obowiązku prawnego ciążącego na administratorze, w szczególności w zakresie obowiązków podatkowych i księgowych, w celach windykacyjnych jako realizacja prawnie uzasadnionego interesu administratora, w celu prowadzenia korespondencji, w tym także elektronicznej jako realizacja prawnie uzasadnionego interesu administratora.'
+  ].forEach(t => content.push({ text: '–  ' + t, margin: [24, 0, 0, 3] }));
+  const p7rest = [
+    'Dostęp do danych osobowych mają jedynie upoważnieni pracownicy/współpracownicy/podwykonawcy w celu realizacji swoich obowiązków służbowych, a także podmioty świadczące usługi informatyczne, księgowe, prawne, hostingowe oraz w zakresie świadczenia usług związanych z utrzymaniem poczty elektronicznej.',
+    'Dane osobowe nie są przekazywane do państwa trzeciego lub organizacji międzynarodowych.',
+    'Dane osobowe będą przetwarzane przez 5 lat od końca roku, w którym zakończyło się wykonywanie przedmiotu umowy, w ramach której dane osobowe zostały zgromadzone w zakresie danych przetwarzanych w ramach wykonywania działalności gospodarczej przez administratora danych',
+    'W pozostałych przypadkach dane osobowe będą przetwarzane tak długo, jak wymagają tego odpowiednie przepisy prawa, w szczególności podatkowe i rachunkowe oraz tak długo jak jest to niezbędne do ustalenia, dochodzenia lub obrony roszczeń.',
+    'Zamawiający ma prawo do:'
+  ];
+  p7rest.forEach((t, i) => content.push({ text: (i + 3) + '.  ' + t, margin: [0, 6, 0, 4] }));
+  [
+    'dostępu do danych osobowych (art. 15 ust. 1 RODO),',
+    'otrzymania kopii danych osobowych (art. 15 ust. 3 RODO),',
+    'sprostowania lub uaktualnienia danych osobowych (art. 16 RODO),',
+    'usunięcia danych osobowych (art. 17 RODO),',
+    'przenoszenia swoich danych osobowych, tj. do otrzymania od Administratora informacji o przetwarzanych danych osobowych, w ustrukturyzowanym, powszechnie używanym formacie nadającym się do odczytu maszynowego wyłącznie w zakresie, w jakim dane osobowe są przetwarzane w celu zawarcia i wykonywania umowy i są przetwarzane w sposób zautomatyzowany (art. 20 RODO),',
+    'wniesienia skargi do Prezesa Urzędu Ochrony Danych Osobowych w przypadku, gdy przetwarzanie danych osobowych narusza przepisy RODO.'
+  ].forEach(t => content.push({ text: '–  ' + t, margin: [24, 0, 0, 3] }));
+  content.push({ text: '8.  W celu skorzystania z przysługujących praw, należy kontaktować się z administratorem pod adresem wskazanym w umowie.', margin: [0, 6, 0, 6] });
+  content.push({ text: '9.  Podanie danych osobowych jest konieczne do zawarcia i wykonania umowy oraz w celu realizacji prawnie uzasadnionego interesu oraz obowiązku administratora.', margin: [0, 0, 0, 6] });
+  content.push({ text: '10. Dane osobowe nie są wykorzystywane w celu profilowania.', margin: [0, 0, 0, 6] });
+
+  // § 8 PRAWO ODSTĄPIENIA
+  content.push({ text: '§ 8', bold: true, alignment: 'center', margin: [0, 10, 0, 4] });
+  content.push({ text: 'Prawo odstąpienia od umowy', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: '1.  Każdej ze stron, w wypadkach innych niż określonych w § 3 ust. 5, 6, 7, 9, 10 i § 4 ust. 4 Umowy, przysługuje prawo odstąpienia od niniejszej umowy z przyczyn niezależnych od drugiej strony, za zapłatą drugiej stronie odstępnego w wysokości ' + withdrawalPct + '% Wynagrodzenia Prognozowanego określonego w § 1 ust. 3 Umowy.', margin: [0, 0, 0, 6] });
+  content.push({ text: '2.  Oświadczenie o odstąpieniu od umowy jest skuteczne tylko wtedy, gdy zostało złożone jednocześnie z zapłatą odstępnego.', margin: [0, 0, 0, 6] });
+  content.push({ text: '3.  Kwota odstępnego może być potrącona przez Wykonawcę z zapłaconą przez Zamawiającego zaliczką, na co Zamawiający wyraża zgodę.', margin: [0, 0, 0, 6] });
+
+  // § 9 POSTANOWIENIA KOŃCOWE
+  content.push({ text: '§ 9', bold: true, alignment: 'center', margin: [0, 10, 0, 4] });
+  content.push({ text: 'Postanowienia końcowe', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  const p9 = [
+    'Wszelkie zmiany umowy wymagają zachowania formy pisemnej pod rygorem nieważności.',
+    'Strony zgodnie postanawiają, że zawarcie umowy oraz jej zmiana może odbyć się także za pośrednictwem środków komunikacji elektronicznej. Skuteczne zawarcie umowy drogą komunikacji elektronicznej wymaga potwierdzenia akceptacji postanowień umowy w wiadomości zwrotnej lub też odesłania podpisanej przez Zamawiającego umowy skanem w wiadomości zwrotnej w terminie 3 dni od daty przesłania umowy przez Wykonawcę Zamawiającemu.',
+    'Przesłana drogą komunikacji elektronicznej umowa stanowi ofertę w rozumieniu Kodeksu Cywilnego przez okres 3 dni od dnia jej nadesłania przez Wykonawcę Zamawiającemu.',
+    'Stwierdzenie nieważności lub abuzywności któregokolwiek z postanowień niniejszej umowy nie powoduje nieważności całej umowy.',
+    'Wszelkie spory mogące wyniknąć na umowy będą rozstrzygane przez Sąd właściwy dla siedziby Wykonawcy. Prawem właściwym dla niniejszej umowy, jest prawo kraju siedziby Wykonawcy.',
+    'W sprawach nieuregulowanych niniejszą umową mają zastosowanie przepisy Kodeksu Cywilnego i inne przepisy prawa powszechnie obowiązującego.',
+    'Strony mogą wprowadzić do niniejszej umowy postanowienia szczegółowe, niezależnie od treści niniejszej umowy. Postanowienia szczegółowe uwzględnia się wyłącznie w polu zatytułowanym: „Postanowienia szczegółowe". Postanowienia szczegółowe mają pierwszeństwo przed postanowieniami niniejszej umowy w zakresie w jakim pozostają z nią w sprzeczności.',
+    'Umowa została sporządzona w dwóch egzemplarzach, po jednym dla każdej ze stron.'
+  ];
+  p9.forEach((t, i) => content.push({ text: (i + 1) + '.  ' + t, margin: [0, 0, 0, 6] }));
+
+  // Postanowienia szczegółowe (opcjonalne)
+  if (d.specialTerms && String(d.specialTerms).trim()) {
+    content.push({ text: 'Postanowienia szczegółowe', bold: true, alignment: 'center', margin: [0, 14, 0, 8] });
+    content.push({ text: String(d.specialTerms), margin: [0, 0, 0, 10] });
+  }
+
+  // PODPISY
+  content.push({
+    margin: [0, 40, 0, 0],
+    columns: [
+      { width: '*', stack: [
+        { text: 'ZAMAWIAJĄCY', alignment: 'center', bold: true, fontSize: 11, margin: [0, 0, 0, 30] },
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' }
+      ]},
+      { width: '*', stack: [
+        { text: 'WYKONAWCA', alignment: 'center', bold: true, fontSize: 11, margin: [0, 0, 0, 30] },
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' }
+      ]}
+    ]
+  });
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [50, 50, 50, 50],
+    defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#1A2332', lineHeight: 1.35, alignment: 'justify' },
+    content: content
+  };
+}
+
+/* PDF: Protokół zakończenia prac — uproszczona, bezpieczna struktura */
+function _ctrDocDefProtokolPrac(src, rec) {
+  const client = clientsDb.find(x => x.id === src.client_id) || {};
+  const d = src.data || {};
+  const company = (d.company && typeof d.company === 'object') ? d.company : CTR_COMPANY_DEFAULT;
+
+  const content = [];
+
+  content.push({ text: 'PROTOKÓŁ ZAKOŃCZENIA PRAC', fontSize: 20, bold: true, color: '#0F3461', alignment: 'center', margin: [0, 0, 0, 4] });
+  content.push({ text: 'z dnia ' + _ctrFmtDate(src.contract_date) + ' sporządzony w ' + (src.place_signed || 'Wrocławiu'), alignment: 'center', fontSize: 11, color: '#475569', margin: [0, 0, 0, 20] });
+
+  // Wykonawca
+  content.push({ text: 'Wykonawca:', bold: true, color: '#0F3461', margin: [0, 0, 0, 4] });
+  content.push({ text: company.name || CTR_COMPANY_DEFAULT.name, bold: true, margin: [10, 0, 0, 2] });
+  content.push({ text: company.address || CTR_COMPANY_DEFAULT.address, margin: [10, 0, 0, 2] });
+  content.push({ text: 'NIP: ' + (company.nip || CTR_COMPANY_DEFAULT.nip), margin: [10, 0, 0, 2] });
+  if (company.regon) content.push({ text: 'REGON: ' + company.regon, margin: [10, 0, 0, 2] });
+
+  // Zamawiający
+  content.push({ text: ' ', margin: [0, 10, 0, 0] });
+  content.push({ text: 'Zamawiający: ' + (client.name || '(brak danych)'), bold: true, color: '#0F3461', margin: [0, 0, 0, 4] });
+  if (client.address) content.push({ text: client.address, margin: [10, 0, 0, 2] });
+  if (client.nip)     content.push({ text: 'PESEL/NIP: ' + client.nip, margin: [10, 0, 0, 2] });
+  if (client.phone)   content.push({ text: 'telefon: ' + client.phone, margin: [10, 0, 0, 2] });
+  if (client.email)   content.push({ text: 'e-mail: ' + client.email, margin: [10, 0, 0, 2] });
+
+  // Odniesienie do umowy
+  if (d.relatedContractRef) {
+    content.push({ text: ' ', margin: [0, 10, 0, 0] });
+    content.push({ text: 'Dotyczy: ' + d.relatedContractRef, bold: true });
+  }
+
+  // Opis prac — proste stringi bez zagnieżdżeń
+  const descLine = d.buildingAddress
+    ? 'Niniejszy protokół zakończenia prac został sporządzony w związku z wykonaniem przez Wykonawcę przedmiotu umowy oznaczonego w umowie określonej powyżej. Strony stwierdzają, że Wykonawca zakończył prace w budynku położonym w ' + d.buildingAddress + '. Po skontrolowaniu zakresu wykonanej usługi oraz sposobu jej wykonania dokonano odbioru.'
+    : 'Niniejszy protokół zakończenia prac został sporządzony w związku z wykonaniem przez Wykonawcę przedmiotu umowy oznaczonego w umowie określonej powyżej. Strony stwierdzają, że Wykonawca zakończył prace. Po skontrolowaniu zakresu wykonanej usługi oraz sposobu jej wykonania dokonano odbioru.';
+  content.push({ text: descLine, margin: [0, 14, 0, 12] });
+
+  // Wykonane prace w ramce
+  content.push({ text: 'Zakres wykonanych prac:', bold: true, color: '#0F3461', margin: [0, 4, 0, 4] });
+  content.push({
+    table: {
+      widths: ['*'],
+      body: [[{ text: d.workDescription || '(brak opisu)', margin: [10, 8, 10, 8] }]]
+    },
+    layout: {
+      fillColor: function() { return '#F8FBFD'; },
+      hLineColor: function() { return '#DCE9F5'; },
+      vLineColor: function() { return '#DCE9F5'; },
+      hLineWidth: function() { return 0.5; },
+      vLineWidth: function() { return 0.5; }
+    },
+    margin: [0, 0, 0, 14]
+  });
+
+  content.push({ text: 'Data zakończenia prac: ' + _ctrFmtDate(d.completionDate), bold: true, margin: [0, 0, 0, 14] });
+
+  // Zastrzeżenia
+  content.push({ text: 'Zastrzeżenia Zamawiającego:', bold: true, color: '#0F3461', margin: [0, 4, 0, 4] });
+  content.push({
+    table: {
+      widths: ['*'],
+      body: [[{ text: d.reservations || 'NIE ZGŁOSZONO ŻADNYCH ZASTRZEŻEŃ', margin: [10, 8, 10, 8], italics: String(d.reservations || '').includes('NIE ZGŁOSZONO') }]]
+    },
+    layout: {
+      fillColor: function() { return '#F8FBFD'; },
+      hLineColor: function() { return '#DCE9F5'; },
+      vLineColor: function() { return '#DCE9F5'; },
+      hLineWidth: function() { return 0.5; },
+      vLineWidth: function() { return 0.5; }
+    },
+    margin: [0, 0, 0, 20]
+  });
+
+  content.push({ text: 'Na tym protokół zakończono i podpisano.', italics: true, alignment: 'center', color: '#475569', margin: [0, 8, 0, 30] });
+
+  // Podpisy — bez canvas
+  content.push({
+    columns: [
+      { width: '*', stack: [
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' },
+        { text: 'ZA WYKONAWCĘ', alignment: 'center', margin: [0, 6, 0, 0], fontSize: 10, color: '#475569', bold: true },
+        { text: company.representedBy || 'Tomasz Dobryniewski', alignment: 'center', fontSize: 9, color: '#94A3B8', italics: true }
+      ]},
+      { width: '*', stack: [
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' },
+        { text: 'ZAMAWIAJĄCY', alignment: 'center', margin: [0, 6, 0, 0], fontSize: 10, color: '#475569', bold: true },
+        { text: client.name || '', alignment: 'center', fontSize: 9, color: '#94A3B8', italics: true }
+      ]}
+    ]
+  });
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [50, 55, 50, 50],
+    defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#1A2332', lineHeight: 1.4 },
+    content: content
+  };
+}
+
+/* ============================================================
    BAZA ZAMONTOWANYCH URZĄDZEŃ + SERWISY
    ============================================================ */
 
@@ -19599,10 +21029,6 @@ function _ssRenderEditor() {
           <option value="inne" ${_ssEditing.building_type === 'inne' ? 'selected' : ''}>Inne</option>
         </select>
       </div>
-      <div>
-        <label class="ss-label">Rok budowy</label>
-        <input type="text" class="ss-input" value="${escapeHtml(_ssEditing.building_year || '')}" onchange="_ssSet('building_year', this.value)" placeholder="1998">
-      </div>
       <div style="grid-column:span 2;">
         <label class="ss-label">Dojazd, klucze, kod bramy, godziny pracy (dla ekipy)</label>
         <textarea class="ss-input" rows="2" onchange="_ssSet('access_notes', this.value)" placeholder="np. Klucze u sąsiadki (mieszkanie 4). Wjazd od tyłu, kod bramy 1234#. Pracownicy w domu od 8:00 do 16:00.">${escapeHtml(_ssEditing.access_notes || '')}</textarea>
@@ -19636,28 +21062,9 @@ function _ssRenderEditor() {
       <div style="grid-column:span 2;margin-top:10px;">
         <div class="ss-section-h">3. Elektryka</div>
       </div>
-      <div>
-        <label class="ss-label">Zasilanie</label>
-        <select class="ss-input" onchange="_ssSet('power_phase', this.value)">
-          <option value="1F" ${_ssEditing.power_phase === '1F' ? 'selected' : ''}>Jednofazowe (230V)</option>
-          <option value="3F" ${_ssEditing.power_phase === '3F' ? 'selected' : ''}>Trójfazowe (400V)</option>
-        </select>
-      </div>
-      <div>
-        <label class="ss-label">Bezpiecznik główny</label>
-        <input type="text" class="ss-input" value="${escapeHtml(_ssEditing.power_main_breaker || '')}" onchange="_ssSet('power_main_breaker', this.value)" placeholder="C25, B16...">
-      </div>
-      <div>
-        <label class="ss-label">Lokalizacja rozdzielni</label>
-        <input type="text" class="ss-input" value="${escapeHtml(_ssEditing.power_panel_location || '')}" onchange="_ssSet('power_panel_location', this.value)" placeholder="Korytarz, pod schodami">
-      </div>
-      <div>
-        <label class="ss-label">Dystans do agregatu (mb)</label>
-        <input type="number" step="0.1" class="ss-input" value="${_ssEditing.power_distance_mb || ''}" onchange="_ssSet('power_distance_mb', this.value === '' ? null : parseFloat(this.value))">
-      </div>
       <div style="grid-column:span 2;">
-        <label class="ss-label">Notatki elektryczne</label>
-        <textarea class="ss-input" rows="2" onchange="_ssSet('power_notes', this.value)" placeholder="np. Wymagana wolna śruba B16 na rozdzielni. Trasa kabla w kanału pod sufitem.">${escapeHtml(_ssEditing.power_notes || '')}</textarea>
+        <label class="ss-label">Notatki elektryczne dla ekipy montażowej</label>
+        <textarea class="ss-input" rows="3" onchange="_ssSet('power_notes', this.value)" placeholder="np. Zasilanie 1F 230V, bezpiecznik C25. Rozdzielnia w korytarzu pod schodami. Wymagana wolna śruba B16. Trasa kabla w kanału pod sufitem. Dystans do agregatu ok. 8 mb.">${escapeHtml(_ssEditing.power_notes || '')}</textarea>
       </div>
 
       ${isHp ? `
@@ -19694,21 +21101,9 @@ function _ssRenderEditor() {
         <div style="grid-column:span 2;margin-top:10px;">
           <div class="ss-section-h">4. Odprowadzenie skroplin</div>
         </div>
-        <div>
-          <label class="ss-label">Odprowadzenie do</label>
-          <select class="ss-input" onchange="_ssSet('condensate_target', this.value)">
-            <option value="kanalizacja" ${_ssEditing.condensate_target === 'kanalizacja' ? 'selected' : ''}>Kanalizacja</option>
-            <option value="balkon"      ${_ssEditing.condensate_target === 'balkon'      ? 'selected' : ''}>Balkon / na zewnątrz</option>
-            <option value="zbiornik"    ${_ssEditing.condensate_target === 'zbiornik'    ? 'selected' : ''}>Zbiornik</option>
-          </select>
-        </div>
-        <div>
-          <label class="ss-label">Długość trasy skroplin (mb)</label>
-          <input type="number" step="0.1" class="ss-input" value="${_ssEditing.condensate_length_mb || ''}" onchange="_ssSet('condensate_length_mb', this.value === '' ? null : parseFloat(this.value))">
-        </div>
         <div style="grid-column:span 2;">
-          <label class="ss-label">Notatki dot. skroplin</label>
-          <textarea class="ss-input" rows="2" onchange="_ssSet('condensate_notes', this.value)" placeholder="np. Grawitacyjnie do syfonu pod umywalką. Pompka nie potrzebna.">${escapeHtml(_ssEditing.condensate_notes || '')}</textarea>
+          <label class="ss-label">Notatki dot. skroplin dla ekipy montażowej</label>
+          <textarea class="ss-input" rows="3" onchange="_ssSet('condensate_notes', this.value)" placeholder="np. Grawitacyjnie do syfonu pod umywalką (ok. 4 mb). Pompka nie potrzebna. Alternatywnie — na balkon do zbiornika.">${escapeHtml(_ssEditing.condensate_notes || '')}</textarea>
         </div>
       `}
 
@@ -21134,14 +22529,12 @@ async function ssGeneratePdfForContractor() {
     ['Klient (osoba kontaktowa)', clientName],
     ['Telefon', na(s.contact_phone)],
     ['Adres montażu', na(s.address)],
-    ['Dostępność (kiedy zastać)', na(s.availability)],
     ['Dojazd, klucze, kod bramy, uwagi wejściowe', na(s.access_notes)]
   ])));
 
   // SEKCJA 2: Budynek + zakres
   content.push(_ssSection('2. Obiekt i zakres prac', _ssRows([
     ['Typ obiektu', _ssLbl('building_type', s.building_type)],
-    ['Rok budowy', na(s.building_year)],
     ['Zakres montażu', _ssLbl('scope', s.scope)]
   ])));
 
@@ -21177,19 +22570,13 @@ async function ssGeneratePdfForContractor() {
 
   // SEKCJA 4: Elektryka
   content.push(_ssSection('4. Zasilanie i elektryka', _ssRows([
-    ['Typ zasilania', _ssLbl('power_phase', s.power_phase)],
-    ['Zabezpieczenie główne (rozdzielnia)', na(s.power_main_breaker)],
-    ['Lokalizacja rozdzielni', na(s.power_panel_location)],
-    ['Odległość rozdzielnia → agregat', s.power_distance_mb ? s.power_distance_mb + ' mb' : '—'],
-    ['Uwagi elektryczne', na(s.power_notes)]
+    ['Notatki elektryczne (dla ekipy)', na(s.power_notes)]
   ])));
 
   // SEKCJA 5A: Skropliny (AC)
   if (isAc) {
     content.push(_ssSection('5. Odprowadzenie skroplin (klimatyzacja)', _ssRows([
-      ['Docelowe miejsce', _ssLbl('condensate_target', s.condensate_target)],
-      ['Długość odprowadzenia', s.condensate_length_mb ? s.condensate_length_mb + ' mb' : '—'],
-      ['Uwagi', na(s.condensate_notes)]
+      ['Notatki dot. skroplin (dla ekipy)', na(s.condensate_notes)]
     ])));
   }
 
@@ -21222,21 +22609,22 @@ async function ssGeneratePdfForContractor() {
       text: 'Legenda kolorów adnotacji: czerwony = trasa freonu, niebieski = hydraulika/skropliny, zielony = elektryka, pomarańczowy = uwaga.',
       fontSize: 8, italics: true, color: '#64748B', margin: [0, 0, 0, 10]
     });
-    // Grid 2 kolumn — 2 zdjęcia obok siebie, każda para w unbreakable stack
+    // 2 zdjęcia na stronę A4 — każde duże (fit szerokość ~515pt), ułożone pionowo pod sobą
+    // Break strony po każdej parze żeby ostro rozdzielić grupy 1-2, 3-4, 5-6...
     for (let i = 0; i < bakedPhotos.length; i += 2) {
-      const left = bakedPhotos[i];
-      const right = bakedPhotos[i+1] || null;
-      content.push({
-        unbreakable: true,
-        stack: [{
-          columns: [
-            _ssPhotoCard(left),
-            right ? _ssPhotoCard(right) : { text: '', width: '*' }
-          ],
-          columnGap: 10
-        }],
-        margin: [0, 0, 0, 12]
-      });
+      const first = bakedPhotos[i];
+      const second = bakedPhotos[i+1] || null;
+      // Pierwsze zdjęcie z pary
+      content.push(_ssBigPhotoBlock(first));
+      // Drugie (jeśli jest) — pod pierwszym na tej samej stronie
+      if (second) {
+        content.push({ text: '', margin: [0, 8, 0, 0] });
+        content.push(_ssBigPhotoBlock(second));
+      }
+      // Break przed następną parą (jeśli będzie)
+      if (i + 2 < bakedPhotos.length) {
+        content.push({ text: '', pageBreak: 'after' });
+      }
     }
   }
 
@@ -21360,6 +22748,30 @@ function _ssPhotoCard(photo) {
           ], border: [false, false, false, false], margin: [6, 6, 6, 6], fillColor: '#F8FBFD' }
         ]] },
         margin: [0, 4, 0, 0]
+      }
+    ]
+  };
+}
+
+/* Duże zdjęcie zajmujące pełną szerokość strony — używane w PDF wizji lokalnej.
+   2 takie zdjęcia mieszczą się na jednej stronie A4 (portret).
+   fit: [515, 340] — szerokość strony A4 (595 - 2×40 margin = 515pt), wysokość ~340pt (2 zdjęcia + opisy zmieszczą się na ~800pt użytecznej wysokości). */
+function _ssBigPhotoBlock(photo) {
+  const desc = photo.description ? photo.description : '(bez opisu)';
+  const annCount = Array.isArray(photo.annotations) ? photo.annotations.length : 0;
+  return {
+    unbreakable: true,
+    stack: [
+      { image: photo.bakedBase64, fit: [515, 340], alignment: 'center' },
+      {
+        table: { widths: ['*'], body: [[
+          { stack: [
+            { text: `Zdjęcie ${photo.idx}`, fontSize: 9, bold: true, color: '#0F3461' },
+            { text: desc, fontSize: 10, color: '#1A2332', margin: [0, 3, 0, 0] },
+            annCount > 0 ? { text: `${annCount} adnotacja/e na zdjęciu`, fontSize: 8, italics: true, color: '#94A3B8', margin: [0, 3, 0, 0] } : {}
+          ], border: [false, false, false, false], margin: [10, 8, 10, 8], fillColor: '#F8FBFD' }
+        ]] },
+        margin: [0, 6, 0, 0]
       }
     ]
   };
