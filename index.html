@@ -2710,43 +2710,48 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
 
       <!-- SEKCJA: ZAMONTOWANE URZĄDZENIA -->
       <section id="v2-section-installed_units" class="v2-section">
-        <h1 class="v2-page-title">Zamontowane urządzenia</h1>
-        <p class="v2-page-subtitle">Baza urządzeń u klientów — auto-planowanie przeglądów, historia serwisów, śledzenie gwarancji.</p>
+        <h1 class="v2-page-title">Zamontowane instalacje</h1>
+        <p class="v2-page-subtitle">Baza instalacji u klientów — auto-planowanie przeglądów, historia serwisów, śledzenie gwarancji.</p>
         <div class="v2-toolbar">
-          <label class="v2-toolbar__label">Typ:</label>
-          <select id="iuTypeFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()">
-            <option value="all">Wszystkie</option>
-            <option value="ac_split">Klimatyzator split</option>
-            <option value="ac_multi_zew">Klima — jedn. zew.</option>
-            <option value="ac_multi_wew">Klima — jedn. wew.</option>
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input id="iuSearch" type="text" placeholder="Szukaj po kliencie, adresie, marce, modelu, S/N..." oninput="renderInstalledUnitsList()">
+          </div>
+          <select id="iuTypeFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()" title="Typ instalacji">
+            <option value="all">Wszystkie typy</option>
+            <option value="ac_split">Split (klimatyzacja)</option>
+            <option value="ac_multi_zew">Multisplit (klimatyzacja)</option>
             <option value="hp">Pompa ciepła</option>
             <option value="rekuperator">Rekuperator</option>
             <option value="inne">Inne</option>
           </select>
-          <label class="v2-toolbar__label">Serwis:</label>
-          <select id="iuServiceFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()">
-            <option value="all">Wszystkie</option>
+          <select id="iuBrandFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()" title="Marka">
+            <option value="all">Wszystkie marki</option>
+          </select>
+          <select id="iuServiceFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()" title="Status serwisu">
+            <option value="all">Serwis: wszystkie</option>
             <option value="overdue">Przeterminowane</option>
             <option value="soon">W ciągu 30 dni</option>
             <option value="ok">W terminie</option>
           </select>
-          <label class="v2-toolbar__label">Status:</label>
-          <select id="iuStatusFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()">
+          <select id="iuWarrantyFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()" title="Status gwarancji">
+            <option value="all">Gwarancja: wszystkie</option>
+            <option value="active">W gwarancji</option>
+            <option value="ending">Kończy się (90 dni)</option>
+            <option value="expired">Po gwarancji</option>
+          </select>
+          <select id="iuStatusFilter" class="v2-toolbar__select" onchange="renderInstalledUnitsList()" title="Status rekordu">
             <option value="active">Aktywne</option>
-            <option value="all">Wszystkie</option>
+            <option value="all">+ archiwalne</option>
             <option value="archived">Zarchiwizowane</option>
             <option value="removed">Wycofane</option>
           </select>
-          <div class="v2-toolbar__search v2-toolbar__search--flex">
-            <i class="ti ti-search" aria-hidden="true"></i>
-            <input id="iuSearch" type="text" placeholder="Szukaj po marce, modelu, S/N, kliencie, adresie..." oninput="renderInstalledUnitsList()">
-          </div>
           <button class="v2-btn v2-btn--primary" onclick="openInstalledUnitEditor(null)">
-            <i class="ti ti-plus"></i> Dodaj urządzenie
+            <i class="ti ti-plus"></i> Dodaj instalację
           </button>
         </div>
         <div id="iuSummary" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;"></div>
-        <div class="v2-panel" id="iuListWrap" style="margin-top:12px;">
+        <div class="v2-panel" id="iuListWrap" style="margin-top:12px;padding:0;background:transparent;border:none;">
           <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
         </div>
       </section>
@@ -19827,6 +19832,12 @@ function _iuBlank() {
     last_service_date: null,
     status: 'active',
     notes: '',
+    // Dla splita (ac_split) — jednostka wewnętrzna ma własne pola z prefixem indoor_
+    indoor_marka: '',
+    indoor_model: '',
+    indoor_serial_number: '',
+    indoor_power_kw: null,
+    indoor_location_room: '',
     // Tylko dla multi_zew — draft listy jednostek wewnętrznych (nie zapisywane bezpośrednio,
     // konwertowane na osobne rekordy z parent_unit_id przy zapisie parenta)
     _indoor_units_draft: []
@@ -19966,22 +19977,80 @@ function _iuRenderEditor() {
             <label class="ss-label">Moc (kW)</label>
             <input type="number" step="0.1" class="ss-input" value="${u.power_kw || ''}" onchange="_iuSet('power_kw', this.value === '' ? null : parseFloat(this.value))" placeholder="np. 3.5">
           </div>
-          <div>
-            <label class="ss-label">Marka *</label>
-            <input type="text" class="ss-input" value="${escapeHtml(u.marka || '')}" onchange="_iuSet('marka', this.value)" placeholder="np. HAIER" list="iuBrandsList">
-            <datalist id="iuBrandsList">
-              ${['HAIER','GREE','LG','PANASONIC','SAMSUNG','TOSHIBA','MITSUBISHI','DAIKIN','VIESSMANN','VAILLANT','KAISAI','SINCLAIR'].map(b => `<option value="${b}">`).join('')}
-            </datalist>
-          </div>
-          <div>
-            <label class="ss-label">Model *</label>
-            <input type="text" class="ss-input" value="${escapeHtml(u.model || '')}" onchange="_iuSet('model', this.value)" placeholder="np. Jade Plus 2,6 kW">
-          </div>
-          <div style="grid-column:span 2;">
-            <label class="ss-label">Numer seryjny</label>
-            <input type="text" class="ss-input" value="${escapeHtml(u.serial_number || '')}" onchange="_iuSet('serial_number', this.value)" placeholder="np. XY123456789 — potrzebny do zgłoszeń gwarancyjnych">
-          </div>
         </div>
+
+        ${u.device_type === 'ac_split' ? `
+          <div style="margin-top:14px;padding:12px 14px;background:#F8FBFD;border:1px solid #DCE9F5;border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="background:#F3E8FF;color:#6B21A8;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-building" style="font-size:11px;"></i> JEDNOSTKA ZEWNĘTRZNA</div>
+              <div style="font-size:11px;color:#64748B;">Agregat na fasadzie / dachu</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label class="ss-label">Marka *</label>
+                <input type="text" class="ss-input" value="${escapeHtml(u.marka || '')}" onchange="_iuSet('marka', this.value)" placeholder="np. DAIKIN" list="iuBrandsList">
+                <datalist id="iuBrandsList">
+                  ${['HAIER','GREE','LG','PANASONIC','SAMSUNG','TOSHIBA','MITSUBISHI','DAIKIN','VIESSMANN','VAILLANT','KAISAI','SINCLAIR'].map(b => `<option value="${b}">`).join('')}
+                </datalist>
+              </div>
+              <div>
+                <label class="ss-label">Model *</label>
+                <input type="text" class="ss-input" value="${escapeHtml(u.model || '')}" onchange="_iuSet('model', this.value)" placeholder="np. RXA35A5V1B8">
+              </div>
+              <div style="grid-column:span 2;">
+                <label class="ss-label">Numer seryjny</label>
+                <input type="text" class="ss-input" value="${escapeHtml(u.serial_number || '')}" onchange="_iuSet('serial_number', this.value)" placeholder="np. T026168">
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;padding:12px 14px;background:#FEFCE8;border:1px solid #FDE68A;border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="background:#FEF3C7;color:#92400E;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-home" style="font-size:11px;"></i> JEDNOSTKA WEWNĘTRZNA</div>
+              <div style="font-size:11px;color:#64748B;">Panel w pomieszczeniu</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label class="ss-label">Marka</label>
+                <input type="text" class="ss-input" value="${escapeHtml(u.indoor_marka || u.marka || '')}" onchange="_iuSet('indoor_marka', this.value)" placeholder="Zwykle ta sama co zewnętrzna">
+              </div>
+              <div>
+                <label class="ss-label">Model *</label>
+                <input type="text" class="ss-input" value="${escapeHtml(u.indoor_model || '')}" onchange="_iuSet('indoor_model', this.value)" placeholder="np. FTXA35C2V1BW">
+              </div>
+              <div>
+                <label class="ss-label">Numer seryjny</label>
+                <input type="text" class="ss-input" value="${escapeHtml(u.indoor_serial_number || '')}" onchange="_iuSet('indoor_serial_number', this.value)" placeholder="np. J075380">
+              </div>
+              <div>
+                <label class="ss-label">Moc (kW)</label>
+                <input type="number" step="0.1" class="ss-input" value="${u.indoor_power_kw || ''}" onchange="_iuSet('indoor_power_kw', this.value === '' ? null : parseFloat(this.value))" placeholder="Zwykle ta sama co zewnętrzna">
+              </div>
+              <div style="grid-column:span 2;">
+                <label class="ss-label">Pomieszczenie</label>
+                <input type="text" class="ss-input" value="${escapeHtml(u.indoor_location_room || u.location_room || '')}" onchange="_iuSet('indoor_location_room', this.value)" placeholder="np. Salon, sypialnia, gabinet">
+              </div>
+            </div>
+          </div>
+        ` : `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div>
+              <label class="ss-label">Marka *</label>
+              <input type="text" class="ss-input" value="${escapeHtml(u.marka || '')}" onchange="_iuSet('marka', this.value)" placeholder="np. HAIER" list="iuBrandsList">
+              <datalist id="iuBrandsList">
+                ${['HAIER','GREE','LG','PANASONIC','SAMSUNG','TOSHIBA','MITSUBISHI','DAIKIN','VIESSMANN','VAILLANT','KAISAI','SINCLAIR'].map(b => `<option value="${b}">`).join('')}
+              </datalist>
+            </div>
+            <div>
+              <label class="ss-label">Model *</label>
+              <input type="text" class="ss-input" value="${escapeHtml(u.model || '')}" onchange="_iuSet('model', this.value)" placeholder="np. Jade Plus 2,6 kW">
+            </div>
+            <div style="grid-column:span 2;">
+              <label class="ss-label">Numer seryjny</label>
+              <input type="text" class="ss-input" value="${escapeHtml(u.serial_number || '')}" onchange="_iuSet('serial_number', this.value)" placeholder="np. XY123456789 — potrzebny do zgłoszeń gwarancyjnych">
+            </div>
+          </div>
+        `}
 
         <div class="ss-section-h" style="margin:16px 0 8px;">3. Serwis i gwarancja</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
@@ -20217,9 +20286,13 @@ async function saveInstalledUnit() {
   if (!payload.created_by) payload.created_by = currentUser?.email ? currentUser.email.split('@')[0] : null;
 
   // Sanityzacja pustych stringów
-  ['power_kw', 'warranty_years', 'service_interval_months'].forEach(k => {
+  ['power_kw', 'warranty_years', 'service_interval_months', 'indoor_power_kw'].forEach(k => {
     if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
     if (typeof payload[k] === 'string') payload[k] = payload[k] ? parseFloat(payload[k]) : null;
+  });
+  // Puste stringi dla pól indoor_ też zamień na null (żeby nie zaśmiecały bazy pustymi stringami)
+  ['indoor_marka', 'indoor_model', 'indoor_serial_number', 'indoor_location_room'].forEach(k => {
+    if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
   });
   ['offer_id', 'site_survey_id', 'parent_unit_id'].forEach(k => {
     if (payload[k] === '' || payload[k] === undefined) payload[k] = null;
@@ -20327,28 +20400,98 @@ async function deleteInstalledUnit(unitId) {
   }
 }
 
+/* Rozwinięte multisplity — pamięć między filtrowaniem/re-renderami */
+let _iuExpandedIds = new Set();
+
+/* Status gwarancji */
+function _iuGetWarrantyStatus(u) {
+  if (!u.warranty_end) return { key: 'unknown', label: 'Brak danych', color: '#94A3B8' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const end = new Date(u.warranty_end);
+  const diffDays = Math.floor((end - today) / (24 * 3600 * 1000));
+  if (diffDays < 0) return { key: 'expired', label: 'Po gwarancji', color: '#DC2626' };
+  if (diffDays <= 90) return { key: 'ending', label: `Kończy się za ${diffDays} dni`, color: '#D97706' };
+  return { key: 'active', label: 'W gwarancji', color: '#059669' };
+}
+
+/* Etykieta i akcent typu instalacji */
+function _iuInstallationBadge(u, childrenCount) {
+  const type = u.device_type;
+  if (type === 'ac_multi_zew') {
+    return {
+      label: 'Multi × ' + (childrenCount || 0),
+      bg: '#DBEAFE', color: '#1E40AF',
+      accentBg: 'linear-gradient(to right, #EEF2F7 0px, #fff 4px)',
+      icon: 'ti-topology-star-3',
+      typeName: 'Multisplit'
+    };
+  }
+  if (type === 'ac_split') {
+    return {
+      label: 'Split × 2',
+      bg: '#F3E8FF', color: '#6B21A8',
+      accentBg: 'linear-gradient(to right, #FAF5FF 0px, #fff 4px)',
+      icon: 'ti-air-conditioning',
+      typeName: 'Split'
+    };
+  }
+  if (type === 'hp') {
+    return {
+      label: 'Pompa ciepła',
+      bg: '#DCFCE7', color: '#166534',
+      accentBg: 'linear-gradient(to right, #F0FDF4 0px, #fff 4px)',
+      icon: 'ti-flame',
+      typeName: 'Pompa ciepła'
+    };
+  }
+  if (type === 'rekuperator') {
+    return {
+      label: 'Rekuperacja',
+      bg: '#FFEDD5', color: '#9A3412',
+      accentBg: 'linear-gradient(to right, #FFF7ED 0px, #fff 4px)',
+      icon: 'ti-wind',
+      typeName: 'Rekuperator'
+    };
+  }
+  return {
+    label: 'Inne', bg: '#F1F5F9', color: '#475569',
+    accentBg: '#fff', icon: 'ti-device-desktop', typeName: 'Urządzenie'
+  };
+}
+
+function _iuToggleExpand(id) {
+  if (_iuExpandedIds.has(id)) _iuExpandedIds.delete(id);
+  else _iuExpandedIds.add(id);
+  renderInstalledUnitsList();
+}
+
 function renderInstalledUnitsList() {
   const wrap = document.getElementById('iuListWrap');
   if (!wrap) return;
-  const typeF   = document.getElementById('iuTypeFilter')?.value || 'all';
-  const svcF    = document.getElementById('iuServiceFilter')?.value || 'all';
-  const statusF = document.getElementById('iuStatusFilter')?.value || 'active';
-  const search  = (document.getElementById('iuSearch')?.value || '').toLowerCase().trim();
+  const typeF     = document.getElementById('iuTypeFilter')?.value || 'all';
+  const brandF    = document.getElementById('iuBrandFilter')?.value || 'all';
+  const svcF      = document.getElementById('iuServiceFilter')?.value || 'all';
+  const warF      = document.getElementById('iuWarrantyFilter')?.value || 'all';
+  const statusF   = document.getElementById('iuStatusFilter')?.value || 'active';
+  const search    = (document.getElementById('iuSearch')?.value || '').toLowerCase().trim();
+
+  // Zbuduj listę marek dla dropdownu (raz)
+  const brandDrop = document.getElementById('iuBrandFilter');
+  if (brandDrop && brandDrop.options.length <= 1) {
+    const brands = [...new Set(installedUnitsDb.map(u => u.marka).filter(Boolean))].sort();
+    brands.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b; opt.textContent = b;
+      brandDrop.appendChild(opt);
+    });
+    // Przywróć wybór jeśli był
+    if (brandF !== 'all') brandDrop.value = brandF;
+  }
 
   let list = [...installedUnitsDb];
   if (statusF !== 'all') list = list.filter(u => u.status === statusF);
-  if (typeF !== 'all') list = list.filter(u => u.device_type === typeF);
-  if (svcF !== 'all') list = list.filter(u => _iuGetServiceStatus(u).key === svcF);
-  if (search) {
-    list = list.filter(u => {
-      const client = clientsDb.find(c => c.id === u.client_id);
-      const blob = [u.marka, u.model, u.serial_number, u.installation_address, u.location_room, client?.name, client?.phone].filter(Boolean).join(' ').toLowerCase();
-      return blob.includes(search);
-    });
-  }
 
-  // Filtruj dzieci multi-splitów — pokazuj je tylko jako dzieci parenta, nie osobno
-  // (chyba że użytkownik szuka konkretnie po parametrach wewnętrznej)
+  // Zbuduj dzieci najpierw, żeby móc filtrować "instalacje" (parent + jego dzieci)
   const childrenByParent = {};
   list.forEach(u => {
     if (u.parent_unit_id) {
@@ -20356,97 +20499,299 @@ function renderInstalledUnitsList() {
       childrenByParent[u.parent_unit_id].push(u);
     }
   });
-  const topLevel = list.filter(u => !u.parent_unit_id);
-  // Jeśli w wynikach jest dziecko którego rodzic NIE ma w wynikach (bo nie pasuje do filtrów) —
-  // pokaż go jednak samodzielnie u góry z informacją że jest częścią instalacji
-  const orphanChildren = list.filter(u => u.parent_unit_id && !topLevel.find(p => p.id === u.parent_unit_id));
+
+  // Instalacje = urządzenia top-level (bez parent_unit_id)
+  // W przypadku multi: jedn. zewn. + jej dzieci = jedna instalacja
+  // W przypadku split/HP/rekuperator: samodzielna jednostka = jedna instalacja
+  let installations = list.filter(u => !u.parent_unit_id);
+
+  // Filtr typu
+  if (typeF !== 'all') installations = installations.filter(u => u.device_type === typeF);
+  // Filtr marki
+  if (brandF !== 'all') installations = installations.filter(u => u.marka === brandF);
+  // Filtr status serwisu
+  if (svcF !== 'all') installations = installations.filter(u => _iuGetServiceStatus(u).key === svcF);
+  // Filtr gwarancji
+  if (warF !== 'all') installations = installations.filter(u => _iuGetWarrantyStatus(u).key === warF);
+  // Wyszukiwarka (pełnotekstowa — w tym po jedn. wewnętrznych multisplitu i splitu!)
+  if (search) {
+    installations = installations.filter(u => {
+      const client = clientsDb.find(c => c.id === u.client_id);
+      const kids = childrenByParent[u.id] || [];
+      const kidsBlob = kids.map(k => [k.marka, k.model, k.serial_number, k.location_room].filter(Boolean).join(' ')).join(' ');
+      const blob = [
+        u.marka, u.model, u.serial_number, u.installation_address, u.location_room,
+        u.indoor_marka, u.indoor_model, u.indoor_serial_number, u.indoor_location_room,
+        client?.name, client?.phone, kidsBlob
+      ].filter(Boolean).join(' ').toLowerCase();
+      return blob.includes(search);
+    });
+  }
 
   // Summary badges
   const summary = document.getElementById('iuSummary');
   if (summary) {
-    const active = installedUnitsDb.filter(u => u.status === 'active').length;
-    const overdue = installedUnitsDb.filter(u => u.status === 'active' && _iuGetServiceStatus(u).key === 'overdue').length;
-    const soon = installedUnitsDb.filter(u => u.status === 'active' && _iuGetServiceStatus(u).key === 'soon').length;
+    const totalInstallations = installedUnitsDb.filter(u => u.status === 'active' && !u.parent_unit_id).length;
+    const totalClients = new Set(installedUnitsDb.filter(u => u.status === 'active' && u.client_id).map(u => u.client_id)).size;
+    const overdue = installedUnitsDb.filter(u => u.status === 'active' && !u.parent_unit_id && _iuGetServiceStatus(u).key === 'overdue').length;
+    const soon = installedUnitsDb.filter(u => u.status === 'active' && !u.parent_unit_id && _iuGetServiceStatus(u).key === 'soon').length;
+    const warEnding = installedUnitsDb.filter(u => u.status === 'active' && !u.parent_unit_id && _iuGetWarrantyStatus(u).key === 'ending').length;
     summary.innerHTML = `
-      <div style="padding:8px 14px;background:#EFF6FF;border-radius:7px;font-size:11.5px;color:#1E40AF;font-weight:600;"><i class="ti ti-device-desktop"></i> Aktywnych urządzeń: <strong>${active}</strong></div>
-      ${overdue > 0 ? `<div style="padding:8px 14px;background:#FEF2F2;border-radius:7px;font-size:11.5px;color:#991B1B;font-weight:600;"><i class="ti ti-alert-triangle"></i> Przeterminowane serwisy: <strong>${overdue}</strong></div>` : ''}
-      ${soon > 0 ? `<div style="padding:8px 14px;background:#FFFBEB;border-radius:7px;font-size:11.5px;color:#92400E;font-weight:600;"><i class="ti ti-clock"></i> W ciągu 30 dni: <strong>${soon}</strong></div>` : ''}
+      <div style="padding:8px 14px;background:#EFF6FF;border-radius:7px;font-size:11.5px;color:#1E40AF;font-weight:600;display:flex;align-items:center;gap:6px;"><i class="ti ti-box"></i> Aktywnych instalacji: <strong>${totalInstallations}</strong> u ${totalClients} klientów</div>
+      ${overdue > 0 ? `<div style="padding:8px 14px;background:#FEF2F2;border-radius:7px;font-size:11.5px;color:#991B1B;font-weight:600;display:flex;align-items:center;gap:6px;"><i class="ti ti-alert-triangle"></i> Przeterminowane serwisy: <strong>${overdue}</strong></div>` : ''}
+      ${soon > 0 ? `<div style="padding:8px 14px;background:#FFFBEB;border-radius:7px;font-size:11.5px;color:#92400E;font-weight:600;display:flex;align-items:center;gap:6px;"><i class="ti ti-clock"></i> Serwis w ciągu 30 dni: <strong>${soon}</strong></div>` : ''}
+      ${warEnding > 0 ? `<div style="padding:8px 14px;background:#FFF7ED;border-radius:7px;font-size:11.5px;color:#9A3412;font-weight:600;display:flex;align-items:center;gap:6px;"><i class="ti ti-shield-half"></i> Gwarancja kończy się (90 dni): <strong>${warEnding}</strong></div>` : ''}
     `;
   }
 
-  if (list.length === 0) {
+  if (installations.length === 0) {
     wrap.innerHTML = `
-      <div style="padding:40px 20px;text-align:center;color:#64748B;">
-        <i class="ti ti-device-desktop-off" style="font-size:32px;color:#CBD5E1;"></i>
-        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">${installedUnitsDb.length === 0 ? 'Baza jest pusta' : 'Brak wyników dla filtrów'}</div>
-        <div style="margin-top:6px;font-size:12px;">${installedUnitsDb.length === 0 ? 'Dodaj pierwsze zamontowane urządzenie.' : 'Zmień filtry lub wyszukiwarkę.'}</div>
+      <div style="padding:60px 20px;text-align:center;color:#64748B;background:#fff;border-radius:10px;border:1px solid #E2E8F0;">
+        <i class="ti ti-device-desktop-off" style="font-size:36px;color:#CBD5E1;"></i>
+        <div style="margin-top:12px;font-size:14px;font-weight:600;color:#334155;">${installedUnitsDb.length === 0 ? 'Baza jest pusta' : 'Brak wyników dla filtrów'}</div>
+        <div style="margin-top:6px;font-size:12px;">${installedUnitsDb.length === 0 ? 'Dodaj pierwszą zamontowaną instalację.' : 'Zmień filtry lub wyszukiwarkę.'}</div>
       </div>
     `;
     return;
   }
 
-  // Zbuduj płaską listę: parent → jego dzieci pod spodem, potem sieroty
-  const flatRows = [];
-  topLevel.forEach(u => {
-    flatRows.push({ ...u, _isChild: false });
-    const kids = childrenByParent[u.id] || [];
-    kids.forEach(k => flatRows.push({ ...k, _isChild: true }));
+  // Sortuj: najnowsze montaże na górze
+  installations.sort((a, b) => {
+    const da = a.installation_date || a.created_at || '';
+    const db = b.installation_date || b.created_at || '';
+    return db.localeCompare(da);
   });
-  orphanChildren.forEach(u => flatRows.push({ ...u, _isChild: false, _isOrphan: true }));
 
+  // Renderuj listę
   wrap.innerHTML = `
-    <div style="max-height:calc(100vh - 380px);overflow-y:auto;">
-      <table style="width:100%;border-collapse:collapse;">
-        <thead style="position:sticky;top:0;z-index:1;">
-          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
-            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Typ</th>
-            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Klient</th>
-            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Urządzenie</th>
-            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">S/N</th>
-            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Montaż</th>
-            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Nast. serwis</th>
-            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Gwarancja</th>
-            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;"></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${flatRows.map(u => {
-            const svc = _iuGetServiceStatus(u);
-            const client = clientsDb.find(c => c.id === u.client_id);
-            const typeColor = IU_DEVICE_COLORS[u.device_type] || '#64748B';
-            const warrantyStatus = u.warranty_end_date ? (new Date(u.warranty_end_date) > new Date() ? 'W gwarancji' : 'Po gwarancji') : '—';
-            const warrantyColor = u.warranty_end_date ? (new Date(u.warranty_end_date) > new Date() ? '#059669' : '#94A3B8') : '#94A3B8';
-            const rowBg = u._isChild ? '#FAFCFF' : (u._isOrphan ? '#FFFBEB' : 'transparent');
-            const indent = u._isChild ? 'padding-left:32px;position:relative;' : '';
-            const branchMarker = u._isChild ? '<span style="position:absolute;left:14px;color:#94A3B8;font-family:monospace;">└─</span>' : '';
-            return `
-              <tr style="border-bottom:1px solid #F1F5F9;cursor:pointer;background:${rowBg};" onclick="openInstalledUnitEditor('${u.id}')" onmouseover="this.style.background='#EFF6FF'" onmouseout="this.style.background='${rowBg}'">
-                <td style="padding:9px 14px;font-size:11px;white-space:nowrap;${indent}">
-                  ${branchMarker}
-                  <span style="padding:2px 8px;background:${typeColor}15;color:${typeColor};border-radius:10px;font-weight:600;">${escapeHtml(IU_DEVICE_LABELS[u.device_type] || u.device_type)}</span>
-                  ${u._isOrphan ? '<span style="margin-left:6px;padding:1px 6px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:9.5px;font-weight:700;">CZĘŚĆ INSTALACJI</span>' : ''}
-                </td>
-                <td style="padding:9px 14px;font-size:12px;color:#0A2647;font-weight:${u._isChild ? '400' : '600'};">${u._isChild ? '' : escapeHtml(client?.name || '—')}${u.location_room ? `<div style="font-size:10.5px;color:#94A3B8;font-weight:400;">${escapeHtml(u.location_room)}</div>` : ''}</td>
-                <td style="padding:9px 14px;font-size:12px;color:#334155;"><strong>${escapeHtml(u.marka)}</strong>${u.model ? ' · ' + escapeHtml(u.model) : ''}${u.power_kw ? ` <span style="color:#64748B;">(${u.power_kw} kW)</span>` : ''}</td>
-                <td style="padding:9px 14px;font-size:11px;color:#64748B;font-family:monospace;">${escapeHtml(u.serial_number || '—')}</td>
-                <td style="padding:9px 14px;font-size:11.5px;text-align:center;color:#64748B;white-space:nowrap;">${u._isChild ? '<span style="color:#CBD5E1;">↑</span>' : _iuFmtDate(u.installation_date)}</td>
-                <td style="padding:9px 14px;font-size:11.5px;text-align:center;white-space:nowrap;">
-                  ${u._isChild ? '<span style="color:#CBD5E1;font-size:10.5px;">wspólny z zew.</span>' : `
-                    <span style="padding:2px 8px;background:${svc.color}15;color:${svc.color};border-radius:5px;font-weight:600;">${svc.label}</span>
-                    ${u.next_service_date && svc.key !== 'none' ? `<div style="font-size:9.5px;color:#94A3B8;margin-top:2px;">${_iuFmtDate(u.next_service_date)}</div>` : ''}
-                  `}
-                </td>
-                <td style="padding:9px 14px;font-size:11px;text-align:center;color:${warrantyColor};font-weight:600;">${u._isChild ? '<span style="color:#CBD5E1;">—</span>' : warrantyStatus + (u.warranty_end_date ? `<div style="font-size:9.5px;color:#94A3B8;font-weight:400;">do ${_iuFmtDate(u.warranty_end_date)}</div>` : '')}</td>
-                <td style="padding:9px 14px;text-align:center;">
-                  ${u._isChild ? '' : `<button onclick="event.stopPropagation(); openServiceVisitEditor(null, {installed_unit_id: '${u.id}', client_id: '${u.client_id || ''}'})" title="Zaplanuj serwis" style="padding:4px 8px;background:#F1F5F9;color:#0F3461;border:none;border-radius:5px;font-size:11px;cursor:pointer;"><i class="ti ti-plus" style="font-size:11px;"></i> Serwis</button>`}
-                </td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
+    <div style="background:#fff;border-radius:10px;border:1px solid #E2E8F0;overflow:hidden;">
+      ${installations.map(u => _iuRenderInstallationRow(u, childrenByParent[u.id] || [])).join('')}
     </div>
   `;
+}
+
+/* Renderuje jeden wiersz instalacji (split / multi / HP / rekuperacja) */
+function _iuRenderInstallationRow(u, children) {
+  const client = clientsDb.find(c => c.id === u.client_id);
+  const badge = _iuInstallationBadge(u, children.length);
+  const svcStatus = _iuGetServiceStatus(u);
+  const warStatus = _iuGetWarrantyStatus(u);
+  const isMulti = u.device_type === 'ac_multi_zew';
+  const isSplit = u.device_type === 'ac_split';
+  const isExpanded = _iuExpandedIds.has(u.id);
+  const address = u.installation_address || (client?.address) || '—';
+
+  // Podpis — różny per typ
+  let subtitle;
+  if (isMulti) {
+    subtitle = 'S/N zewn.: ' + (u.serial_number || '—');
+  } else if (isSplit) {
+    // Split — podpis zawiera tylko S/N zewn. (indoor pokazany w rozwiniętym panelu)
+    subtitle = 'S/N zewn.: ' + (u.serial_number || '—');
+  } else {
+    subtitle = [u.location_room, u.serial_number ? 'S/N: ' + u.serial_number : null].filter(Boolean).join(' · ') || '—';
+  }
+
+  // Split ma także rozwijalny panel — pokazuje jednostkę wewnętrzną
+  const canExpand = isMulti || (isSplit && (u.indoor_model || u.indoor_serial_number || u.indoor_location_room));
+  const expandCount = isMulti ? children.length : (isSplit ? 1 : 0);
+
+  return `
+    <div style="border-bottom:1px solid #F1F5F9;">
+      <div style="padding:14px 16px;background:${badge.accentBg};display:grid;grid-template-columns:minmax(0,2.2fr) 1.4fr 100px 130px 120px 90px;gap:14px;align-items:center;cursor:${canExpand ? 'pointer' : 'default'};" ${canExpand ? `onclick="_iuToggleExpand('${u.id}')"` : ''}>
+
+        <div style="min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">
+            <span style="background:${badge.bg};color:${badge.color};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ${badge.icon}" style="font-size:11px;"></i> ${badge.label.toUpperCase()}</span>
+            ${u.marka ? `<span style="font-size:11px;color:#64748B;font-weight:600;">${escapeHtml(u.marka)}</span>` : ''}
+          </div>
+          <div style="font-size:14px;font-weight:700;color:#0A2647;">${escapeHtml(u.model || '(bez modelu)')}${u.power_kw ? ' <span style="color:#64748B;font-weight:500;">' + u.power_kw + ' kW</span>' : ''}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">${escapeHtml(subtitle)}</div>
+        </div>
+
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#0A2647;">${escapeHtml(client?.name || '—')}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;display:flex;align-items:center;gap:4px;"><i class="ti ti-map-pin" style="font-size:11px;"></i> ${escapeHtml(address)}</div>
+        </div>
+
+        <div style="font-size:11px;">
+          <div style="color:#94A3B8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Montaż</div>
+          <div style="color:#0A2647;font-weight:600;margin-top:2px;">${u.installation_date ? _iuFmtDate(u.installation_date) : '—'}</div>
+        </div>
+
+        <div style="font-size:11px;">
+          <div style="color:#94A3B8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Nast. serwis</div>
+          <div style="margin-top:3px;">
+            ${svcStatus.key !== 'none' ? `<span style="background:${svcStatus.key === 'overdue' ? '#FEE2E2' : svcStatus.key === 'soon' ? '#FEF3C7' : '#DCFCE7'};color:${svcStatus.color};font-weight:600;padding:2px 8px;border-radius:4px;font-size:10.5px;">${svcStatus.label}</span>` : '<span style="color:#94A3B8;">—</span>'}
+          </div>
+        </div>
+
+        <div style="font-size:11px;">
+          <div style="color:#94A3B8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;">Gwarancja</div>
+          <div style="color:${warStatus.color};font-weight:600;margin-top:2px;font-size:11px;">${warStatus.key === 'unknown' ? '—' : (u.warranty_end ? 'do ' + _iuFmtDate(u.warranty_end) : warStatus.label)}</div>
+        </div>
+
+        <div style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
+          ${canExpand ? `
+            <button onclick="event.stopPropagation(); _iuToggleExpand('${u.id}')" title="${isExpanded ? 'Zwiń' : (isMulti ? 'Rozwiń jednostki wewnętrzne' : 'Rozwiń jedn. wewnętrzną')}" style="background:${isExpanded ? '#0F3461' : 'transparent'};color:${isExpanded ? '#fff' : '#0F3461'};border:1px solid ${isExpanded ? '#0F3461' : '#CBD5E1'};padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+              <i class="ti ti-chevron-${isExpanded ? 'up' : 'down'}" style="font-size:12px;"></i>
+              ${expandCount}
+            </button>
+          ` : ''}
+          <button onclick="event.stopPropagation(); _iuOpenActionsMenu(event, '${u.id}')" title="Akcje" style="background:transparent;color:#64748B;border:1px solid #E2E8F0;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;">
+            <i class="ti ti-dots" style="font-size:13px;"></i>
+          </button>
+        </div>
+      </div>
+
+      ${isMulti && isExpanded ? _iuRenderChildrenPanel(u, children) : ''}
+      ${isSplit && isExpanded ? _iuRenderSplitIndoorPanel(u) : ''}
+    </div>
+  `;
+}
+
+/* Panel jedn. wewnętrznej dla splita — pokazuje zewn. + wewn. side by side */
+function _iuRenderSplitIndoorPanel(u) {
+  return `
+    <div style="padding:14px 20px 14px 24px;background:#F8FBFD;border-top:1px solid #E2E8F0;border-left:3px solid #DDD6FE;">
+      <div style="font-size:10px;color:#6B21A8;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-air-conditioning"></i> Skład instalacji split
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+        <div style="background:#fff;border:1px solid #DCE9F5;border-radius:6px;padding:12px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <div style="background:#DBEAFE;color:#1E40AF;width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;"><i class="ti ti-building" style="font-size:12px;"></i></div>
+            <div style="font-size:10.5px;color:#1E40AF;text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Jednostka zewnętrzna</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:#0A2647;">${escapeHtml(u.marka || '—')} · ${escapeHtml(u.model || '(bez modelu)')}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:3px;">S/N: <span style="font-family:monospace;color:#334155;">${escapeHtml(u.serial_number || '—')}</span></div>
+          ${u.power_kw ? `<div style="font-size:11px;color:#64748B;margin-top:2px;">Moc: ${u.power_kw} kW</div>` : ''}
+        </div>
+
+        <div style="background:#fff;border:1px solid #FDE68A;border-radius:6px;padding:12px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <div style="background:#FEF3C7;color:#92400E;width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;"><i class="ti ti-home" style="font-size:12px;"></i></div>
+            <div style="font-size:10.5px;color:#92400E;text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Jednostka wewnętrzna</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:#0A2647;">${escapeHtml(u.indoor_marka || u.marka || '—')} · ${escapeHtml(u.indoor_model || '(bez modelu)')}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:3px;">S/N: <span style="font-family:monospace;color:#334155;">${escapeHtml(u.indoor_serial_number || '—')}</span></div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">${u.indoor_location_room || u.location_room ? 'Pomieszczenie: ' + escapeHtml(u.indoor_location_room || u.location_room) : ''}${u.indoor_power_kw ? ' · Moc: ' + u.indoor_power_kw + ' kW' : ''}</div>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+/* Panel z jednostkami wewnętrznymi multisplita */
+function _iuRenderChildrenPanel(parent, children) {
+  if (children.length === 0) {
+    return `
+      <div style="padding:14px 20px;background:#F8FBFD;border-top:1px solid #E2E8F0;border-left:3px solid #93C5FD;">
+        <div style="font-size:11.5px;color:#64748B;font-style:italic;display:flex;align-items:center;gap:6px;">
+          <i class="ti ti-alert-circle" style="font-size:14px;color:#F59E0B;"></i>
+          Brak zdefiniowanych jednostek wewnętrznych. Kliknij "Edytuj" żeby je dodać.
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div style="padding:14px 20px 14px 24px;background:#F8FBFD;border-top:1px solid #E2E8F0;border-left:3px solid #93C5FD;">
+      <div style="font-size:10px;color:#1E40AF;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-topology-star-3"></i> Jednostki wewnętrzne (${children.length})
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">
+        ${children.map((c, i) => `
+          <div style="background:#fff;border:1px solid #DCE9F5;border-radius:6px;padding:10px 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+              <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                <div style="background:#DBEAFE;color:#1E40AF;width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${i + 1}</div>
+                <div style="font-size:12px;font-weight:700;color:#0A2647;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.location_room || 'Bez lokalizacji')}</div>
+              </div>
+              ${c.power_kw ? `<span style="font-size:10px;color:#64748B;font-weight:600;background:#F1F5F9;padding:1px 6px;border-radius:3px;flex-shrink:0;">${c.power_kw} kW</span>` : ''}
+            </div>
+            <div style="font-size:11px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.model || '(brak modelu)')}</div>
+            <div style="font-size:10.5px;color:#94A3B8;margin-top:3px;font-family:monospace;">S/N: ${escapeHtml(c.serial_number || '—')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* Menu akcji dla wiersza (edit / archiwizuj / usuń / serwis) */
+function _iuOpenActionsMenu(event, unitId) {
+  event.stopPropagation();
+  // Zamknij istniejące menu
+  document.querySelectorAll('.iu-actions-menu').forEach(m => m.remove());
+
+  const u = installedUnitsDb.find(x => x.id === unitId);
+  if (!u) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'iu-actions-menu';
+  menu.style.cssText = 'position:fixed;background:#fff;border:1px solid #CBD5E1;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);padding:4px;z-index:9999;min-width:180px;font-size:12.5px;';
+
+  const rect = event.target.closest('button').getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = (rect.right - 180) + 'px';
+
+  menu.innerHTML = `
+    <button onclick="openInstalledUnitEditor('${unitId}'); _iuCloseActionsMenu()" style="width:100%;text-align:left;padding:8px 12px;background:transparent;border:none;font-size:12px;color:#0F3461;cursor:pointer;display:flex;align-items:center;gap:8px;border-radius:5px;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'"><i class="ti ti-pencil" style="font-size:14px;"></i> Edytuj</button>
+    <button onclick="openServiceVisitEditor(null, {installed_unit_id: '${unitId}', client_id: '${u.client_id || ''}'}); _iuCloseActionsMenu()" style="width:100%;text-align:left;padding:8px 12px;background:transparent;border:none;font-size:12px;color:#0F3461;cursor:pointer;display:flex;align-items:center;gap:8px;border-radius:5px;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'"><i class="ti ti-tool" style="font-size:14px;"></i> Zaplanuj serwis</button>
+    ${u.client_id ? `<button onclick="v2ShowSection('clients'); _iuCloseActionsMenu()" style="width:100%;text-align:left;padding:8px 12px;background:transparent;border:none;font-size:12px;color:#0F3461;cursor:pointer;display:flex;align-items:center;gap:8px;border-radius:5px;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'"><i class="ti ti-user" style="font-size:14px;"></i> Przejdź do klienta</button>` : ''}
+    <div style="border-top:1px solid #E2E8F0;margin:4px 0;"></div>
+    <button onclick="_iuArchive('${unitId}'); _iuCloseActionsMenu()" style="width:100%;text-align:left;padding:8px 12px;background:transparent;border:none;font-size:12px;color:#64748B;cursor:pointer;display:flex;align-items:center;gap:8px;border-radius:5px;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'"><i class="ti ti-archive" style="font-size:14px;"></i> Zarchiwizuj</button>
+    <button onclick="_iuDelete('${unitId}'); _iuCloseActionsMenu()" style="width:100%;text-align:left;padding:8px 12px;background:transparent;border:none;font-size:12px;color:#991B1B;cursor:pointer;display:flex;align-items:center;gap:8px;border-radius:5px;" onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='transparent'"><i class="ti ti-trash" style="font-size:14px;"></i> Usuń</button>
+  `;
+
+  document.body.appendChild(menu);
+
+  // Zamknij menu przy klik gdzie indziej
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target)) {
+        _iuCloseActionsMenu();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
+}
+
+function _iuCloseActionsMenu() {
+  document.querySelectorAll('.iu-actions-menu').forEach(m => m.remove());
+}
+
+async function _iuArchive(unitId) {
+  if (!confirm('Zarchiwizować tę instalację? Nie będzie widoczna w widoku domyślnym, ale zostanie w bazie.')) return;
+  try {
+    await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(unitId), 'PATCH', { status: 'archived' });
+    showToast('Zarchiwizowano');
+    await loadInstalledUnits();
+    renderInstalledUnitsList();
+  } catch(e) { showToast('Błąd: ' + (e.message || e)); }
+}
+
+async function _iuDelete(unitId) {
+  const u = installedUnitsDb.find(x => x.id === unitId);
+  if (!u) return;
+  const children = installedUnitsDb.filter(c => c.parent_unit_id === unitId);
+  const warning = children.length > 0
+    ? `Usunąć TĘ INSTALACJĘ wraz z ${children.length} jednostkami wewnętrznymi? Operacja jest nieodwracalna.`
+    : 'Usunąć tę instalację? Operacja jest nieodwracalna.';
+  if (!confirm(warning)) return;
+  try {
+    // Cascade delete: najpierw dzieci
+    for (const c of children) {
+      await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(c.id), 'DELETE');
+    }
+    await sbFetch('/rest/v1/installed_units?id=eq.' + encodeURIComponent(unitId), 'DELETE');
+    showToast('Usunięto');
+    await loadInstalledUnits();
+    renderInstalledUnitsList();
+  } catch(e) { showToast('Błąd: ' + (e.message || e)); }
 }
 
 /* ==================== SERWISY ==================== */
