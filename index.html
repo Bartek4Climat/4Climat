@@ -2787,6 +2787,9 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
           <button class="v2-btn v2-btn--primary" onclick="openServiceVisitEditor(null)">
             <i class="ti ti-plus"></i> Nowy serwis
           </button>
+          <button class="v2-btn" onclick="openReminderCenter()" style="background:#F1F5F9;color:#0F3461;border:1px solid #CBD5E1;" title="Wyślij przypomnienia klientom o zbliżającym się serwisie">
+            <i class="ti ti-bell"></i> Przypomnienia
+          </button>
         </div>
         <div id="svSummary" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;"></div>
         <div class="v2-panel" id="svListWrap" style="margin-top:12px;">
@@ -12363,101 +12366,491 @@ async function showClientCard(clientId) {
   document.getElementById('clientCardTitle').textContent = c.name;
   document.getElementById('clientCardModal').classList.add('modal-backdrop--open');
   const body = document.getElementById('clientCardBody');
-  body.innerHTML = '<div style="text-align:center;padding:30px;color:#94A3B8;">Ładowanie historii ofert...</div>';
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:#94A3B8;">Ładowanie karty klienta...</div>';
 
-  // Załaduj oferty z Supabase
-  let offers = [];
+  // Zapamiętaj id + aktualnie aktywną zakładkę
+  window._clientCardCurrentId = clientId;
+  if (!window._clientCardTab) window._clientCardTab = 'overview';
+
+  // Załaduj wszystkie dane związane z klientem równolegle
+  let offers = [], contracts = [], units = [], services = [], surveys = [];
   try {
-    const data = await sbFetch('/rest/v1/offers?client_id=eq.' + encodeURIComponent(clientId) + '&order=created_at.desc&select=*');
-    offers = data || [];
+    const [oRes, cRes, uRes, sRes, svRes] = await Promise.all([
+      sbFetch('/rest/v1/offers?client_id=eq.' + encodeURIComponent(clientId) + '&order=created_at.desc&select=*').catch(() => []),
+      sbFetch('/rest/v1/contracts?client_id=eq.' + encodeURIComponent(clientId) + '&order=contract_date.desc&select=*').catch(() => []),
+      sbFetch('/rest/v1/installed_units?client_id=eq.' + encodeURIComponent(clientId) + '&order=installation_date.desc&select=*').catch(() => []),
+      (typeof loadServiceVisits === 'function' ? sbFetch('/rest/v1/service_visits?client_id=eq.' + encodeURIComponent(clientId) + '&order=scheduled_date.desc&select=*').catch(() => []) : Promise.resolve([])),
+      sbFetch('/rest/v1/site_surveys?client_id=eq.' + encodeURIComponent(clientId) + '&order=survey_date.desc&select=*').catch(() => [])
+    ]);
+    offers = oRes || [];
+    contracts = cRes || [];
+    units = uRes || [];
+    services = sRes || [];
+    surveys = svRes || [];
   } catch(e) {
-    // Fallback do lokalnych ofert
-    offers = (c.offers || []).map(o => ({
-      offer_no: o.offerNo,
-      total_br: o.totalBr,
-      file_name: o.fileName,
-      created_at: o.date,
-      user_email: null,
-      scope: null
-    }));
+    console.warn('Client card data load error:', e);
   }
+
+  // Follow-upy — z lokalnych klienta
+  const followups = Array.isArray(c.followUps) ? c.followUps : (typeof fuForClient === 'function' ? fuForClient(clientId) : []);
+
+  window._clientCardData = { client: c, offers, contracts, units, services, surveys, followups };
+  _renderClientCard();
+}
+
+function _renderClientCard() {
+  const data = window._clientCardData;
+  if (!data) return;
+  const c = data.client;
+  const tab = window._clientCardTab || 'overview';
 
   const fmtPLN = n => Number(n||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' zł';
   const fmtDate = d => d ? new Date(d).toLocaleDateString('pl-PL') : '—';
-  const totalValue = offers.reduce((s, o) => s + (parseFloat(o.total_br)||0), 0);
 
-  const scopeLabel = s => ({ac:'Klimatyzacja', hp:'Pompa ciepła', both:'Klima + PC', custom:'Dowolna'}[s] || s || '—');
+  // Summary counts
+  const openInstallations = data.units.filter(u => u.status === 'active' && !u.parent_unit_id).length;
+  const totalOffersValue = data.offers.reduce((s, o) => s + (parseFloat(o.total_br) || 0), 0);
+  const activeContracts = data.contracts.filter(x => x.status === 'active' || x.status === 'draft').length;
+  const upcomingServices = data.services.filter(s => s.status === 'planned' && new Date(s.scheduled_date) >= new Date(new Date().setHours(0,0,0,0))).length;
+  const pendingFollowups = Array.isArray(data.followups) ? data.followups.filter(f => !f.done).length : 0;
 
-  const offersHtml = offers.length === 0
-    ? '<div style="text-align:center;padding:30px;color:#94A3B8;font-size:13px;">Brak ofert dla tego klienta</div>'
-    : `<table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr style="background:#F8FBFD;border-bottom:2px solid #D8E3EE;">
-            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">DATA</th>
-            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">NR OFERTY</th>
-            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">ZAKRES</th>
-            <th style="padding:9px 12px;text-align:right;font-size:11px;color:#1B4F8C;font-weight:700;">WARTOŚĆ</th>
-            <th style="padding:9px 12px;text-align:left;font-size:11px;color:#1B4F8C;font-weight:700;">HANDLOWIEC</th>
-            <th style="padding:9px 12px;text-align:center;font-size:11px;color:#1B4F8C;font-weight:700;">AKCJE</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${offers.map((o,i) => `
-            <tr style="border-bottom:1px solid #F1F5F9;${i%2===0?'':'background:#FAFCFF'}">
-              <td style="padding:9px 12px;font-size:12px;color:#64748B;">${fmtDate(o.created_at)}</td>
-              <td style="padding:9px 12px;font-size:12px;font-weight:700;color:#1B4F8C;">${escapeHtml(o.offer_no||'—')}</td>
-              <td style="padding:9px 12px;font-size:12px;">${scopeLabel(o.scope)}</td>
-              <td style="padding:9px 12px;font-size:13px;font-weight:700;text-align:right;color:#1B4F8C;">${fmtPLN(o.total_br)}</td>
-              <td style="padding:9px 12px;font-size:11px;color:#94A3B8;">${o.user_email ? o.user_email.split('@')[0] : '—'}</td>
-              <td style="padding:9px 12px;text-align:center;">
-                ${o.id ? `
-                  <button onclick="previewOfferPdf('${o.id}')" title="Podgląd PDF (bez edycji)" style="padding:5px 10px;background:#0F3461;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">
-                    <i class="ti ti-eye" style="font-size:11px;"></i> PDF
-                  </button>
-                ` : `<span style="font-size:11px;color:#94A3B8;">—</span>`}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>`;
-
+  const body = document.getElementById('clientCardBody');
   body.innerHTML = `
-    <!-- Dane klienta -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;padding:16px;background:#F8FBFD;border-radius:12px;">
-      <div>
-        <div style="font-size:11px;color:#1B4F8C;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Dane kontaktowe</div>
-        ${c.nip ? `<div style="font-size:13px;color:#334155;margin-bottom:3px;">NIP: <strong>${escapeHtml(c.nip)}</strong></div>` : ''}
-        ${c.address ? `<div style="font-size:13px;color:#334155;margin-bottom:3px;"><i class="ti ti-map-pin" style="font-size:12px;"></i> ${escapeHtml(c.address)}</div>` : ''}
-        ${c.phone ? `<div style="font-size:13px;color:#334155;margin-bottom:3px;"><i class="ti ti-phone" style="font-size:12px;"></i> ${escapeHtml(c.phone)}</div>` : ''}
-        ${c.email ? `<div style="font-size:13px;color:#334155;margin-bottom:3px;"><i class="ti ti-mail" style="font-size:12px;"></i> ${escapeHtml(c.email)}</div>` : ''}
-        ${!c.nip && !c.address && !c.phone && !c.email ? '<div style="font-size:12px;color:#94A3B8;">Brak danych kontaktowych</div>' : ''}
-      </div>
-      <div>
-        <div style="font-size:11px;color:#1B4F8C;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Podsumowanie</div>
-        <div style="font-size:22px;font-weight:800;color:#1B4F8C;">${fmtPLN(totalValue)}</div>
-        <div style="font-size:12px;color:#64748B;">łączna wartość ofert</div>
-        <div style="font-size:13px;font-weight:600;color:#334155;margin-top:6px;">${offers.length} ofert${offers.length===1?'a':offers.length<5?'y':''}</div>
-      </div>
-    </div>
-    ${c.notes ? `<div style="padding:12px 16px;background:#FFFBEB;border-radius:8px;margin-bottom:16px;font-size:13px;color:#92400E;border-left:3px solid #F59E0B;"><i class="ti ti-edit" style="font-size:12px;"></i> ${escapeHtml(c.notes)}</div>` : ''}
+    <div style="display:grid;grid-template-columns:280px 1fr;min-height:70vh;">
 
-    <!-- Historia ofert -->
-    <div style="font-size:12px;font-weight:700;color:#1B4F8C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">
-      Historia ofert
-    </div>
-    <div style="border:1px solid #D8E3EE;border-radius:10px;overflow:hidden;">
-      ${offersHtml}
-    </div>
+      <!-- LEWY PANEL — dane kontaktowe + statystyki -->
+      <div style="background:#F8FBFD;padding:20px;border-right:1px solid #E2E8F0;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <div style="width:44px;height:44px;background:#0F3461;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;">${(c.name || '?').charAt(0).toUpperCase()}</div>
+          <div style="min-width:0;">
+            <div style="font-size:14px;font-weight:700;color:#0A2647;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name || '(bez nazwy)')}</div>
+            ${c.status ? `<div style="font-size:10.5px;color:#64748B;margin-top:2px;">${escapeHtml(c.status)}</div>` : ''}
+          </div>
+        </div>
 
-    <!-- Przyciski akcji -->
-    <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #D8E3EE;">
-      <button class="btn btn--accent" onclick="useClient('${clientId}');closeClientCard();">
-        ✓ Wybierz do oferty
-      </button>
-      <button class="btn btn--ghost" onclick="closeClientCard()">Zamknij</button>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+          ${c.phone ? `<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;"><i class="ti ti-phone" style="font-size:14px;color:#64748B;"></i> ${escapeHtml(c.phone)}</div>` : ''}
+          ${c.email ? `<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;word-break:break-all;"><i class="ti ti-mail" style="font-size:14px;color:#64748B;"></i> ${escapeHtml(c.email)}</div>` : ''}
+          ${c.address ? `<div style="display:flex;align-items:start;gap:8px;font-size:12px;color:#334155;"><i class="ti ti-map-pin" style="font-size:14px;color:#64748B;flex-shrink:0;margin-top:2px;"></i> <span>${escapeHtml(c.address)}</span></div>` : ''}
+          ${c.nip ? `<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;"><i class="ti ti-building" style="font-size:14px;color:#64748B;"></i> NIP: ${escapeHtml(c.nip)}</div>` : ''}
+        </div>
+
+        <div style="border-top:1px solid #E2E8F0;padding-top:14px;">
+          <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:8px;">Podsumowanie</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:6px;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;"><span style="color:#64748B;">Aktywne instalacje</span><span style="font-weight:700;color:#0A2647;">${openInstallations}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;"><span style="color:#64748B;">Wszystkie oferty</span><span style="font-weight:700;color:#0A2647;">${data.offers.length}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;"><span style="color:#64748B;">Wartość ofert</span><span style="font-weight:700;color:#0F3461;">${fmtPLN(totalOffersValue)}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;"><span style="color:#64748B;">Aktywne dokumenty</span><span style="font-weight:700;color:#0A2647;">${activeContracts}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;"><span style="color:#64748B;">Zaplanowane serwisy</span><span style="font-weight:700;color:${upcomingServices > 0 ? '#059669' : '#0A2647'};">${upcomingServices}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;"><span style="color:#64748B;">Otwarte follow-upy</span><span style="font-weight:700;color:${pendingFollowups > 0 ? '#D97706' : '#0A2647'};">${pendingFollowups}</span></div>
+          </div>
+        </div>
+
+        ${c.notes ? `
+          <div style="border-top:1px solid #E2E8F0;padding-top:14px;margin-top:14px;">
+            <div style="font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:6px;">Notatki</div>
+            <div style="font-size:12px;color:#334155;line-height:1.5;white-space:pre-wrap;">${escapeHtml(c.notes)}</div>
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- PRAWY PANEL — zakładki + treść -->
+      <div style="display:flex;flex-direction:column;min-width:0;">
+        <div style="border-bottom:1px solid #E2E8F0;background:#fff;padding:0 20px;display:flex;gap:0;overflow-x:auto;">
+          ${_renderClientCardTab('overview', 'Przegląd', 'ti-layout-dashboard', tab)}
+          ${_renderClientCardTab('installations', 'Instalacje', 'ti-air-conditioning', tab, openInstallations)}
+          ${_renderClientCardTab('offers', 'Oferty', 'ti-file-invoice', tab, data.offers.length)}
+          ${_renderClientCardTab('contracts', 'Dokumenty', 'ti-file-text', tab, data.contracts.length)}
+          ${_renderClientCardTab('services', 'Serwisy', 'ti-tool', tab, data.services.length)}
+          ${_renderClientCardTab('surveys', 'Wizje', 'ti-map-pin', tab, data.surveys.length)}
+          ${_renderClientCardTab('followups', 'Follow-upy', 'ti-clock', tab, pendingFollowups)}
+        </div>
+        <div style="padding:20px;flex:1;overflow-y:auto;background:#fff;">
+          ${_renderClientCardTabContent(tab, data)}
+        </div>
+      </div>
+
     </div>
   `;
 }
+
+function _renderClientCardTab(id, label, icon, activeTab, badge) {
+  const isActive = id === activeTab;
+  return `
+    <button onclick="window._clientCardTab='${id}'; _renderClientCard()" style="padding:12px 16px;background:transparent;border:none;border-bottom:2px solid ${isActive ? '#0F3461' : 'transparent'};color:${isActive ? '#0F3461' : '#64748B'};font-size:12.5px;font-weight:${isActive ? '700' : '500'};cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+      <i class="ti ${icon}" style="font-size:14px;"></i>
+      ${label}
+      ${badge != null && badge > 0 ? `<span style="background:${isActive ? '#0F3461' : '#E2E8F0'};color:${isActive ? '#fff' : '#64748B'};font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;">${badge}</span>` : ''}
+    </button>
+  `;
+}
+
+function _renderClientCardTabContent(tab, data) {
+  const fmtPLN = n => Number(n||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' zł';
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('pl-PL') : '—';
+
+  if (tab === 'overview') {
+    return _renderClientCardOverview(data, fmtPLN, fmtDate);
+  }
+  if (tab === 'installations') {
+    return _renderClientCardInstallations(data, fmtPLN, fmtDate);
+  }
+  if (tab === 'offers') {
+    return _renderClientCardOffers(data, fmtPLN, fmtDate);
+  }
+  if (tab === 'contracts') {
+    return _renderClientCardContracts(data, fmtPLN, fmtDate);
+  }
+  if (tab === 'services') {
+    return _renderClientCardServices(data, fmtPLN, fmtDate);
+  }
+  if (tab === 'surveys') {
+    return _renderClientCardSurveys(data, fmtPLN, fmtDate);
+  }
+  if (tab === 'followups') {
+    return _renderClientCardFollowups(data, fmtPLN, fmtDate);
+  }
+  return '';
+}
+
+function _renderClientCardOverview(data, fmtPLN, fmtDate) {
+  const c = data.client;
+
+  // Timeline aktywności — ostatnie 10 zdarzeń, wszystkie typy
+  const events = [];
+  data.offers.forEach(o => events.push({
+    date: o.created_at, type: 'offer', icon: 'ti-file-invoice', color: '#0F3461',
+    title: 'Oferta ' + (o.offer_no || '—'),
+    subtitle: fmtPLN(o.total_br || 0)
+  }));
+  data.contracts.forEach(x => events.push({
+    date: x.contract_date || x.created_at, type: 'contract', icon: 'ti-file-text', color: '#7C3AED',
+    title: (CTR_TYPE_LABELS[x.contract_type] || x.contract_type) + ' nr ' + (x.contract_number || '—'),
+    subtitle: x.total_gross ? fmtPLN(x.total_gross) : (CTR_STATUS_LABELS[x.status] || '')
+  }));
+  data.units.filter(u => !u.parent_unit_id).forEach(u => events.push({
+    date: u.installation_date || u.created_at, type: 'install', icon: 'ti-air-conditioning', color: '#059669',
+    title: 'Montaż: ' + (u.marka || '') + ' ' + (u.model || ''),
+    subtitle: u.location_room || u.installation_address || ''
+  }));
+  data.services.forEach(s => events.push({
+    date: s.scheduled_date || s.created_at, type: 'service', icon: 'ti-tool', color: s.status === 'completed' ? '#059669' : '#D97706',
+    title: (s.status === 'completed' ? 'Serwis zrealizowany' : 'Serwis zaplanowany') + (s.service_type ? ' — ' + s.service_type : ''),
+    subtitle: s.description || ''
+  }));
+  data.surveys.forEach(s => events.push({
+    date: s.survey_date || s.created_at, type: 'survey', icon: 'ti-map-pin', color: '#0891B2',
+    title: 'Wizja lokalna',
+    subtitle: s.address || ''
+  }));
+
+  events.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const recent = events.slice(0, 15);
+
+  // Nadchodzące — zaplanowane serwisy w przyszłości + follow-upy z terminem w przyszłości
+  const today = new Date(); today.setHours(0,0,0,0);
+  const upcoming = [];
+  data.services.filter(s => s.status === 'planned' && new Date(s.scheduled_date) >= today).forEach(s => upcoming.push({
+    date: s.scheduled_date, type: 'service', icon: 'ti-tool', color: '#D97706',
+    title: 'Serwis: ' + (s.service_type || 'przegląd'),
+    subtitle: s.description || ''
+  }));
+  if (Array.isArray(data.followups)) {
+    data.followups.filter(f => !f.done && f.date && new Date(f.date) >= today).forEach(f => upcoming.push({
+      date: f.date, type: 'followup', icon: 'ti-clock', color: '#F59E0B',
+      title: 'Follow-up',
+      subtitle: f.note || ''
+    }));
+  }
+  upcoming.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  return `
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;">
+
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#0A2647;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px;">Ostatnia aktywność</div>
+        ${recent.length === 0 ? `
+          <div style="padding:40px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;font-size:13px;">Brak aktywności — dodaj pierwszą ofertę, wizję lub instalację.</div>
+        ` : `
+          <div style="display:flex;flex-direction:column;">
+            ${recent.map((ev, i) => `
+              <div style="display:flex;gap:12px;padding:10px 0;${i < recent.length - 1 ? 'border-bottom:1px solid #F1F5F9;' : ''}">
+                <div style="width:32px;height:32px;background:${ev.color}15;color:${ev.color};border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ${ev.icon}" style="font-size:15px;"></i></div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:12.5px;font-weight:600;color:#0A2647;">${escapeHtml(ev.title)}</div>
+                  ${ev.subtitle ? `<div style="font-size:11px;color:#64748B;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(ev.subtitle)}</div>` : ''}
+                </div>
+                <div style="font-size:11px;color:#94A3B8;flex-shrink:0;">${fmtDate(ev.date)}</div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#0A2647;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px;">Nadchodzące</div>
+        ${upcoming.length === 0 ? `
+          <div style="padding:20px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;font-size:12px;">Nic zaplanowanego</div>
+        ` : `
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${upcoming.slice(0, 10).map(ev => `
+              <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                  <i class="ti ${ev.icon}" style="font-size:14px;color:${ev.color};"></i>
+                  <div style="font-size:12px;font-weight:600;color:#0A2647;">${escapeHtml(ev.title)}</div>
+                </div>
+                <div style="font-size:11px;color:#64748B;">${fmtDate(ev.date)}</div>
+                ${ev.subtitle ? `<div style="font-size:11px;color:#334155;margin-top:2px;">${escapeHtml(ev.subtitle)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `}
+
+        <div style="margin-top:16px;">
+          <div style="font-size:13px;font-weight:700;color:#0A2647;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Szybkie akcje</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:6px;">
+            <button onclick="closeClientCard(); openContractCreator('${c.id}')" style="padding:10px 12px;background:#F1F5F9;color:#0F3461;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">
+              <i class="ti ti-file-plus"></i> Nowy dokument dla tego klienta
+            </button>
+            <button onclick="closeClientCard(); openInstalledUnitEditor(null, {client_id: '${c.id}'})" style="padding:10px 12px;background:#F1F5F9;color:#0F3461;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">
+              <i class="ti ti-plus"></i> Dodaj instalację
+            </button>
+            <button onclick="closeClientCard(); openServiceVisitEditor(null, {client_id: '${c.id}'})" style="padding:10px 12px;background:#F1F5F9;color:#0F3461;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">
+              <i class="ti ti-tool"></i> Zaplanuj serwis
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+function _renderClientCardInstallations(data, fmtPLN, fmtDate) {
+  const units = data.units;
+  if (units.length === 0) {
+    return `
+      <div style="padding:40px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;">
+        <i class="ti ti-air-conditioning-disabled" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">Brak zamontowanych instalacji</div>
+        <div style="margin-top:6px;font-size:12px;">
+          <button onclick="closeClientCard(); openInstalledUnitEditor(null, {client_id: '${data.client.id}'})" style="margin-top:12px;padding:8px 16px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">
+            <i class="ti ti-plus"></i> Dodaj pierwszą instalację
+          </button>
+        </div>
+      </div>
+    `;
+  }
+  // Zbuduj mapa dzieci
+  const childrenByParent = {};
+  units.forEach(u => {
+    if (u.parent_unit_id) {
+      if (!childrenByParent[u.parent_unit_id]) childrenByParent[u.parent_unit_id] = [];
+      childrenByParent[u.parent_unit_id].push(u);
+    }
+  });
+  const installations = units.filter(u => !u.parent_unit_id);
+
+  return `
+    <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+      ${installations.map(u => {
+        const children = childrenByParent[u.id] || [];
+        const badge = typeof _iuInstallationBadge === 'function' ? _iuInstallationBadge(u, children.length) : { label: u.device_type, bg: '#F1F5F9', color: '#475569', icon: 'ti-device-desktop' };
+        const svcStatus = typeof _iuGetServiceStatus === 'function' ? _iuGetServiceStatus(u) : { key: 'none', label: '—', color: '#94A3B8' };
+        return `
+          <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px;cursor:pointer;" onclick="closeClientCard(); v2ShowSection('installed_units'); setTimeout(() => openInstalledUnitEditor('${u.id}'), 100)" onmouseover="this.style.borderColor='#0F3461'" onmouseout="this.style.borderColor='#E2E8F0'">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+              <span style="background:${badge.bg};color:${badge.color};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ${badge.icon}" style="font-size:11px;"></i> ${badge.label.toUpperCase()}</span>
+              <span style="font-size:11px;color:#64748B;font-weight:600;">${escapeHtml(u.marka || '')}</span>
+              <span style="font-size:11px;color:#94A3B8;margin-left:auto;">Montaż: ${fmtDate(u.installation_date)}</span>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#0A2647;">${escapeHtml(u.model || '(bez modelu)')}${u.power_kw ? ' <span style="color:#64748B;font-weight:500;">' + u.power_kw + ' kW</span>' : ''}</div>
+            <div style="font-size:11px;color:#64748B;margin-top:2px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              ${u.location_room ? '<span><i class="ti ti-home" style="font-size:11px;"></i> ' + escapeHtml(u.location_room) + '</span>' : ''}
+              ${u.serial_number ? '<span>S/N: ' + escapeHtml(u.serial_number) + '</span>' : ''}
+              ${svcStatus.key !== 'none' ? '<span style="color:' + svcStatus.color + ';font-weight:600;">Serwis: ' + svcStatus.label + '</span>' : ''}
+              ${children.length > 0 ? '<span style="color:#1E40AF;font-weight:600;"><i class="ti ti-topology-star-3" style="font-size:11px;"></i> ' + children.length + ' jedn. wewn.</span>' : ''}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function _renderClientCardOffers(data, fmtPLN, fmtDate) {
+  const offers = data.offers;
+  if (offers.length === 0) {
+    return '<div style="padding:40px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;">Brak ofert dla tego klienta</div>';
+  }
+  return `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:#F8FBFD;border-bottom:2px solid #D8E3EE;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Numer</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Data</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Zakres</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Wartość brutto</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${offers.map(o => {
+          const scopeLabel = ({ac:'Klimatyzacja', hp:'Pompa ciepła', both:'Klima + PC', custom:'Dowolna'})[o.scope] || o.scope || '—';
+          return `
+            <tr style="border-bottom:1px solid #F1F5F9;">
+              <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#0F3461;font-weight:700;">${escapeHtml(o.offer_no || '—')}</td>
+              <td style="padding:10px 12px;font-size:11.5px;text-align:center;color:#64748B;">${fmtDate(o.created_at)}</td>
+              <td style="padding:10px 12px;font-size:12px;color:#334155;">${escapeHtml(scopeLabel)}</td>
+              <td style="padding:10px 12px;font-size:12.5px;text-align:right;color:#0F3461;font-weight:700;">${fmtPLN(o.total_br || 0)}</td>
+              <td style="padding:10px 12px;text-align:center;">
+                <button onclick="typeof previewOfferPdf === 'function' && previewOfferPdf('${o.id}')" title="Podgląd PDF" style="padding:5px 10px;background:#0F3461;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">
+                  <i class="ti ti-eye" style="font-size:11px;"></i> PDF
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function _renderClientCardContracts(data, fmtPLN, fmtDate) {
+  const contracts = data.contracts;
+  if (contracts.length === 0) {
+    return `
+      <div style="padding:40px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;">
+        <i class="ti ti-file-off" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">Brak dokumentów</div>
+        <button onclick="closeClientCard(); openContractCreator('${data.client.id}')" style="margin-top:12px;padding:8px 16px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">
+          <i class="ti ti-plus"></i> Utwórz pierwszy dokument
+        </button>
+      </div>
+    `;
+  }
+  return `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:#F8FBFD;border-bottom:2px solid #D8E3EE;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Typ</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Numer</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Data</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Wartość</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Status</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.04em;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${contracts.map(x => {
+          const typeColor = CTR_TYPE_COLORS[x.contract_type] || '#64748B';
+          return `
+            <tr style="border-bottom:1px solid #F1F5F9;">
+              <td style="padding:10px 12px;font-size:11px;"><span style="padding:2px 8px;background:${typeColor}15;color:${typeColor};border-radius:10px;font-weight:600;">${escapeHtml(CTR_TYPE_LABELS[x.contract_type] || x.contract_type)}</span></td>
+              <td style="padding:10px 12px;font-size:12px;font-family:monospace;color:#0F3461;font-weight:700;">${escapeHtml(x.contract_number || '—')}</td>
+              <td style="padding:10px 12px;font-size:11.5px;text-align:center;color:#64748B;">${fmtDate(x.contract_date)}</td>
+              <td style="padding:10px 12px;font-size:12px;text-align:right;color:#0F3461;font-weight:600;">${x.total_gross ? fmtPLN(x.total_gross) : '—'}</td>
+              <td style="padding:10px 12px;font-size:11px;text-align:center;color:#64748B;">${escapeHtml(CTR_STATUS_LABELS[x.status] || x.status)}</td>
+              <td style="padding:10px 12px;text-align:center;">
+                <button onclick="previewContractPdf('${x.id}')" title="PDF" style="padding:5px 10px;background:#0F3461;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">
+                  <i class="ti ti-eye" style="font-size:11px;"></i> PDF
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function _renderClientCardServices(data, fmtPLN, fmtDate) {
+  const services = data.services;
+  if (services.length === 0) {
+    return `
+      <div style="padding:40px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;">
+        <i class="ti ti-tool" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">Brak serwisów</div>
+        <button onclick="closeClientCard(); openServiceVisitEditor(null, {client_id: '${data.client.id}'})" style="margin-top:12px;padding:8px 16px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">
+          <i class="ti ti-plus"></i> Zaplanuj pierwszy serwis
+        </button>
+      </div>
+    `;
+  }
+  const statusColors = { planned: '#D97706', completed: '#059669', cancelled: '#94A3B8' };
+  const statusLabels = { planned: 'Zaplanowany', completed: 'Zrealizowany', cancelled: 'Anulowany' };
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${services.map(s => {
+        const color = statusColors[s.status] || '#94A3B8';
+        return `
+          <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:100px 1fr auto;gap:12px;align-items:center;">
+            <div style="text-align:center;">
+              <div style="font-size:16px;font-weight:700;color:#0A2647;">${fmtDate(s.scheduled_date)}</div>
+              ${s.scheduled_time ? `<div style="font-size:11px;color:#64748B;">${s.scheduled_time}</div>` : ''}
+            </div>
+            <div>
+              <div style="font-size:12.5px;font-weight:600;color:#0A2647;">${escapeHtml(s.service_type || 'przegląd')}</div>
+              ${s.description ? `<div style="font-size:11px;color:#64748B;margin-top:2px;">${escapeHtml(s.description)}</div>` : ''}
+            </div>
+            <span style="padding:3px 10px;background:${color}15;color:${color};border-radius:5px;font-size:11px;font-weight:600;">${statusLabels[s.status] || s.status}</span>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function _renderClientCardSurveys(data, fmtPLN, fmtDate) {
+  const surveys = data.surveys;
+  if (surveys.length === 0) {
+    return '<div style="padding:40px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;">Brak wizji lokalnych dla tego klienta</div>';
+  }
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${surveys.map(s => {
+        const photosCount = Array.isArray(s.photos) ? s.photos.length : 0;
+        return `
+          <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;cursor:pointer;" onclick="closeClientCard(); v2ShowSection('site-survey'); setTimeout(() => typeof _ssOpenEditor === 'function' && _ssOpenEditor('${s.id}'), 100)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="font-size:12.5px;font-weight:600;color:#0A2647;">Wizja z ${fmtDate(s.survey_date)}</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                ${photosCount > 0 ? `<span style="font-size:10.5px;color:#64748B;"><i class="ti ti-camera" style="font-size:11px;"></i> ${photosCount}</span>` : ''}
+                <span style="font-size:10.5px;color:#64748B;">${escapeHtml(s.scope === 'ac' ? 'Klima' : s.scope === 'hp' ? 'Pompa ciepła' : 'Obie')}</span>
+              </div>
+            </div>
+            ${s.address ? `<div style="font-size:11px;color:#64748B;margin-top:4px;"><i class="ti ti-map-pin" style="font-size:11px;"></i> ${escapeHtml(s.address)}</div>` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function _renderClientCardFollowups(data, fmtPLN, fmtDate) {
+  const followups = data.followups;
+  if (!Array.isArray(followups) || followups.length === 0) {
+    return '<div style="padding:40px;text-align:center;color:#94A3B8;background:#F8FBFD;border-radius:8px;">Brak follow-upów dla tego klienta</div>';
+  }
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${followups.map(f => `
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
+            <div style="flex:1;">
+              <div style="font-size:12.5px;color:#0A2647;">${escapeHtml(f.note || '(bez opisu)')}</div>
+              <div style="font-size:11px;color:#64748B;margin-top:4px;">Termin: ${fmtDate(f.date)}</div>
+            </div>
+            <span style="padding:3px 10px;background:${f.done ? '#DCFCE7' : '#FEF3C7'};color:${f.done ? '#166534' : '#92400E'};border-radius:5px;font-size:11px;font-weight:600;flex-shrink:0;">${f.done ? 'Wykonane' : 'Otwarte'}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+
 
 function renderClientsList() {
   const body = document.getElementById('clientsBody');
@@ -18497,8 +18890,8 @@ function openContractCreator(prefillClientId) {
     protokol_etapu:   'Odbiór częściowy — potwierdzenie wykonania jednego etapu (etap I, II itd.).'
   };
   const availableTypes = types.filter(t => {
-    // W Etapie 1 aktywne są tylko umowa i protokol_prac (odpowiedź na plan implementacji)
-    return t === 'umowa' || t === 'protokol_prac';
+    // Wszystkie typy dokumentów są aktywne (Etap 2 dokończony)
+    return t === 'umowa' || t === 'protokol_prac' || t === 'protokol_etapu' || t === 'aneks';
   });
 
   mod.innerHTML = `
@@ -18568,46 +18961,79 @@ async function _ctrStartCreation(contractType, prefillClientId) {
 }
 
 function _ctrBlankData(type) {
+  // Wszystkie typy dokumentów mogą mieć odniesienie do umowy LUB oferty (opcjonalne)
+  const referenceBase = {
+    referenceType: 'none',       // 'none' | 'umowa' | 'oferta'
+    referenceText: '',           // np. "Umowa nr 4/07/2026 z dn. 20.07.2026" — auto-wypełniane
+  };
+
   // Domyślne pola danych per typ dokumentu
   if (type === 'umowa') {
     return {
+      ...referenceBase,
       company: { ...CTR_COMPANY_DEFAULT },
-      scopeType: 'klimatyzacja',   // 'klimatyzacja' | 'pompa_ciepla' | 'wentylacja' | 'inne'
+      scopeType: 'klimatyzacja',
       scopeOther: '',
       buildingAddress: '',
-      buildingDescription: '',      // § 1 ust. 2 — "Lokal mieszkalny znajdujący się we Wrocławiu..."
-      items: [],                    // [{ name, unit: 'szt.', qty: 1, priceNet: 0 }]
+      buildingDescription: '',
+      items: [],
 
-      // Warunki firmowe (można zmienić w formularzu, domyślnie 4Climat)
-      advancePercent: 50,           // procent zaliczki
+      // Warunki firmowe
+      advancePercent: 50,
       bankName: 'Erste Bank Polski',
       bankAccount: '88 1090 2402 0000 0001 5962 4054',
-      extraWorkRate: 230,           // stawka za roboczogodzinę prac dodatkowych (netto)
+      extraWorkRate: 230,
       warrantyEmail: 'kontakt@4climat.pl',
-      penaltyNoAccess: 600,         // kara umowna za nieudostępnienie miejsca (zł)
-      withdrawalPercent: 20,        // odstępne w % Wynagrodzenia Prognozowanego
+      penaltyNoAccess: 600,
+      withdrawalPercent: 20,
 
-      // Postanowienia szczegółowe (opcjonalne, § 9 ust. 7)
       specialTerms: '',
-
-      // Harmonogram realizacji — [{stage: 'I', description: '...', plannedDate: '2026-09-15'}]
       scheduleItems: [],
-
       notes: ''
     };
   }
   if (type === 'protokol_prac') {
     return {
+      ...referenceBase,
       company: { ...CTR_COMPANY_DEFAULT },
-      relatedContractRef: '',      // "Umowa 4/07/2026 z dn. 20.07.2026"
-      buildingAddress: '',         // gdzie wykonano prace
-      workDescription: '',         // rodzaj wykonanych prac
+      buildingAddress: '',
+      workDescription: '',
       completionDate: new Date().toISOString().slice(0, 10),
       reservations: 'NIE ZGŁOSZONO ŻADNYCH ZASTRZEŻEŃ',
       notes: ''
     };
   }
-  return {};
+  if (type === 'protokol_etapu') {
+    return {
+      ...referenceBase,
+      company: { ...CTR_COMPANY_DEFAULT },
+      buildingAddress: '',
+      stageName: '',              // "Etap I — Dostawa urządzeń"
+      stageDescription: '',       // szczegółowy opis wykonanych prac tego etapu
+      completionDate: new Date().toISOString().slice(0, 10),
+      stageValueNet: null,        // wartość netto etapu (do faktury zaliczkowej / częściowej)
+      stageValueGross: null,
+      vatRate: 23,
+      reservations: 'NIE ZGŁOSZONO ŻADNYCH ZASTRZEŻEŃ',
+      notes: ''
+    };
+  }
+  if (type === 'aneks') {
+    return {
+      ...referenceBase,
+      company: { ...CTR_COMPANY_DEFAULT },
+      changeType: 'termin',       // 'termin' | 'zakres' | 'cena' | 'inne'
+      changeDescription: '',      // Opis zmian wprowadzanych aneksem
+      newDeadline: '',            // Nowy termin (jeśli changeType === 'termin')
+      newScope: '',               // Nowy zakres (jeśli changeType === 'zakres')
+      newPriceNet: null,          // Nowa kwota netto
+      newPriceGross: null,        // Nowa kwota brutto
+      vatRate: 23,
+      effectiveDate: new Date().toISOString().slice(0, 10),  // od kiedy zmiany obowiązują
+      notes: ''
+    };
+  }
+  return { ...referenceBase };
 }
 
 /* Modal edycji dokumentu — formularz per typ */
@@ -18649,6 +19075,8 @@ function _ctrRenderEditor() {
         ${_ctrRenderCommonHeader(c)}
         ${c.contract_type === 'umowa' ? _ctrRenderUmowaFields(c) : ''}
         ${c.contract_type === 'protokol_prac' ? _ctrRenderProtokolPracFields(c) : ''}
+        ${c.contract_type === 'protokol_etapu' ? _ctrRenderProtokolEtapuFields(c) : ''}
+        ${c.contract_type === 'aneks' ? _ctrRenderAneksFields(c) : ''}
       </div>
       <div class="modal__foot" style="padding:12px 18px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;gap:8px;">
         <div>
@@ -18717,7 +19145,10 @@ function _ctrRenderCommonHeader(c) {
       </div>
     </div>
 
-    <div class="ss-section-h" style="margin:16px 0 8px;">2. Dane Wykonawcy (4Climat) — z możliwością zmiany</div>
+    <div class="ss-section-h" style="margin:16px 0 8px;">2. Odniesienie do umowy lub oferty ${c.contract_type === 'aneks' || c.contract_type === 'protokol_etapu' ? '<span style="color:#DC2626;">*</span>' : '<span style="color:#94A3B8;font-weight:400;font-size:11px;">(opcjonalne)</span>'}</div>
+    ${_ctrRenderReferenceSection(c)}
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">3. Dane Wykonawcy (4Climat) — z możliwością zmiany</div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
       <div>
         <label class="ss-label">Nazwa firmy</label>
@@ -18738,6 +19169,64 @@ function _ctrRenderCommonHeader(c) {
       <div>
         <label class="ss-label">REGON</label>
         <input type="text" class="ss-input" value="${escapeHtml(c.data?.company?.regon || CTR_COMPANY_DEFAULT.regon)}" onchange="_ctrSetCompany('regon', this.value)">
+      </div>
+    </div>
+  `;
+}
+
+/* Sekcja "Odniesienie do umowy lub oferty" — wspólna dla wszystkich typów dokumentów */
+function _ctrRenderReferenceSection(c) {
+  const d = c.data || {};
+  const refType = d.referenceType || 'none';
+  const clientId = c.client_id;
+
+  // Pobierz umowy tego klienta (bez tego dokumentu jeśli edycja)
+  const clientContracts = clientId
+    ? contractsDb.filter(x => x.client_id === clientId && x.contract_type === 'umowa' && x.id !== c.id)
+    : [];
+  const clientOffers = clientId
+    ? (typeof offersDb !== 'undefined' ? offersDb.filter(o => o.client_id === clientId) : [])
+    : [];
+
+  return `
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:start;">
+      <div>
+        <label class="ss-label">Typ odniesienia</label>
+        <select class="ss-input" onchange="_ctrSetData('referenceType', this.value); _ctrEditing.parent_contract_id = null; _ctrEditing.offer_id = null; _ctrSetData('referenceText', ''); _ctrRenderEditor()">
+          <option value="none"${refType === 'none' ? ' selected' : ''}>Brak odniesienia</option>
+          <option value="umowa"${refType === 'umowa' ? ' selected' : ''}>Odniesienie do umowy</option>
+          <option value="oferta"${refType === 'oferta' ? ' selected' : ''}>Odniesienie do oferty</option>
+        </select>
+      </div>
+      <div>
+        ${refType === 'umowa' ? `
+          <label class="ss-label">Wybierz umowę klienta</label>
+          ${!clientId
+            ? '<div style="padding:8px 12px;background:#FEF3C7;border-radius:6px;font-size:11px;color:#92400E;">Najpierw wybierz klienta powyżej.</div>'
+            : clientContracts.length === 0
+            ? '<div style="padding:8px 12px;background:#F1F5F9;border-radius:6px;font-size:11px;color:#64748B;">Ten klient nie ma jeszcze żadnych umów w systemie.</div>'
+            : `<select class="ss-input" onchange="_ctrLinkParentContract(this.value)">
+                <option value="">— wybierz umowę —</option>
+                ${clientContracts.map(x => `<option value="${x.id}"${c.parent_contract_id === x.id ? ' selected' : ''}>nr ${escapeHtml(x.contract_number || '—')} z dn. ${_ctrFmtDate(x.contract_date)}${x.total_gross ? ' · ' + _ctrFmtPln(x.total_gross) : ''}</option>`).join('')}
+              </select>`
+          }
+          <input type="text" class="ss-input" value="${escapeHtml(d.referenceText || '')}" onchange="_ctrSetData('referenceText', this.value)" placeholder="Opis odniesienia (auto-wypełnia się po wyborze)" style="margin-top:8px;">
+        ` : refType === 'oferta' ? `
+          <label class="ss-label">Wybierz ofertę klienta</label>
+          ${!clientId
+            ? '<div style="padding:8px 12px;background:#FEF3C7;border-radius:6px;font-size:11px;color:#92400E;">Najpierw wybierz klienta powyżej.</div>'
+            : clientOffers.length === 0
+            ? '<div style="padding:8px 12px;background:#F1F5F9;border-radius:6px;font-size:11px;color:#64748B;">Ten klient nie ma jeszcze żadnych ofert w systemie.</div>'
+            : `<select class="ss-input" onchange="_ctrLinkOffer(this.value)">
+                <option value="">— wybierz ofertę —</option>
+                ${clientOffers.map(o => `<option value="${o.id}"${c.offer_id === o.id ? ' selected' : ''}>nr ${escapeHtml(o.offer_no || '—')} z dn. ${_ctrFmtDate(o.created_at)}${o.total_br ? ' · ' + _ctrFmtPln(o.total_br) : ''}</option>`).join('')}
+              </select>`
+          }
+          <input type="text" class="ss-input" value="${escapeHtml(d.referenceText || '')}" onchange="_ctrSetData('referenceText', this.value)" placeholder="Opis odniesienia (auto-wypełnia się po wyborze)" style="margin-top:8px;">
+        ` : `
+          <label class="ss-label" style="color:#94A3B8;">Odniesienie nie jest wymagane</label>
+          <div style="padding:8px 12px;background:#F8FAFC;border-radius:6px;font-size:11px;color:#64748B;font-style:italic;">Ten dokument nie odnosi się do żadnej umowy ani oferty (np. samodzielny protokół).</div>
+        `}
       </div>
     </div>
   `;
@@ -18945,33 +19434,14 @@ function _ctrRenderUmowaFields(c) {
 /* Pola specyficzne dla protokołu zakończenia prac */
 function _ctrRenderProtokolPracFields(c) {
   const d = c.data || {};
-  // Pobierz istniejące umowy tego klienta do wyboru odniesienia
-  const clientContracts = c.client_id
-    ? contractsDb.filter(x => x.client_id === c.client_id && x.contract_type === 'umowa' && x.id !== c.id)
-    : [];
 
   return `
-    <div class="ss-section-h" style="margin:16px 0 8px;">3. Odniesienie do umowy</div>
-    ${clientContracts.length > 0 ? `
-      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#1E40AF;">
-        <i class="ti ti-info-circle"></i> Ten klient ma ${clientContracts.length} umowę/umów. Wybierz jedną żeby wypełnić pole odniesienia:
-        <select onchange="if(this.value) _ctrLinkParentContract(this.value); this.value=''" style="margin-left:8px;padding:4px 8px;border:1px solid #93C5FD;border-radius:5px;font-size:12px;background:#fff;">
-          <option value="">— wybierz umowę —</option>
-          ${clientContracts.map(x => `<option value="${x.id}">nr ${escapeHtml(x.contract_number || '—')} z dn. ${_ctrFmtDate(x.contract_date)}</option>`).join('')}
-        </select>
-      </div>
-    ` : ''}
+    <div class="ss-section-h" style="margin:16px 0 8px;">4. Miejsce i zakres wykonanych prac</div>
     <div>
-      <label class="ss-label">Odniesienie do umowy (opis)</label>
-      <input type="text" class="ss-input" value="${escapeHtml(d.relatedContractRef || '')}" onchange="_ctrSetData('relatedContractRef', this.value)" placeholder="np. Umowa nr 4/07/2026 z dn. 20.07.2026">
-    </div>
-    <div style="margin-top:12px;">
       <label class="ss-label">Adres wykonania prac</label>
       <input type="text" class="ss-input" value="${escapeHtml(d.buildingAddress || '')}" onchange="_ctrSetData('buildingAddress', this.value)" placeholder="Wrocław, ul. Braniborska 14">
     </div>
-
-    <div class="ss-section-h" style="margin:16px 0 8px;">4. Wykonane prace</div>
-    <div>
+    <div style="margin-top:12px;">
       <label class="ss-label">Rodzaj wykonanych prac, typ zamontowanych urządzeń, stan pomieszczeń</label>
       <textarea class="ss-input" rows="6" onchange="_ctrSetData('workDescription', this.value)" placeholder="Wykonano montaż klimatyzacji multisplit Daikin 3MXM52A8 wraz z 3 jednostkami wewnętrznymi FTXA25/20/20. Pomieszczenia po pracach czyste, brak uszkodzeń.">${escapeHtml(d.workDescription || '')}</textarea>
     </div>
@@ -18994,6 +19464,161 @@ function _ctrRenderProtokolPracFields(c) {
       <textarea class="ss-input" rows="2" onchange="_ctrSetData('notes', this.value)">${escapeHtml(d.notes || '')}</textarea>
     </div>
   `;
+}
+
+/* Pola dla protokołu zakończenia etapu */
+function _ctrRenderProtokolEtapuFields(c) {
+  const d = c.data || {};
+  const vatRate = d.vatRate || 23;
+
+  // Pobierz harmonogram z powiązanej umowy (jeśli jest)
+  const parentContract = c.parent_contract_id
+    ? contractsDb.find(x => x.id === c.parent_contract_id)
+    : null;
+  const parentSchedule = parentContract?.data?.scheduleItems || parentContract?.snapshot?.data?.scheduleItems || [];
+
+  return `
+    <div class="ss-section-h" style="margin:16px 0 8px;">4. Etap i zakres wykonanych prac</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Nazwa etapu *</label>
+        <input type="text" class="ss-input" value="${escapeHtml(d.stageName || '')}" onchange="_ctrSetData('stageName', this.value)" placeholder="np. Etap I — Dostawa urządzeń">
+        ${parentSchedule.length > 0 ? `
+          <select onchange="if(this.value) { const s = ${escapeHtml(JSON.stringify(parentSchedule))}[parseInt(this.value)]; _ctrSetData('stageName', 'Etap ' + s.stage + (s.description ? ' — ' + s.description : '')); _ctrRenderEditor(); } this.value=''" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid #93C5FD;border-radius:5px;font-size:11px;background:#EFF6FF;color:#1E40AF;">
+            <option value="">— lub wybierz etap z harmonogramu umowy —</option>
+            ${parentSchedule.map((s, i) => `<option value="${i}">Etap ${escapeHtml(s.stage || '')} — ${escapeHtml(s.description || '')} ${s.plannedDate ? '(' + _ctrFmtDate(s.plannedDate) + ')' : ''}</option>`).join('')}
+          </select>
+        ` : ''}
+      </div>
+      <div>
+        <label class="ss-label">Data zakończenia etapu *</label>
+        <input type="date" class="ss-input" value="${d.completionDate || new Date().toISOString().slice(0,10)}" onchange="_ctrSetData('completionDate', this.value)">
+      </div>
+      <div style="grid-column:span 2;">
+        <label class="ss-label">Adres wykonania prac</label>
+        <input type="text" class="ss-input" value="${escapeHtml(d.buildingAddress || '')}" onchange="_ctrSetData('buildingAddress', this.value)" placeholder="Wrocław, ul. Braniborska 14">
+      </div>
+      <div style="grid-column:span 2;">
+        <label class="ss-label">Szczegółowy opis wykonanych prac w tym etapie</label>
+        <textarea class="ss-input" rows="5" onchange="_ctrSetData('stageDescription', this.value)" placeholder="Wykonano dostawę i rozładunek 4 jednostek wewnętrznych oraz 1 jednostki zewnętrznej Daikin 4MXM68A9. Sprzęt złożony w pomieszczeniu wskazanym przez Zamawiającego, w oryginalnych opakowaniach.">${escapeHtml(d.stageDescription || '')}</textarea>
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">5. Wartość etapu (do faktury częściowej)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Wartość netto (zł)</label>
+        <input type="number" step="0.01" class="ss-input" value="${d.stageValueNet || ''}" onchange="_ctrSetData('stageValueNet', parseFloat(this.value) || 0); _ctrRecalcStageGross()" placeholder="0.00">
+      </div>
+      <div>
+        <label class="ss-label">VAT %</label>
+        <input type="number" step="1" class="ss-input" value="${vatRate}" onchange="_ctrSetData('vatRate', parseFloat(this.value) || 23); _ctrRecalcStageGross()">
+      </div>
+      <div>
+        <label class="ss-label">Wartość brutto (zł)</label>
+        <input type="number" step="0.01" class="ss-input" value="${d.stageValueGross || ''}" onchange="_ctrSetData('stageValueGross', parseFloat(this.value) || 0)" style="font-weight:600;background:#F0FDF4;" readonly>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">Zostaw puste jeśli protokół nie służy do wystawienia faktury.</div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">6. Zastrzeżenia i uwagi</div>
+    <div>
+      <label class="ss-label">Zastrzeżenia Zamawiającego</label>
+      <textarea class="ss-input" rows="3" onchange="_ctrSetData('reservations', this.value)">${escapeHtml(d.reservations || 'NIE ZGŁOSZONO ŻADNYCH ZASTRZEŻEŃ')}</textarea>
+    </div>
+    <div style="margin-top:12px;">
+      <label class="ss-label">Uwagi wewnętrzne (nie pojawią się w PDF)</label>
+      <textarea class="ss-input" rows="2" onchange="_ctrSetData('notes', this.value)">${escapeHtml(d.notes || '')}</textarea>
+    </div>
+  `;
+}
+
+function _ctrRecalcStageGross() {
+  if (!_ctrEditing?.data) return;
+  const net = parseFloat(_ctrEditing.data.stageValueNet) || 0;
+  const vat = parseFloat(_ctrEditing.data.vatRate) || 23;
+  _ctrEditing.data.stageValueGross = Math.round(net * (1 + vat / 100) * 100) / 100;
+  _ctrRenderEditor();
+}
+
+/* Pola dla aneksu */
+function _ctrRenderAneksFields(c) {
+  const d = c.data || {};
+  const vatRate = d.vatRate || 23;
+  const changeType = d.changeType || 'termin';
+
+  return `
+    <div class="ss-section-h" style="margin:16px 0 8px;">4. Zakres zmian wprowadzanych aneksem</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Typ zmiany *</label>
+        <select class="ss-input" onchange="_ctrSetData('changeType', this.value); _ctrRenderEditor()">
+          <option value="termin"${changeType === 'termin' ? ' selected' : ''}>Zmiana terminu realizacji</option>
+          <option value="zakres"${changeType === 'zakres' ? ' selected' : ''}>Zmiana zakresu prac</option>
+          <option value="cena"${changeType === 'cena' ? ' selected' : ''}>Zmiana wynagrodzenia</option>
+          <option value="inne"${changeType === 'inne' ? ' selected' : ''}>Inne zmiany</option>
+        </select>
+      </div>
+      <div>
+        <label class="ss-label">Data wejścia w życie *</label>
+        <input type="date" class="ss-input" value="${d.effectiveDate || new Date().toISOString().slice(0,10)}" onchange="_ctrSetData('effectiveDate', this.value)">
+      </div>
+    </div>
+
+    ${changeType === 'termin' ? `
+      <div style="margin-top:12px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;">
+        <label class="ss-label">Nowy termin realizacji</label>
+        <input type="date" class="ss-input" value="${d.newDeadline || ''}" onchange="_ctrSetData('newDeadline', this.value)">
+        <div style="font-size:11px;color:#1E40AF;margin-top:6px;"><i class="ti ti-info-circle"></i> Aneks zmienia termin realizacji określony w § 3 umowy nadrzędnej.</div>
+      </div>
+    ` : ''}
+
+    ${changeType === 'zakres' ? `
+      <div style="margin-top:12px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;">
+        <label class="ss-label">Nowy / zmieniony zakres prac</label>
+        <textarea class="ss-input" rows="4" onchange="_ctrSetData('newScope', this.value)" placeholder="Opis dodatkowego zakresu, dodatkowych urządzeń, wyłączeń z zakresu pierwotnego...">${escapeHtml(d.newScope || '')}</textarea>
+      </div>
+    ` : ''}
+
+    ${changeType === 'cena' ? `
+      <div style="margin-top:12px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div>
+            <label class="ss-label">Nowa wartość netto (zł)</label>
+            <input type="number" step="0.01" class="ss-input" value="${d.newPriceNet || ''}" onchange="_ctrSetData('newPriceNet', parseFloat(this.value) || 0); _ctrRecalcAneksGross()">
+          </div>
+          <div>
+            <label class="ss-label">VAT %</label>
+            <input type="number" step="1" class="ss-input" value="${vatRate}" onchange="_ctrSetData('vatRate', parseFloat(this.value) || 23); _ctrRecalcAneksGross()">
+          </div>
+          <div>
+            <label class="ss-label">Nowa wartość brutto</label>
+            <input type="number" step="0.01" class="ss-input" value="${d.newPriceGross || ''}" style="font-weight:600;background:#F0FDF4;" readonly>
+          </div>
+        </div>
+      </div>
+    ` : ''}
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">5. Szczegółowy opis zmian</div>
+    <div>
+      <label class="ss-label">Pełny opis zmian wprowadzanych aneksem *</label>
+      <textarea class="ss-input" rows="6" onchange="_ctrSetData('changeDescription', this.value)" placeholder="Strony postanawiają zmienić § X ust. Y Umowy w następujący sposób: ...&#10;&#10;Uzasadnienie zmian: ..."></textarea>
+      <div style="font-size:11px;color:#64748B;margin-top:4px;">Wpisz konkretny opis zmian jaki chcesz zawrzeć w aneksie. Pozostałe postanowienia umowy nie ulegają zmianie.</div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <label class="ss-label">Uwagi wewnętrzne (nie pojawią się w PDF)</label>
+      <textarea class="ss-input" rows="2" onchange="_ctrSetData('notes', this.value)">${escapeHtml(d.notes || '')}</textarea>
+    </div>
+  `;
+}
+
+function _ctrRecalcAneksGross() {
+  if (!_ctrEditing?.data) return;
+  const net = parseFloat(_ctrEditing.data.newPriceNet) || 0;
+  const vat = parseFloat(_ctrEditing.data.vatRate) || 23;
+  _ctrEditing.data.newPriceGross = Math.round(net * (1 + vat / 100) * 100) / 100;
+  _ctrRenderEditor();
 }
 
 /* Helpery dla pozycji w umowie */
@@ -19105,15 +19730,41 @@ function _ctrImportFromOffer(offerId) {
 
 function _ctrLinkParentContract(contractId) {
   if (!_ctrEditing) return;
+  if (!contractId) {
+    _ctrEditing.parent_contract_id = null;
+    _ctrSetData('referenceText', '');
+    _ctrRenderEditor();
+    return;
+  }
   const parent = contractsDb.find(x => x.id === contractId);
   if (!parent) return;
   _ctrEditing.parent_contract_id = contractId;
+  _ctrEditing.offer_id = null; // wyklucz alternatywne odniesienie
+  _ctrSetData('referenceType', 'umowa');
   const ref = `Umowa nr ${parent.contract_number || '—'} z dn. ${_ctrFmtDate(parent.contract_date)}`;
-  _ctrSetData('relatedContractRef', ref);
+  _ctrSetData('referenceText', ref);
   // Autofill adresu jeśli pusty
   if (!_ctrEditing.data.buildingAddress && parent.data?.buildingAddress) {
     _ctrEditing.data.buildingAddress = parent.data.buildingAddress;
   }
+  _ctrRenderEditor();
+}
+
+function _ctrLinkOffer(offerId) {
+  if (!_ctrEditing) return;
+  if (!offerId) {
+    _ctrEditing.offer_id = null;
+    _ctrSetData('referenceText', '');
+    _ctrRenderEditor();
+    return;
+  }
+  const offer = (typeof offersDb !== 'undefined' ? offersDb : []).find(o => o.id === offerId);
+  if (!offer) return;
+  _ctrEditing.offer_id = offerId;
+  _ctrEditing.parent_contract_id = null; // wyklucz alternatywne odniesienie
+  _ctrSetData('referenceType', 'oferta');
+  const ref = `Oferta nr ${offer.offer_no || '—'} z dn. ${_ctrFmtDate(offer.created_at)}`;
+  _ctrSetData('referenceText', ref);
   _ctrRenderEditor();
 }
 
@@ -19196,43 +19847,19 @@ async function deleteContract(contractId) {
    ============================================================ */
 
 async function previewContractPdf(contractId) {
-  // === WIDOCZNY MARKER — jeśli tego alertu nie widzisz, funkcja się nie wywołuje (cache przeglądarki?) ===
-  console.log('[previewContractPdf] CALLED with id:', contractId);
-  console.log('[previewContractPdf] pdfMake exists?', typeof pdfMake);
-  console.log('[previewContractPdf] contractsDb length:', contractsDb.length);
-
-  if (typeof pdfMake === 'undefined') {
-    alert('BŁĄD: biblioteka pdfMake nie jest załadowana. Sprawdź połączenie z internetem i odśwież stronę (Ctrl+Shift+R).');
-    return;
-  }
-  if (!pdfMake.vfs) {
-    alert('BŁĄD: czcionki pdfMake jeszcze się nie załadowały. Poczekaj chwilę i spróbuj ponownie.');
-    return;
-  }
+  if (typeof pdfMake === 'undefined') { showToast('Biblioteka pdfMake nie jest załadowana'); return; }
+  if (!pdfMake.vfs) { showToast('Czcionki pdfMake jeszcze się ładują — spróbuj za chwilę'); return; }
   const c = contractsDb.find(x => x.id === contractId);
-  if (!c) {
-    alert('BŁĄD: nie znaleziono dokumentu w bazie. ID=' + contractId + '\nLista w pamięci: ' + contractsDb.length + ' dokumentów.');
-    return;
-  }
-  console.log('[previewContractPdf] contract found:', c);
+  if (!c) { showToast('Nie znaleziono dokumentu'); return; }
   showToast('Generuję PDF…');
   try {
     const src = c.snapshot || c;
-    console.log('[previewContractPdf] source (snapshot or record):', src);
-    if (!src.data) throw new Error('Snapshot bez pola data — dokument niekompletny. Spróbuj otworzyć i zapisać ponownie.');
+    if (!src.data) throw new Error('Snapshot dokumentu jest niekompletny — otwórz i zapisz ponownie');
     const docDef = _ctrBuildDocDef(src, c);
     if (!docDef) throw new Error('Ten typ dokumentu (' + c.contract_type + ') nie ma jeszcze generatora PDF');
 
-    window._lastContractDocDef = docDef;
-    console.log('[previewContractPdf] docDef built. content items:', docDef.content?.length);
-    console.log('[previewContractPdf] full docDef in window._lastContractDocDef');
-    console.log('[previewContractPdf] calling pdfMake.createPdf().getBlob() now...');
-
     const blob = await new Promise((resolve, reject) => {
-      // Timeout — jeśli pdfMake nie wywoła callbacku w 10s, rzuć błąd
-      const timeoutId = setTimeout(() => {
-        reject(new Error('Timeout — pdfMake nie odpowiedział w 10 sekund. Prawdopodobnie błąd w strukturze dokumentu (nieprawidłowy typ elementu, zagnieżdżone tablice w content).'));
-      }, 10000);
+      const timeoutId = setTimeout(() => reject(new Error('Timeout generowania PDF (10s)')), 10000);
       try {
         pdfMake.createPdf(docDef).getBlob(b => {
           clearTimeout(timeoutId);
@@ -19246,25 +19873,20 @@ async function previewContractPdf(contractId) {
     });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, '_blank');
-    if (!w) {
-      showToast('Popup zablokowany — zezwól na wyskakujące okna');
-    } else {
-      showToast('Podgląd otwarty');
-    }
+    if (!w) showToast('Popup zablokowany — zezwól na wyskakujące okna');
+    else showToast('Podgląd otwarty');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch(e) {
     console.error('previewContractPdf error:', e);
-    // Pełny błąd do konsoli + skrócony toast
-    const msg = String(e.message || e);
-    showToast('Błąd PDF: ' + msg.slice(0, 150));
-    // Dla developera — alert z pełnym stack traceem
-    alert('BŁĄD generowania PDF umowy:\n\n' + msg + '\n\nPełny stack trace w konsoli (F12).');
+    showToast('Błąd PDF: ' + String(e.message || e).slice(0, 150));
   }
 }
 
 function _ctrBuildDocDef(src, rec) {
   if (rec.contract_type === 'umowa') return _ctrDocDefUmowa(src, rec);
   if (rec.contract_type === 'protokol_prac') return _ctrDocDefProtokolPrac(src, rec);
+  if (rec.contract_type === 'protokol_etapu') return _ctrDocDefProtokolEtapu(src, rec);
+  if (rec.contract_type === 'aneks') return _ctrDocDefAneks(src, rec);
   return null;
 }
 
@@ -19703,6 +20325,249 @@ function _ctrDocDefProtokolPrac(src, rec) {
   };
 }
 
+/* PDF: Protokół zakończenia etapu — spójny stylistycznie z protokołem prac */
+function _ctrDocDefProtokolEtapu(src, rec) {
+  const client = clientsDb.find(x => x.id === src.client_id) || {};
+  const d = src.data || {};
+  const company = (d.company && typeof d.company === 'object') ? d.company : CTR_COMPANY_DEFAULT;
+  const hasValue = d.stageValueNet && parseFloat(d.stageValueNet) > 0;
+
+  const content = [];
+
+  content.push({ text: 'PROTOKÓŁ ZAKOŃCZENIA ETAPU', fontSize: 20, bold: true, color: '#0F3461', alignment: 'center', margin: [0, 0, 0, 4] });
+  content.push({ text: 'z dnia ' + _ctrFmtDate(src.contract_date) + ' sporządzony w ' + (src.place_signed || 'Wrocławiu'), alignment: 'center', fontSize: 11, color: '#475569', margin: [0, 0, 0, 6] });
+  if (d.stageName) content.push({ text: d.stageName, fontSize: 14, bold: true, color: '#0F3461', alignment: 'center', margin: [0, 0, 0, 20] });
+  else content.push({ text: ' ', margin: [0, 0, 0, 14] });
+
+  // Wykonawca
+  content.push({ text: 'Wykonawca:', bold: true, color: '#0F3461', margin: [0, 0, 0, 4] });
+  content.push({ text: 'Firma ' + _ctrCleanCompanyName(company.name), bold: true, margin: [10, 0, 0, 2] });
+  content.push({ text: company.address || CTR_COMPANY_DEFAULT.address, margin: [10, 0, 0, 2] });
+  content.push({ text: 'NIP: ' + (company.nip || CTR_COMPANY_DEFAULT.nip), margin: [10, 0, 0, 2] });
+  if (company.regon) content.push({ text: 'REGON: ' + company.regon, margin: [10, 0, 0, 2] });
+
+  // Zamawiający
+  content.push({ text: ' ', margin: [0, 10, 0, 0] });
+  content.push({ text: 'Zamawiający: ' + (client.name || '(brak danych)'), bold: true, color: '#0F3461', margin: [0, 0, 0, 4] });
+  if (client.address) content.push({ text: client.address, margin: [10, 0, 0, 2] });
+  if (client.nip)     content.push({ text: 'PESEL/NIP: ' + client.nip, margin: [10, 0, 0, 2] });
+  if (client.phone)   content.push({ text: 'telefon: ' + client.phone, margin: [10, 0, 0, 2] });
+  if (client.email)   content.push({ text: 'e-mail: ' + client.email, margin: [10, 0, 0, 2] });
+
+  // Odniesienie
+  if (d.referenceText) {
+    content.push({ text: ' ', margin: [0, 10, 0, 0] });
+    content.push({ text: 'Dotyczy: ' + d.referenceText, bold: true });
+  }
+
+  // Opis
+  const descLine = d.buildingAddress
+    ? 'Niniejszy protokół zakończenia etapu został sporządzony w związku z wykonaniem przez Wykonawcę etapu prac oznaczonego w umowie/ofercie określonej powyżej. Strony stwierdzają, że Wykonawca zakończył prace tego etapu w budynku położonym w ' + d.buildingAddress + '. Po skontrolowaniu zakresu wykonanych prac oraz sposobu ich wykonania dokonano odbioru etapu.'
+    : 'Niniejszy protokół zakończenia etapu został sporządzony w związku z wykonaniem przez Wykonawcę etapu prac oznaczonego w umowie/ofercie określonej powyżej. Strony stwierdzają, że Wykonawca zakończył prace tego etapu. Po skontrolowaniu zakresu wykonanych prac oraz sposobu ich wykonania dokonano odbioru etapu.';
+  content.push({ text: descLine, margin: [0, 14, 0, 12] });
+
+  // Zakres prac
+  content.push({ text: 'Zakres wykonanych prac w tym etapie:', bold: true, color: '#0F3461', margin: [0, 4, 0, 4] });
+  content.push({
+    table: {
+      widths: ['*'],
+      body: [[{ text: d.stageDescription || '(brak opisu)', margin: [10, 8, 10, 8] }]]
+    },
+    layout: {
+      fillColor: function() { return '#F8FBFD'; },
+      hLineColor: function() { return '#DCE9F5'; },
+      vLineColor: function() { return '#DCE9F5'; },
+      hLineWidth: function() { return 0.5; },
+      vLineWidth: function() { return 0.5; }
+    },
+    margin: [0, 0, 0, 14]
+  });
+
+  content.push({ text: 'Data zakończenia etapu: ' + _ctrFmtDate(d.completionDate), bold: true, margin: [0, 0, 0, 12] });
+
+  // Wartość etapu (jeśli podana)
+  if (hasValue) {
+    const netVal = parseFloat(d.stageValueNet) || 0;
+    const grossVal = parseFloat(d.stageValueGross) || 0;
+    const vatVal = grossVal - netVal;
+    const vatRate = d.vatRate || 23;
+    content.push({ text: 'Wartość etapu (podstawa do wystawienia faktury):', bold: true, color: '#0F3461', margin: [0, 4, 0, 6] });
+    content.push({
+      table: {
+        widths: ['*', 120],
+        body: [
+          [{ text: 'Wartość netto', margin: [10, 5, 10, 5] }, { text: _ctrFmtPln(netVal), alignment: 'right', margin: [10, 5, 10, 5] }],
+          [{ text: 'VAT ' + vatRate + '%', margin: [10, 5, 10, 5] }, { text: _ctrFmtPln(vatVal), alignment: 'right', margin: [10, 5, 10, 5] }],
+          [{ text: 'Wartość brutto', bold: true, color: '#fff', fillColor: '#0F3461', margin: [10, 8, 10, 8] }, { text: _ctrFmtPln(grossVal), bold: true, color: '#fff', fillColor: '#0F3461', alignment: 'right', margin: [10, 8, 10, 8] }]
+        ]
+      },
+      layout: {
+        hLineColor: function() { return '#C7D8E8'; },
+        vLineColor: function() { return '#C7D8E8'; },
+        hLineWidth: function() { return 0.5; },
+        vLineWidth: function() { return 0.5; }
+      },
+      margin: [0, 0, 0, 14]
+    });
+  }
+
+  // Zastrzeżenia
+  content.push({ text: 'Zastrzeżenia Zamawiającego:', bold: true, color: '#0F3461', margin: [0, 4, 0, 4] });
+  content.push({
+    table: {
+      widths: ['*'],
+      body: [[{ text: d.reservations || 'NIE ZGŁOSZONO ŻADNYCH ZASTRZEŻEŃ', margin: [10, 8, 10, 8], italics: String(d.reservations || '').includes('NIE ZGŁOSZONO') }]]
+    },
+    layout: {
+      fillColor: function() { return '#F8FBFD'; },
+      hLineColor: function() { return '#DCE9F5'; },
+      vLineColor: function() { return '#DCE9F5'; },
+      hLineWidth: function() { return 0.5; },
+      vLineWidth: function() { return 0.5; }
+    },
+    margin: [0, 0, 0, 20]
+  });
+
+  content.push({ text: 'Na tym protokół zakończono i podpisano.', italics: true, alignment: 'center', color: '#475569', margin: [0, 8, 0, 30] });
+
+  // Podpisy
+  content.push({
+    columns: [
+      { width: '*', stack: [
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' },
+        { text: 'ZA WYKONAWCĘ', alignment: 'center', margin: [0, 6, 0, 0], fontSize: 10, color: '#475569', bold: true },
+        { text: company.representedBy || 'Tomasz Dobryniewski', alignment: 'center', fontSize: 9, color: '#94A3B8', italics: true }
+      ]},
+      { width: '*', stack: [
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' },
+        { text: 'ZAMAWIAJĄCY', alignment: 'center', margin: [0, 6, 0, 0], fontSize: 10, color: '#475569', bold: true },
+        { text: client.name || '', alignment: 'center', fontSize: 9, color: '#94A3B8', italics: true }
+      ]}
+    ]
+  });
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [50, 55, 50, 50],
+    defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#1A2332', lineHeight: 1.4 },
+    content: content
+  };
+}
+
+/* PDF: Aneks do umowy */
+function _ctrDocDefAneks(src, rec) {
+  const client = clientsDb.find(x => x.id === src.client_id) || {};
+  const d = src.data || {};
+  const company = (d.company && typeof d.company === 'object') ? d.company : CTR_COMPANY_DEFAULT;
+  const changeType = d.changeType || 'termin';
+
+  const content = [];
+
+  // Nagłówek
+  content.push({ text: 'ANEKS nr ' + (src.contract_number || '—'), fontSize: 18, bold: true, color: '#0F3461', alignment: 'center', margin: [0, 0, 0, 4] });
+  if (d.referenceText) content.push({ text: 'do ' + d.referenceText, fontSize: 12, color: '#475569', alignment: 'center', margin: [0, 0, 0, 4] });
+  content.push({ text: 'zawarty w dniu ' + _ctrFmtDate(src.contract_date) + ' w ' + (src.place_signed || 'Wrocławiu'), alignment: 'center', fontSize: 11, color: '#475569', margin: [0, 0, 0, 20] });
+
+  // Strony
+  content.push({ text: 'Strony aneksu:', bold: true, color: '#0F3461', margin: [0, 0, 0, 6] });
+
+  content.push({ text: '1.  ' + (client.name || '(imię i nazwisko / nazwa)'), bold: true, margin: [0, 0, 0, 2] });
+  if (client.address) content.push({ text: client.address, margin: [16, 0, 0, 2] });
+  if (client.nip) content.push({ text: 'NIP: ' + client.nip, margin: [16, 0, 0, 2] });
+  content.push({ text: 'zwany dalej Zamawiającym;', italics: true, margin: [16, 4, 0, 10] });
+
+  content.push({ text: 'a,', alignment: 'center', margin: [0, 0, 0, 8] });
+
+  content.push({ text: '2.  Firmą ' + _ctrCleanCompanyName(company.name) + ' z siedzibą we Wrocławiu', bold: true, margin: [0, 0, 0, 2] });
+  content.push({ text: company.address || CTR_COMPANY_DEFAULT.address, margin: [16, 0, 0, 2] });
+  content.push({ text: 'NIP: ' + (company.nip || CTR_COMPANY_DEFAULT.nip), margin: [16, 0, 0, 2] });
+  content.push({ text: 'reprezentowaną przez ' + (company.representedBy || 'Tomasz Dobryniewski'), margin: [16, 0, 0, 2] });
+  content.push({ text: 'zwaną dalej Wykonawcą.', italics: true, margin: [16, 4, 0, 20] });
+
+  // § 1 Przedmiot aneksu
+  content.push({ text: '§ 1', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Przedmiot aneksu', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: 'Strony niniejszym postanawiają wprowadzić zmiany do ' + (d.referenceText || 'umowy/oferty wskazanej w nagłówku aneksu') + ' o zakresie i treści określonych poniżej.', margin: [0, 0, 0, 12] });
+
+  // § 2 Zakres zmian
+  content.push({ text: '§ 2', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  const changeTypeName = {
+    termin: 'Zmiana terminu realizacji',
+    zakres: 'Zmiana zakresu prac',
+    cena: 'Zmiana wynagrodzenia',
+    inne: 'Postanowienia szczegółowe'
+  }[changeType] || 'Zakres zmian';
+  content.push({ text: changeTypeName, bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+
+  // Specyficzne dla typu zmiany
+  if (changeType === 'termin' && d.newDeadline) {
+    content.push({ text: '1.  Strony zgodnie postanawiają, że nowy termin realizacji przedmiotu umowy zostaje ustalony na dzień ' + _ctrFmtDate(d.newDeadline) + '.', margin: [0, 0, 0, 6] });
+    content.push({ text: '2.  W związku z powyższą zmianą, § 3 umowy nadrzędnej otrzymuje nowe brzmienie zgodnie z niniejszym aneksem. Pozostałe postanowienia § 3 pozostają bez zmian.', margin: [0, 0, 0, 12] });
+  } else if (changeType === 'zakres' && d.newScope) {
+    content.push({ text: '1.  Strony zgodnie postanawiają rozszerzyć/zmienić zakres prac Wykonawcy o następujące elementy:', margin: [0, 0, 0, 6] });
+    content.push({
+      table: { widths: ['*'], body: [[{ text: d.newScope, margin: [10, 8, 10, 8] }]] },
+      layout: { fillColor: () => '#F8FBFD', hLineColor: () => '#DCE9F5', vLineColor: () => '#DCE9F5', hLineWidth: () => 0.5, vLineWidth: () => 0.5 },
+      margin: [0, 0, 0, 12]
+    });
+  } else if (changeType === 'cena' && d.newPriceNet) {
+    const netVal = parseFloat(d.newPriceNet) || 0;
+    const grossVal = parseFloat(d.newPriceGross) || 0;
+    const vatVal = grossVal - netVal;
+    const vatRate = d.vatRate || 23;
+    content.push({ text: '1.  Strony zgodnie postanawiają, że wynagrodzenie Wykonawcy określone w § 1 ust. 3 umowy nadrzędnej ulega zmianie i wynosi:', margin: [0, 0, 0, 6] });
+    content.push({
+      table: {
+        widths: ['*', 120],
+        body: [
+          [{ text: 'Nowe wynagrodzenie netto', margin: [10, 5, 10, 5] }, { text: _ctrFmtPln(netVal), alignment: 'right', margin: [10, 5, 10, 5] }],
+          [{ text: 'VAT ' + vatRate + '%', margin: [10, 5, 10, 5] }, { text: _ctrFmtPln(vatVal), alignment: 'right', margin: [10, 5, 10, 5] }],
+          [{ text: 'Nowe wynagrodzenie brutto', bold: true, color: '#fff', fillColor: '#0F3461', margin: [10, 8, 10, 8] }, { text: _ctrFmtPln(grossVal), bold: true, color: '#fff', fillColor: '#0F3461', alignment: 'right', margin: [10, 8, 10, 8] }]
+        ]
+      },
+      layout: { hLineColor: () => '#C7D8E8', vLineColor: () => '#C7D8E8', hLineWidth: () => 0.5, vLineWidth: () => 0.5 },
+      margin: [0, 0, 0, 12]
+    });
+  }
+
+  // Pełny opis zmian
+  if (d.changeDescription) {
+    content.push({ text: 'Szczegółowy opis zmian:', bold: true, margin: [0, 6, 0, 4] });
+    content.push({ text: d.changeDescription, margin: [0, 0, 0, 12] });
+  }
+
+  content.push({ text: (changeType === 'termin' || changeType === 'zakres' || changeType === 'cena' ? '3.' : '2.') + '  Niniejszy aneks wchodzi w życie z dniem ' + _ctrFmtDate(d.effectiveDate) + '.', margin: [0, 4, 0, 12] });
+
+  // § 3 Postanowienia końcowe
+  content.push({ text: '§ 3', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Postanowienia końcowe', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: '1.  Pozostałe postanowienia umowy nadrzędnej, nieobjęte niniejszym aneksem, pozostają bez zmian.', margin: [0, 0, 0, 6] });
+  content.push({ text: '2.  Wszelkie zmiany niniejszego aneksu wymagają formy pisemnej pod rygorem nieważności.', margin: [0, 0, 0, 6] });
+  content.push({ text: '3.  Aneks sporządzono w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej ze stron.', margin: [0, 0, 0, 20] });
+
+  // Podpisy
+  content.push({
+    margin: [0, 40, 0, 0],
+    columns: [
+      { width: '*', stack: [
+        { text: 'ZAMAWIAJĄCY', alignment: 'center', bold: true, fontSize: 11, margin: [0, 0, 0, 30] },
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' }
+      ]},
+      { width: '*', stack: [
+        { text: 'WYKONAWCA', alignment: 'center', bold: true, fontSize: 11, margin: [0, 0, 0, 30] },
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' }
+      ]}
+    ]
+  });
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [50, 50, 50, 50],
+    defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#1A2332', lineHeight: 1.4, alignment: 'justify' },
+    content: content
+  };
+}
+
 /* ============================================================
    BAZA ZAMONTOWANYCH URZĄDZEŃ + SERWISY
    ============================================================ */
@@ -19764,6 +20629,336 @@ async function loadInstalledUnits() {
     }
   }
 }
+
+/* ============================================================
+   CENTRUM PRZYPOMNIEŃ SERWISOWYCH
+   ============================================================ */
+
+const REMINDER_WINDOW_DAYS = 7;      // przypomnienia o serwisie ≤7 dni
+const REMINDER_WARRANTY_DAYS = 30;   // ostrzeżenia o kończącej się gwarancji ≤30 dni
+
+let _rmnFilter = 'all';   // 'all' | 'service' | 'warranty'
+let _rmnLoading = false;
+
+async function openReminderCenter() {
+  document.getElementById('reminderCenterModal').classList.add('modal-backdrop--open');
+  await _rmnRender();
+}
+
+function closeReminderCenter() {
+  document.getElementById('reminderCenterModal').classList.remove('modal-backdrop--open');
+}
+
+async function _rmnRender() {
+  const body = document.getElementById('reminderCenterBody');
+  if (!body) return;
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:#94A3B8;">Ładowanie...</div>';
+
+  // Zbierz dane
+  const today = new Date(); today.setHours(0,0,0,0);
+  const svcCutoff = new Date(today.getTime() + REMINDER_WINDOW_DAYS * 24 * 3600 * 1000);
+  const warCutoff = new Date(today.getTime() + REMINDER_WARRANTY_DAYS * 24 * 3600 * 1000);
+
+  // Serwisy w oknie: zaplanowane, ≤7 dni, jeszcze niewysłane przypomnienie
+  const services = (serviceVisitsDb || []).filter(s => {
+    if (s.status !== 'planned' || !s.scheduled_date) return false;
+    const d = new Date(s.scheduled_date); d.setHours(0,0,0,0);
+    if (d < today || d > svcCutoff) return false;
+    // Reminder już wysłany w ciągu ostatnich 3 dni? — pomiń
+    if (s.reminder_sent_at) {
+      const sentAgo = (Date.now() - new Date(s.reminder_sent_at).getTime()) / (24*3600*1000);
+      if (sentAgo < 3) return false;
+    }
+    return true;
+  });
+
+  // Instalacje z kończącą się gwarancją: ≤30 dni, aktywne, top-level
+  const warranties = (installedUnitsDb || []).filter(u => {
+    if (u.status !== 'active' || u.parent_unit_id || !u.warranty_end) return false;
+    const d = new Date(u.warranty_end); d.setHours(0,0,0,0);
+    return d >= today && d <= warCutoff;
+  });
+
+  const totalCount = services.length + warranties.length;
+
+  // Header + filtry
+  let items = [];
+  if (_rmnFilter === 'all' || _rmnFilter === 'service') {
+    services.forEach(s => items.push({ kind: 'service', ref: s }));
+  }
+  if (_rmnFilter === 'all' || _rmnFilter === 'warranty') {
+    warranties.forEach(u => items.push({ kind: 'warranty', ref: u }));
+  }
+
+  // Sort po dacie
+  items.sort((a, b) => {
+    const da = a.kind === 'service' ? a.ref.scheduled_date : a.ref.warranty_end;
+    const db = b.kind === 'service' ? b.ref.scheduled_date : b.ref.warranty_end;
+    return (da || '').localeCompare(db || '');
+  });
+
+  body.innerHTML = `
+    <div style="padding:16px 20px;background:#F8FBFD;border-bottom:1px solid #E2E8F0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;gap:6px;">
+        <button onclick="_rmnFilter='all'; _rmnRender()" style="padding:6px 12px;background:${_rmnFilter==='all'?'#0F3461':'#fff'};color:${_rmnFilter==='all'?'#fff':'#334155'};border:1px solid ${_rmnFilter==='all'?'#0F3461':'#CBD5E1'};border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Wszystkie (${services.length + warranties.length})</button>
+        <button onclick="_rmnFilter='service'; _rmnRender()" style="padding:6px 12px;background:${_rmnFilter==='service'?'#D97706':'#fff'};color:${_rmnFilter==='service'?'#fff':'#334155'};border:1px solid ${_rmnFilter==='service'?'#D97706':'#CBD5E1'};border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-tool" style="font-size:12px;"></i> Serwisy w ${REMINDER_WINDOW_DAYS} dni (${services.length})</button>
+        <button onclick="_rmnFilter='warranty'; _rmnRender()" style="padding:6px 12px;background:${_rmnFilter==='warranty'?'#9A3412':'#fff'};color:${_rmnFilter==='warranty'?'#fff':'#334155'};border:1px solid ${_rmnFilter==='warranty'?'#9A3412':'#CBD5E1'};border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-shield-half"></i> Kończące się gwarancje (${warranties.length})</button>
+      </div>
+      <div style="margin-left:auto;font-size:11.5px;color:#64748B;">
+        <i class="ti ti-info-circle"></i> Kliknij przycisk email/SMS aby otworzyć okno wiadomości z gotową treścią. Wysłanie zapisze datę przypomnienia.
+      </div>
+    </div>
+
+    <div style="padding:16px 20px;background:#fff;">
+      ${totalCount === 0 ? `
+        <div style="padding:60px 20px;text-align:center;color:#64748B;">
+          <i class="ti ti-check-circle" style="font-size:36px;color:#059669;"></i>
+          <div style="margin-top:12px;font-size:14px;font-weight:600;color:#334155;">Nic nie wymaga przypomnienia</div>
+          <div style="margin-top:6px;font-size:12px;">Wszystkie zaplanowane serwisy zostały już zgłoszone klientom, a gwarancje są w porządku.</div>
+        </div>
+      ` : items.length === 0 ? `
+        <div style="padding:40px;text-align:center;color:#94A3B8;">Brak wyników dla wybranego filtra.</div>
+      ` : `
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${items.map(item => item.kind === 'service' ? _rmnRenderServiceRow(item.ref) : _rmnRenderWarrantyRow(item.ref)).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function _rmnRenderServiceRow(s) {
+  const client = clientsDb.find(c => c.id === s.client_id) || {};
+  const unit = installedUnitsDb.find(u => u.id === s.installed_unit_id);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const scheduled = new Date(s.scheduled_date); scheduled.setHours(0,0,0,0);
+  const daysUntil = Math.floor((scheduled - today) / (24 * 3600 * 1000));
+  const urgencyColor = daysUntil <= 1 ? '#DC2626' : daysUntil <= 3 ? '#D97706' : '#059669';
+  const urgencyLabel = daysUntil === 0 ? 'DZISIAJ' : daysUntil === 1 ? 'JUTRO' : `za ${daysUntil} dni`;
+  const hasEmail = !!(client.email);
+  const hasPhone = !!(client.phone);
+
+  return `
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;">
+      <div style="display:grid;grid-template-columns:60px 1fr auto;gap:14px;align-items:center;">
+        <div style="text-align:center;padding:8px;background:${urgencyColor}15;border-radius:8px;">
+          <div style="font-size:9px;font-weight:700;color:${urgencyColor};text-transform:uppercase;letter-spacing:0.06em;">${urgencyLabel}</div>
+          <div style="font-size:11px;font-weight:700;color:#0A2647;margin-top:2px;">${_iuFmtDate(s.scheduled_date)}</div>
+        </div>
+
+        <div style="min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+            <span style="background:#FEF3C7;color:#92400E;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-tool" style="font-size:11px;"></i> SERWIS</span>
+            <span style="font-size:13px;font-weight:700;color:#0A2647;">${escapeHtml(client.name || '—')}</span>
+          </div>
+          <div style="font-size:12px;color:#334155;">${escapeHtml(s.service_type || 'przegląd')}${unit ? ' · ' + escapeHtml(unit.marka || '') + ' ' + escapeHtml(unit.model || '') : ''}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;display:flex;gap:12px;flex-wrap:wrap;">
+            ${client.phone ? `<span><i class="ti ti-phone" style="font-size:11px;"></i> ${escapeHtml(client.phone)}</span>` : '<span style="color:#DC2626;">brak telefonu</span>'}
+            ${client.email ? `<span><i class="ti ti-mail" style="font-size:11px;"></i> ${escapeHtml(client.email)}</span>` : '<span style="color:#DC2626;">brak emaila</span>'}
+            ${s.reminder_sent_at ? `<span style="color:#059669;"><i class="ti ti-check" style="font-size:11px;"></i> Wysłano ${_iuFmtDate(s.reminder_sent_at)}</span>` : ''}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button ${hasEmail ? '' : 'disabled'} onclick="_rmnSendEmail('service', '${s.id}')" title="${hasEmail ? 'Wyślij email z przypomnieniem' : 'Klient nie ma emaila w bazie'}" style="padding:8px 12px;background:${hasEmail ? '#0F3461' : '#E2E8F0'};color:${hasEmail ? '#fff' : '#94A3B8'};border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:${hasEmail ? 'pointer' : 'not-allowed'};display:inline-flex;align-items:center;gap:5px;">
+            <i class="ti ti-mail" style="font-size:13px;"></i> Email
+          </button>
+          <button ${hasPhone ? '' : 'disabled'} onclick="_rmnSendSms('service', '${s.id}')" title="${hasPhone ? 'Wyślij SMS z przypomnieniem' : 'Klient nie ma telefonu w bazie'}" style="padding:8px 12px;background:${hasPhone ? '#059669' : '#E2E8F0'};color:${hasPhone ? '#fff' : '#94A3B8'};border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:${hasPhone ? 'pointer' : 'not-allowed'};display:inline-flex;align-items:center;gap:5px;">
+            <i class="ti ti-message" style="font-size:13px;"></i> SMS
+          </button>
+          <button onclick="_rmnMarkContacted('service', '${s.id}')" title="Odznacz jako skontaktowany (np. przez telefon)" style="padding:8px 10px;background:transparent;color:#64748B;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;cursor:pointer;">
+            <i class="ti ti-check" style="font-size:13px;"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _rmnRenderWarrantyRow(u) {
+  const client = clientsDb.find(c => c.id === u.client_id) || {};
+  const today = new Date(); today.setHours(0,0,0,0);
+  const warEnd = new Date(u.warranty_end); warEnd.setHours(0,0,0,0);
+  const daysUntil = Math.floor((warEnd - today) / (24 * 3600 * 1000));
+  const urgencyColor = daysUntil <= 7 ? '#DC2626' : daysUntil <= 14 ? '#D97706' : '#9A3412';
+  const hasEmail = !!(client.email);
+  const hasPhone = !!(client.phone);
+
+  return `
+    <div style="background:#fff;border:1px solid #FED7AA;border-radius:10px;padding:14px 16px;">
+      <div style="display:grid;grid-template-columns:60px 1fr auto;gap:14px;align-items:center;">
+        <div style="text-align:center;padding:8px;background:${urgencyColor}15;border-radius:8px;">
+          <div style="font-size:9px;font-weight:700;color:${urgencyColor};text-transform:uppercase;letter-spacing:0.06em;">za ${daysUntil} dni</div>
+          <div style="font-size:11px;font-weight:700;color:#0A2647;margin-top:2px;">${_iuFmtDate(u.warranty_end)}</div>
+        </div>
+
+        <div style="min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+            <span style="background:#FFEDD5;color:#9A3412;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-shield-half" style="font-size:11px;"></i> GWARANCJA</span>
+            <span style="font-size:13px;font-weight:700;color:#0A2647;">${escapeHtml(client.name || '—')}</span>
+          </div>
+          <div style="font-size:12px;color:#334155;">${escapeHtml(u.marka || '')} ${escapeHtml(u.model || '')}${u.power_kw ? ' · ' + u.power_kw + ' kW' : ''}${u.installation_address ? ' · ' + escapeHtml(u.installation_address) : ''}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;display:flex;gap:12px;flex-wrap:wrap;">
+            ${client.phone ? `<span><i class="ti ti-phone" style="font-size:11px;"></i> ${escapeHtml(client.phone)}</span>` : '<span style="color:#DC2626;">brak telefonu</span>'}
+            ${client.email ? `<span><i class="ti ti-mail" style="font-size:11px;"></i> ${escapeHtml(client.email)}</span>` : '<span style="color:#DC2626;">brak emaila</span>'}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button ${hasEmail ? '' : 'disabled'} onclick="_rmnSendEmail('warranty', '${u.id}')" title="${hasEmail ? 'Wyślij ofertę przedłużenia gwarancji / ostatniego przeglądu' : 'Klient nie ma emaila w bazie'}" style="padding:8px 12px;background:${hasEmail ? '#0F3461' : '#E2E8F0'};color:${hasEmail ? '#fff' : '#94A3B8'};border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:${hasEmail ? 'pointer' : 'not-allowed'};display:inline-flex;align-items:center;gap:5px;">
+            <i class="ti ti-mail" style="font-size:13px;"></i> Email
+          </button>
+          <button ${hasPhone ? '' : 'disabled'} onclick="_rmnSendSms('warranty', '${u.id}')" title="${hasPhone ? 'Wyślij SMS' : 'Klient nie ma telefonu w bazie'}" style="padding:8px 12px;background:${hasPhone ? '#059669' : '#E2E8F0'};color:${hasPhone ? '#fff' : '#94A3B8'};border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:${hasPhone ? 'pointer' : 'not-allowed'};display:inline-flex;align-items:center;gap:5px;">
+            <i class="ti ti-message" style="font-size:13px;"></i> SMS
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* Szablony wiadomości */
+function _rmnBuildServiceEmail(s) {
+  const client = clientsDb.find(c => c.id === s.client_id) || {};
+  const unit = installedUnitsDb.find(u => u.id === s.installed_unit_id);
+  const firstName = (client.name || '').split(' ')[0] || 'Państwo';
+  const scheduled = _iuFmtDate(s.scheduled_date);
+  const svcType = s.service_type || 'przegląd okresowy';
+  const unitDesc = unit ? `${unit.marka || ''} ${unit.model || ''}${unit.installation_address ? ' pod adresem ' + unit.installation_address : ''}` : 'zamontowanego urządzenia';
+
+  const subject = `Przypomnienie o wizycie serwisowej — ${scheduled}`;
+  const body = `Szanowni Państwo,
+
+przypominamy o zaplanowanej wizycie serwisowej w dniu ${scheduled}.
+
+Zakres wizyty: ${svcType}
+Urządzenie: ${unitDesc}${s.scheduled_time ? '\nGodzina: ' + s.scheduled_time : ''}
+
+Prosimy o zapewnienie dostępu do urządzenia w wyznaczonym terminie. W przypadku konieczności zmiany terminu prosimy o kontakt telefoniczny.
+
+W razie pytań pozostajemy do Państwa dyspozycji.
+
+Z poważaniem,
+Zespół 4Climat
+tel. kontaktowy: 501 XXX XXX
+kontakt@4climat.pl
+www.4climat.pl`;
+
+  return { subject, body };
+}
+
+function _rmnBuildServiceSms(s) {
+  const scheduled = _iuFmtDate(s.scheduled_date);
+  const time = s.scheduled_time ? ' o godz. ' + s.scheduled_time : '';
+  return `4Climat: przypominamy o wizycie serwisowej ${scheduled}${time}. W razie zmiany terminu prosimy o kontakt. Pozdrawiamy.`;
+}
+
+function _rmnBuildWarrantyEmail(u) {
+  const client = clientsDb.find(c => c.id === u.client_id) || {};
+  const warEnd = _iuFmtDate(u.warranty_end);
+  const unitDesc = `${u.marka || ''} ${u.model || ''}`;
+
+  const subject = `Ostatni przegląd w gwarancji — ${unitDesc}`;
+  const body = `Szanowni Państwo,
+
+informujemy, że gwarancja producenta na zamontowane urządzenie ${unitDesc}${u.installation_address ? ' pod adresem ' + u.installation_address : ''} kończy się ${warEnd}.
+
+Aby zachować pełne uprawnienia gwarancyjne oraz upewnić się, że urządzenie działa prawidłowo, zalecamy wykonanie ostatniego przeglądu w okresie gwarancyjnym. Nasi technicy sprawdzą stan techniczny urządzenia, oczyszczą filtry i wymiennik ciepła oraz zweryfikują parametry pracy.
+
+Cena przeglądu okresowego dla klimatyzacji split: od 350 zł brutto.
+Cena przeglądu okresowego dla klimatyzacji multisplit lub pompy ciepła: wycena indywidualna.
+
+Zapraszamy do kontaktu w celu ustalenia dogodnego terminu.
+
+Z poważaniem,
+Zespół 4Climat
+tel. kontaktowy: 501 XXX XXX
+kontakt@4climat.pl
+www.4climat.pl`;
+
+  return { subject, body };
+}
+
+function _rmnBuildWarrantySms(u) {
+  const warEnd = _iuFmtDate(u.warranty_end);
+  return `4Climat: gwarancja na Państwa urządzenie kończy się ${warEnd}. Zapraszamy na ostatni przegląd w gwarancji. Kontakt: kontakt@4climat.pl`;
+}
+
+/* Wysyłka */
+async function _rmnSendEmail(kind, id) {
+  let payload;
+  let clientEmail;
+  if (kind === 'service') {
+    const s = serviceVisitsDb.find(x => x.id === id);
+    if (!s) return;
+    const client = clientsDb.find(c => c.id === s.client_id);
+    if (!client?.email) { showToast('Klient nie ma emaila'); return; }
+    payload = _rmnBuildServiceEmail(s);
+    clientEmail = client.email;
+  } else {
+    const u = installedUnitsDb.find(x => x.id === id);
+    if (!u) return;
+    const client = clientsDb.find(c => c.id === u.client_id);
+    if (!client?.email) { showToast('Klient nie ma emaila'); return; }
+    payload = _rmnBuildWarrantyEmail(u);
+    clientEmail = client.email;
+  }
+  const mailto = `mailto:${encodeURIComponent(clientEmail)}?subject=${encodeURIComponent(payload.subject)}&body=${encodeURIComponent(payload.body)}`;
+  window.open(mailto, '_blank');
+  showToast('Otwarto okno wiadomości — zapisano datę przypomnienia');
+  if (kind === 'service') await _rmnMarkSent(id, 'email');
+}
+
+async function _rmnSendSms(kind, id) {
+  let body;
+  let phone;
+  if (kind === 'service') {
+    const s = serviceVisitsDb.find(x => x.id === id);
+    if (!s) return;
+    const client = clientsDb.find(c => c.id === s.client_id);
+    if (!client?.phone) { showToast('Klient nie ma telefonu'); return; }
+    body = _rmnBuildServiceSms(s);
+    phone = client.phone;
+  } else {
+    const u = installedUnitsDb.find(x => x.id === id);
+    if (!u) return;
+    const client = clientsDb.find(c => c.id === u.client_id);
+    if (!client?.phone) { showToast('Klient nie ma telefonu'); return; }
+    body = _rmnBuildWarrantySms(u);
+    phone = client.phone;
+  }
+  const cleanPhone = phone.replace(/\s+/g, '');
+  const smsUri = `sms:${cleanPhone}?body=${encodeURIComponent(body)}`;
+  window.open(smsUri, '_blank');
+  showToast('Otwarto okno SMS — zapisano datę przypomnienia');
+  if (kind === 'service') await _rmnMarkSent(id, 'sms');
+}
+
+async function _rmnMarkContacted(kind, id) {
+  if (kind !== 'service') return;
+  await _rmnMarkSent(id, 'phone');
+  showToast('Oznaczono jako skontaktowany');
+}
+
+async function _rmnMarkSent(serviceId, channel) {
+  try {
+    await sbFetch('/rest/v1/service_visits?id=eq.' + encodeURIComponent(serviceId), 'PATCH', {
+      reminder_sent_at: new Date().toISOString(),
+      reminder_channel: channel
+    });
+    const s = serviceVisitsDb.find(x => x.id === serviceId);
+    if (s) {
+      s.reminder_sent_at = new Date().toISOString();
+      s.reminder_channel = channel;
+    }
+    // Re-render po chwili (żeby użytkownik zdążył zobaczyć że okno się otworzyło)
+    setTimeout(() => _rmnRender(), 500);
+  } catch(e) {
+    console.warn('Nie udało się zapisać daty przypomnienia:', e);
+    // Nie blokuje przepływu — email/SMS już się otworzył
+  }
+}
+
 
 async function loadServiceVisits() {
   try {
@@ -25256,16 +26451,32 @@ checkAuth();
 
 
 
+<!-- REMINDER CENTER MODAL -->
+<div id="reminderCenterModal" class="modal-backdrop">
+  <div class="modal" style="max-width:1080px;">
+    <div class="modal__head">
+      <div>
+        <div class="modal__title"><i class="ti ti-bell" style="font-size:14px;"></i> Centrum przypomnień serwisowych</div>
+        <div style="font-size:11.5px;color:#64748B;margin-top:2px;">Zbliżające się serwisy i kończące się gwarancje — klienci do skontaktowania.</div>
+      </div>
+      <button class="modal__close" onclick="closeReminderCenter()">✕</button>
+    </div>
+    <div class="modal__body" id="reminderCenterBody" style="overflow-y:auto;padding:0;">
+      <div style="text-align:center;padding:40px;color:#94A3B8;">Ładowanie...</div>
+    </div>
+  </div>
+</div>
+
 <!-- CLIENT CARD MODAL -->
 <div id="clientCardModal" class="modal-backdrop">
-  <div class="modal" style="max-width:680px;">
+  <div class="modal" style="max-width:1080px;">
     <div class="modal__head">
       <div>
         <div class="modal__title" id="clientCardTitle">Karta klienta</div>
       </div>
       <button class="modal__close" onclick="closeClientCard()">✕</button>
     </div>
-    <div class="modal__body" id="clientCardBody" style="overflow-y:auto;">
+    <div class="modal__body" id="clientCardBody" style="overflow-y:auto;padding:0;">
       <div style="text-align:center;padding:40px;color:#94A3B8;">Ładowanie...</div>
     </div>
   </div>
