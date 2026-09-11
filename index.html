@@ -2681,7 +2681,7 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         </div>
       </section>
 
-      <!-- SEKCJA: MAGAZYN (Wkrótce) -->
+      <!-- SEKCJA: MAGAZYN -->
       <section id="v2-section-warehouse" class="v2-section">
         <h1 class="v2-page-title">Magazyn</h1>
         <p class="v2-page-subtitle">Stan urządzeń i materiałów, przyjęcia, wydania na budowy, historia ruchów.</p>
@@ -18891,7 +18891,7 @@ function openContractCreator(prefillClientId) {
   };
   const availableTypes = types.filter(t => {
     // Wszystkie typy dokumentów są aktywne (Etap 2 dokończony)
-    return t === 'umowa' || t === 'protokol_prac' || t === 'protokol_etapu' || t === 'aneks';
+    return t === 'umowa' || t === 'umowa_serwisowa' || t === 'protokol_prac' || t === 'protokol_etapu' || t === 'aneks';
   });
 
   mod.innerHTML = `
@@ -19018,6 +19018,47 @@ function _ctrBlankData(type) {
       notes: ''
     };
   }
+  if (type === 'umowa_serwisowa') {
+    return {
+      ...referenceBase,
+      company: { ...CTR_COMPANY_DEFAULT },
+      buildingAddress: '',            // gdzie mają się odbywać serwisy
+      scopeItems: [                   // pozycje zakresu: {label, included: true/false}
+        { label: 'Przegląd okresowy urządzeń (czyszczenie filtrów, kontrola parametrów, dezynfekcja)', included: true },
+        { label: 'Kontrola szczelności układu freonowego (ustawowo raz w roku dla >3 kg czynnika)', included: true },
+        { label: 'Interwencje awaryjne w reakcji na zgłoszenie usterki', included: true },
+        { label: 'Dostępność technika w dni robocze w godz. 8:00–16:00', included: true },
+        { label: 'Priorytetowa obsługa zgłoszeń w sezonie (kwiecień–wrzesień)', included: false },
+        { label: 'Dojazd technika w cenie abonamentu (do 30 km od siedziby Wykonawcy)', included: true }
+      ],
+      inspectionFrequency: 'roczna',  // 'kwartalna' | 'polroczna' | 'roczna'
+      inspectionCount: 1,             // liczba przeglądów w okresie obowiązywania (auto z częstotliwości)
+      responseTimeHours: 48,          // czas reakcji na zgłoszenie awaryjne (godziny robocze)
+
+      // Abonament
+      billingCycle: 'roczny',         // 'miesieczny' | 'kwartalny' | 'roczny'
+      priceNet: null,                 // cena abonamentu za jeden okres rozliczeniowy (netto)
+      priceGross: null,               // brutto
+      vatRate: 23,
+
+      // Okres obowiązywania
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: '',                    // data zakończenia; puste = umowa bezterminowa z wypowiedzeniem
+      noticePeriodMonths: 3,          // okres wypowiedzenia w miesiącach
+      autoRenewal: true,              // automatyczne przedłużenie na kolejny rok
+
+      // Dodatkowe opłaty
+      extraVisitPrice: 350,           // cena dodatkowej wizyty poza abonamentem (netto)
+      extraWorkRate: 230,             // stawka godzinowa za prace dodatkowe (netto)
+      partsMarkupPercent: 20,         // narzut na części zamienne (%)
+
+      // Wykaz obsługiwanych urządzeń — [{marka, model, serialNumber, location, powerKw}]
+      equipmentList: [],
+
+      specialTerms: '',
+      notes: ''
+    };
+  }
   if (type === 'aneks') {
     return {
       ...referenceBase,
@@ -19074,6 +19115,7 @@ function _ctrRenderEditor() {
       <div class="modal__body" style="padding:16px 18px;max-height:calc(100vh - 200px);overflow-y:auto;">
         ${_ctrRenderCommonHeader(c)}
         ${c.contract_type === 'umowa' ? _ctrRenderUmowaFields(c) : ''}
+        ${c.contract_type === 'umowa_serwisowa' ? _ctrRenderUmowaSerwisowaFields(c) : ''}
         ${c.contract_type === 'protokol_prac' ? _ctrRenderProtokolPracFields(c) : ''}
         ${c.contract_type === 'protokol_etapu' ? _ctrRenderProtokolEtapuFields(c) : ''}
         ${c.contract_type === 'aneks' ? _ctrRenderAneksFields(c) : ''}
@@ -19464,6 +19506,250 @@ function _ctrRenderProtokolPracFields(c) {
       <textarea class="ss-input" rows="2" onchange="_ctrSetData('notes', this.value)">${escapeHtml(d.notes || '')}</textarea>
     </div>
   `;
+}
+
+/* Pola dla umowy serwisowej (abonament HVAC) */
+function _ctrRenderUmowaSerwisowaFields(c) {
+  const d = c.data || {};
+  const vatRate = d.vatRate || 23;
+  const scopeItems = Array.isArray(d.scopeItems) ? d.scopeItems : [];
+  const equipmentList = Array.isArray(d.equipmentList) ? d.equipmentList : [];
+  const billingCycleLabel = { miesieczny: 'miesięcznie', kwartalny: 'kwartalnie', roczny: 'rocznie' }[d.billingCycle] || 'rocznie';
+
+  // Pobierz zamontowane urządzenia tego klienta do podpowiedzi
+  const clientInstalledUnits = c.client_id && typeof installedUnitsDb !== 'undefined'
+    ? installedUnitsDb.filter(u => u.client_id === c.client_id && u.status === 'active' && !u.parent_unit_id)
+    : [];
+
+  return `
+    <div class="ss-section-h" style="margin:16px 0 8px;">4. Miejsce świadczenia usług</div>
+    <div>
+      <label class="ss-label">Adres świadczenia usług serwisowych</label>
+      <input type="text" class="ss-input" value="${escapeHtml(d.buildingAddress || '')}" onchange="_ctrSetData('buildingAddress', this.value)" placeholder="Wrocław, ul. Braniborska 14 (lub 'wszystkie lokalizacje klienta')">
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">5. Zakres świadczonych usług</div>
+    <div style="background:#F8FBFD;border:1px solid #DCE9F5;border-radius:8px;padding:10px 12px;">
+      ${scopeItems.map((item, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;${i < scopeItems.length - 1 ? 'border-bottom:1px solid #E2E8F0;' : ''}">
+          <input type="checkbox" ${item.included ? 'checked' : ''} onchange="_ctrToggleScopeItem(${i})" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;">
+          <input type="text" class="ss-input" value="${escapeHtml(item.label)}" onchange="_ctrSetScopeItem(${i}, this.value)" style="flex:1;padding:5px 8px;font-size:11.5px;${item.included ? '' : 'color:#94A3B8;text-decoration:line-through;'}">
+          <button onclick="_ctrRemoveScopeItem(${i})" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;flex-shrink:0;"><i class="ti ti-x" style="font-size:11px;"></i></button>
+        </div>
+      `).join('')}
+      <button onclick="_ctrAddScopeItem()" style="margin-top:8px;width:100%;padding:7px;background:#fff;color:#0F3461;border:1px dashed #93C5FD;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+        <i class="ti ti-plus" style="font-size:11px;"></i> Dodaj pozycję zakresu
+      </button>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">6. Częstotliwość przeglądów i czas reakcji</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Częstotliwość przeglądów okresowych</label>
+        <select class="ss-input" onchange="_ctrSetInspectionFrequency(this.value)">
+          <option value="kwartalna" ${d.inspectionFrequency === 'kwartalna' ? 'selected' : ''}>Kwartalna (4 x rok)</option>
+          <option value="polroczna" ${d.inspectionFrequency === 'polroczna' ? 'selected' : ''}>Półroczna (2 x rok)</option>
+          <option value="roczna" ${d.inspectionFrequency === 'roczna' ? 'selected' : ''}>Roczna (1 x rok)</option>
+        </select>
+      </div>
+      <div>
+        <label class="ss-label">Czas reakcji na zgłoszenie awaryjne (godz. robocze)</label>
+        <input type="number" min="1" max="168" class="ss-input" value="${d.responseTimeHours || 48}" onchange="_ctrSetData('responseTimeHours', parseInt(this.value) || 48)" placeholder="48">
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">7. Wynagrodzenie za abonament</div>
+    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px 14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+        <div>
+          <label class="ss-label">Okres rozliczeniowy</label>
+          <select class="ss-input" onchange="_ctrSetData('billingCycle', this.value)">
+            <option value="miesieczny" ${d.billingCycle === 'miesieczny' ? 'selected' : ''}>Miesięczny</option>
+            <option value="kwartalny" ${d.billingCycle === 'kwartalny' ? 'selected' : ''}>Kwartalny</option>
+            <option value="roczny" ${d.billingCycle === 'roczny' ? 'selected' : ''}>Roczny</option>
+          </select>
+        </div>
+        <div>
+          <label class="ss-label">Cena netto (zł)</label>
+          <input type="number" step="0.01" class="ss-input" value="${d.priceNet || ''}" onchange="_ctrSetData('priceNet', parseFloat(this.value) || 0); _ctrRecalcServiceGross()" placeholder="0.00">
+        </div>
+        <div>
+          <label class="ss-label">VAT %</label>
+          <input type="number" step="1" class="ss-input" value="${vatRate}" onchange="_ctrSetData('vatRate', parseFloat(this.value) || 23); _ctrRecalcServiceGross()">
+        </div>
+        <div>
+          <label class="ss-label">Cena brutto (zł) <span style="color:#059669;">— ${billingCycleLabel}</span></label>
+          <input type="number" step="0.01" class="ss-input" value="${d.priceGross || ''}" style="font-weight:700;color:#166534;background:#fff;" readonly>
+        </div>
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">8. Okres obowiązywania</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Data rozpoczęcia *</label>
+        <input type="date" class="ss-input" value="${d.startDate || new Date().toISOString().slice(0,10)}" onchange="_ctrSetData('startDate', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">Data zakończenia <span style="color:#94A3B8;font-size:10px;">(puste = bezterminowa)</span></label>
+        <input type="date" class="ss-input" value="${d.endDate || ''}" onchange="_ctrSetData('endDate', this.value)">
+      </div>
+      <div>
+        <label class="ss-label">Okres wypowiedzenia (miesiące)</label>
+        <input type="number" min="1" max="12" class="ss-input" value="${d.noticePeriodMonths || 3}" onchange="_ctrSetData('noticePeriodMonths', parseInt(this.value) || 3)">
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;cursor:pointer;">
+        <input type="checkbox" ${d.autoRenewal ? 'checked' : ''} onchange="_ctrSetData('autoRenewal', this.checked)" style="width:16px;height:16px;">
+        Automatyczne przedłużenie na kolejne 12 miesięcy jeśli żadna ze stron nie wypowie umowy w okresie wypowiedzenia
+      </label>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">9. Opłaty za usługi ponadstandardowe</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div>
+        <label class="ss-label">Dodatkowa wizyta poza abonamentem (zł netto)</label>
+        <input type="number" step="0.01" class="ss-input" value="${d.extraVisitPrice || 350}" onchange="_ctrSetData('extraVisitPrice', parseFloat(this.value) || 0)">
+      </div>
+      <div>
+        <label class="ss-label">Stawka roboczogodziny (zł netto)</label>
+        <input type="number" step="0.01" class="ss-input" value="${d.extraWorkRate || 230}" onchange="_ctrSetData('extraWorkRate', parseFloat(this.value) || 0)">
+      </div>
+      <div>
+        <label class="ss-label">Narzut na części zamienne (%)</label>
+        <input type="number" min="0" max="100" step="1" class="ss-input" value="${d.partsMarkupPercent || 20}" onchange="_ctrSetData('partsMarkupPercent', parseInt(this.value) || 0)">
+      </div>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">10. Wykaz obsługiwanych urządzeń</div>
+    ${clientInstalledUnits.length > 0 && equipmentList.length === 0 ? `
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#1E40AF;">
+        <i class="ti ti-info-circle"></i> Ten klient ma ${clientInstalledUnits.length} zamontowaną instalację w bazie.
+        <button onclick="_ctrImportClientEquipment()" style="margin-left:8px;padding:4px 10px;background:#0F3461;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;">
+          Zaimportuj do wykazu
+        </button>
+      </div>
+    ` : ''}
+    <div style="background:#F8FBFD;border:1px solid #DCE9F5;border-radius:8px;padding:10px 12px;">
+      ${equipmentList.length === 0 ? `
+        <div style="padding:20px;text-align:center;color:#94A3B8;font-size:12px;font-style:italic;">Brak urządzeń w wykazie. Dodaj ręcznie lub zaimportuj z bazy klienta.</div>
+      ` : `
+        <table style="width:100%;font-size:11.5px;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #D8E3EE;">
+              <th style="text-align:left;padding:6px;color:#475569;font-weight:600;">Marka / Model</th>
+              <th style="text-align:left;padding:6px;color:#475569;font-weight:600;">S/N</th>
+              <th style="text-align:center;padding:6px;color:#475569;font-weight:600;">Moc kW</th>
+              <th style="text-align:left;padding:6px;color:#475569;font-weight:600;">Lokalizacja</th>
+              <th style="width:30px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${equipmentList.map((eq, i) => `
+              <tr style="border-bottom:1px solid #F1F5F9;">
+                <td style="padding:6px;"><input type="text" value="${escapeHtml(eq.marka || '')} ${escapeHtml(eq.model || '')}" onchange="_ctrSetEquipmentField(${i}, 'label', this.value)" placeholder="Marka + model" style="width:100%;padding:4px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:11.5px;"></td>
+                <td style="padding:6px;"><input type="text" value="${escapeHtml(eq.serialNumber || '')}" onchange="_ctrSetEquipmentField(${i}, 'serialNumber', this.value)" placeholder="S/N" style="width:100%;padding:4px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:11.5px;font-family:monospace;"></td>
+                <td style="padding:6px;"><input type="number" step="0.1" value="${eq.powerKw || ''}" onchange="_ctrSetEquipmentField(${i}, 'powerKw', parseFloat(this.value) || 0)" style="width:100%;padding:4px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:11.5px;text-align:center;"></td>
+                <td style="padding:6px;"><input type="text" value="${escapeHtml(eq.location || '')}" onchange="_ctrSetEquipmentField(${i}, 'location', this.value)" placeholder="np. Salon" style="width:100%;padding:4px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:11.5px;"></td>
+                <td style="padding:6px;"><button onclick="_ctrRemoveEquipment(${i})" style="padding:3px 6px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:10px;cursor:pointer;"><i class="ti ti-x" style="font-size:10px;"></i></button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `}
+      <button onclick="_ctrAddEquipment()" style="margin-top:8px;width:100%;padding:7px;background:#fff;color:#0F3461;border:1px dashed #93C5FD;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+        <i class="ti ti-plus" style="font-size:11px;"></i> Dodaj urządzenie
+      </button>
+    </div>
+
+    <div class="ss-section-h" style="margin:16px 0 8px;">11. Postanowienia szczegółowe (opcjonalne)</div>
+    <div>
+      <label class="ss-label">Dodatkowe klauzule</label>
+      <textarea class="ss-input" rows="3" onchange="_ctrSetData('specialTerms', this.value)" placeholder="np. Klauzula priorytetowej obsługi w przypadku B2B, wyłączenie odpowiedzialności za sprzęt starszy niż 10 lat, warunki gwarancji na wykonane naprawy...">${escapeHtml(d.specialTerms || '')}</textarea>
+    </div>
+    <div style="margin-top:12px;">
+      <label class="ss-label">Uwagi wewnętrzne (nie pojawią się w PDF)</label>
+      <textarea class="ss-input" rows="2" onchange="_ctrSetData('notes', this.value)">${escapeHtml(d.notes || '')}</textarea>
+    </div>
+  `;
+}
+
+function _ctrRecalcServiceGross() {
+  if (!_ctrEditing?.data) return;
+  const net = parseFloat(_ctrEditing.data.priceNet) || 0;
+  const vat = parseFloat(_ctrEditing.data.vatRate) || 23;
+  _ctrEditing.data.priceGross = Math.round(net * (1 + vat / 100) * 100) / 100;
+  _ctrRenderEditor();
+}
+
+function _ctrSetInspectionFrequency(freq) {
+  if (!_ctrEditing?.data) return;
+  const counts = { kwartalna: 4, polroczna: 2, roczna: 1 };
+  _ctrEditing.data.inspectionFrequency = freq;
+  _ctrEditing.data.inspectionCount = counts[freq] || 1;
+  _ctrRenderEditor();
+}
+
+function _ctrToggleScopeItem(i) {
+  if (!_ctrEditing?.data?.scopeItems?.[i]) return;
+  _ctrEditing.data.scopeItems[i].included = !_ctrEditing.data.scopeItems[i].included;
+  _ctrRenderEditor();
+}
+function _ctrSetScopeItem(i, label) {
+  if (!_ctrEditing?.data?.scopeItems?.[i]) return;
+  _ctrEditing.data.scopeItems[i].label = label;
+}
+function _ctrAddScopeItem() {
+  if (!_ctrEditing?.data) return;
+  if (!Array.isArray(_ctrEditing.data.scopeItems)) _ctrEditing.data.scopeItems = [];
+  _ctrEditing.data.scopeItems.push({ label: '', included: true });
+  _ctrRenderEditor();
+}
+function _ctrRemoveScopeItem(i) {
+  if (!_ctrEditing?.data?.scopeItems) return;
+  _ctrEditing.data.scopeItems.splice(i, 1);
+  _ctrRenderEditor();
+}
+
+function _ctrAddEquipment() {
+  if (!_ctrEditing?.data) return;
+  if (!Array.isArray(_ctrEditing.data.equipmentList)) _ctrEditing.data.equipmentList = [];
+  _ctrEditing.data.equipmentList.push({ marka: '', model: '', serialNumber: '', powerKw: null, location: '' });
+  _ctrRenderEditor();
+}
+function _ctrRemoveEquipment(i) {
+  if (!_ctrEditing?.data?.equipmentList) return;
+  _ctrEditing.data.equipmentList.splice(i, 1);
+  _ctrRenderEditor();
+}
+function _ctrSetEquipmentField(i, field, value) {
+  if (!_ctrEditing?.data?.equipmentList?.[i]) return;
+  if (field === 'label') {
+    // Split "Marka Model" back into pieces — best effort
+    const parts = value.trim().split(/\s+/);
+    _ctrEditing.data.equipmentList[i].marka = parts[0] || '';
+    _ctrEditing.data.equipmentList[i].model = parts.slice(1).join(' ');
+  } else {
+    _ctrEditing.data.equipmentList[i][field] = value;
+  }
+}
+function _ctrImportClientEquipment() {
+  if (!_ctrEditing?.client_id || typeof installedUnitsDb === 'undefined') return;
+  const units = installedUnitsDb.filter(u => u.client_id === _ctrEditing.client_id && u.status === 'active' && !u.parent_unit_id);
+  if (units.length === 0) { showToast('Brak zamontowanych urządzeń tego klienta'); return; }
+  if (!Array.isArray(_ctrEditing.data.equipmentList)) _ctrEditing.data.equipmentList = [];
+  units.forEach(u => {
+    _ctrEditing.data.equipmentList.push({
+      marka: u.marka || '',
+      model: u.model || '',
+      serialNumber: u.serial_number || '',
+      powerKw: u.power_kw,
+      location: u.installation_address || u.location_room || ''
+    });
+  });
+  _ctrRenderEditor();
+  showToast('Zaimportowano ' + units.length + ' urządzeń');
 }
 
 /* Pola dla protokołu zakończenia etapu */
@@ -19884,6 +20170,7 @@ async function previewContractPdf(contractId) {
 
 function _ctrBuildDocDef(src, rec) {
   if (rec.contract_type === 'umowa') return _ctrDocDefUmowa(src, rec);
+  if (rec.contract_type === 'umowa_serwisowa') return _ctrDocDefUmowaSerwisowa(src, rec);
   if (rec.contract_type === 'protokol_prac') return _ctrDocDefProtokolPrac(src, rec);
   if (rec.contract_type === 'protokol_etapu') return _ctrDocDefProtokolEtapu(src, rec);
   if (rec.contract_type === 'aneks') return _ctrDocDefAneks(src, rec);
@@ -20321,6 +20608,199 @@ function _ctrDocDefProtokolPrac(src, rec) {
     pageSize: 'A4',
     pageMargins: [50, 55, 50, 50],
     defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#1A2332', lineHeight: 1.4 },
+    content: content
+  };
+}
+
+/* PDF: Umowa serwisowa (abonament HVAC) — stylistycznie spójna z umową główną */
+function _ctrDocDefUmowaSerwisowa(src, rec) {
+  const client = clientsDb.find(x => x.id === src.client_id) || {};
+  const d = src.data || {};
+  const company = (d.company && typeof d.company === 'object') ? d.company : CTR_COMPANY_DEFAULT;
+  const scopeItems = Array.isArray(d.scopeItems) ? d.scopeItems.filter(x => x.included && x.label) : [];
+  const equipmentList = Array.isArray(d.equipmentList) ? d.equipmentList : [];
+  const netVal = parseFloat(d.priceNet) || 0;
+  const grossVal = parseFloat(d.priceGross) || 0;
+  const vatVal = grossVal - netVal;
+  const vatRate = d.vatRate || 23;
+  const billingCycleLabel = { miesieczny: 'miesięcznie', kwartalny: 'kwartalnie', roczny: 'rocznie' }[d.billingCycle] || 'rocznie';
+  const inspectionLabel = { kwartalna: 'kwartalne (raz na trzy miesiące)', polroczna: 'półroczne (raz na sześć miesięcy)', roczna: 'roczne (raz w roku)' }[d.inspectionFrequency] || 'roczne';
+
+  const content = [];
+
+  // Nagłówek
+  content.push({ text: 'UMOWA SERWISOWA nr ' + (src.contract_number || '—'), fontSize: 18, bold: true, color: '#0F3461', alignment: 'center', margin: [0, 0, 0, 4] });
+  content.push({ text: 'zawarta w dniu ' + _ctrFmtDate(src.contract_date) + ' w ' + (src.place_signed || 'Wrocławiu'), alignment: 'center', fontSize: 11, color: '#475569', margin: [0, 0, 0, 20] });
+
+  // Strony
+  content.push({ text: 'Strony umowy:', bold: true, color: '#0F3461', margin: [0, 0, 0, 6] });
+
+  content.push({ text: '1.  ' + (client.name || '(imię i nazwisko / nazwa)'), bold: true, margin: [0, 0, 0, 2] });
+  if (client.address) content.push({ text: client.address, margin: [16, 0, 0, 2] });
+  if (client.nip) content.push({ text: 'PESEL/NIP: ' + client.nip, margin: [16, 0, 0, 2] });
+  content.push({ text: 'zwany dalej Zleceniodawcą;', italics: true, margin: [16, 4, 0, 10] });
+
+  content.push({ text: 'a,', alignment: 'center', margin: [0, 0, 0, 8] });
+
+  content.push({ text: '2.  Firmą ' + _ctrCleanCompanyName(company.name) + ' z siedzibą we Wrocławiu', bold: true, margin: [0, 0, 0, 2] });
+  content.push({ text: company.address || CTR_COMPANY_DEFAULT.address, margin: [16, 0, 0, 2] });
+  content.push({ text: 'NIP: ' + (company.nip || CTR_COMPANY_DEFAULT.nip) + (company.regon ? ', REGON: ' + company.regon : ''), margin: [16, 0, 0, 2] });
+  content.push({ text: 'reprezentowaną przez ' + (company.representedBy || 'Tomasz Dobryniewski'), margin: [16, 0, 0, 2] });
+  content.push({ text: 'zwaną dalej Wykonawcą.', italics: true, margin: [16, 4, 0, 20] });
+
+  // § 1 Przedmiot umowy
+  content.push({ text: '§ 1', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Przedmiot umowy', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: '1.  Przedmiotem niniejszej umowy jest świadczenie przez Wykonawcę na rzecz Zleceniodawcy usług serwisowych oraz przeglądowo-konserwacyjnych urządzeń klimatyzacyjnych, pomp ciepła oraz systemów wentylacji z odzyskiem ciepła, w zakresie i na warunkach określonych w niniejszej umowie.', margin: [0, 0, 0, 6] });
+  if (d.buildingAddress) content.push({ text: '2.  Usługi świadczone będą pod adresem: ' + d.buildingAddress + '.', margin: [0, 0, 0, 6] });
+  if (d.referenceText) content.push({ text: (d.buildingAddress ? '3.' : '2.') + '  Umowa niniejsza pozostaje w związku z ' + d.referenceText + '.', margin: [0, 0, 0, 12] });
+
+  // § 2 Zakres usług
+  content.push({ text: '§ 2', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Zakres świadczonych usług', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: '1.  W ramach abonamentu Wykonawca zobowiązuje się do świadczenia następujących usług:', margin: [0, 0, 0, 6] });
+  if (scopeItems.length > 0) {
+    content.push({
+      ul: scopeItems.map(item => item.label),
+      margin: [10, 0, 0, 10]
+    });
+  }
+  content.push({ text: '2.  Przeglądy okresowe wykonywane będą z częstotliwością ' + inspectionLabel + '. Termin każdego przeglądu zostanie uzgodniony pomiędzy Stronami z wyprzedzeniem nie krótszym niż 14 dni.', margin: [0, 4, 0, 6] });
+  content.push({ text: '3.  W przypadku zgłoszenia awarii Wykonawca zobowiązuje się do reakcji w terminie nie dłuższym niż ' + (d.responseTimeHours || 48) + ' godzin roboczych od momentu otrzymania zgłoszenia.', margin: [0, 0, 0, 12] });
+
+  // § 3 Wykaz urządzeń
+  content.push({ text: '§ 3', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Wykaz obsługiwanych urządzeń', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  if (equipmentList.length > 0) {
+    content.push({
+      table: {
+        headerRows: 1,
+        widths: [30, '*', 80, 40, '*'],
+        body: [
+          [
+            { text: 'Lp.', bold: true, color: '#fff', fillColor: '#0F3461', margin: [4, 4, 4, 4] },
+            { text: 'Marka / Model', bold: true, color: '#fff', fillColor: '#0F3461', margin: [4, 4, 4, 4] },
+            { text: 'Nr seryjny', bold: true, color: '#fff', fillColor: '#0F3461', margin: [4, 4, 4, 4] },
+            { text: 'Moc', bold: true, color: '#fff', fillColor: '#0F3461', alignment: 'center', margin: [4, 4, 4, 4] },
+            { text: 'Lokalizacja', bold: true, color: '#fff', fillColor: '#0F3461', margin: [4, 4, 4, 4] }
+          ],
+          ...equipmentList.map((eq, i) => [
+            { text: (i + 1) + '.', margin: [4, 4, 4, 4], alignment: 'center' },
+            { text: ((eq.marka || '') + ' ' + (eq.model || '')).trim() || '—', margin: [4, 4, 4, 4] },
+            { text: eq.serialNumber || '—', margin: [4, 4, 4, 4], fontSize: 9 },
+            { text: eq.powerKw ? eq.powerKw + ' kW' : '—', margin: [4, 4, 4, 4], alignment: 'center' },
+            { text: eq.location || '—', margin: [4, 4, 4, 4] }
+          ])
+        ]
+      },
+      layout: {
+        hLineColor: () => '#C7D8E8',
+        vLineColor: () => '#C7D8E8',
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5
+      },
+      margin: [0, 0, 0, 10]
+    });
+  } else {
+    content.push({ text: 'Wykaz urządzeń objętych umową stanowi Załącznik nr 1 do niniejszej umowy.', italics: true, color: '#64748B', margin: [0, 0, 0, 10] });
+  }
+  content.push({ text: 'Zleceniodawca zobowiązuje się do niezwłocznego zgłoszenia Wykonawcy każdej zmiany w wykazie urządzeń (dodanie nowego sprzętu, wymiana, demontaż).', margin: [0, 4, 0, 12] });
+
+  // § 4 Wynagrodzenie
+  content.push({ text: '§ 4', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Wynagrodzenie i warunki płatności', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: '1.  Za świadczenie usług objętych niniejszą umową Zleceniodawca zapłaci Wykonawcy wynagrodzenie w wysokości:', margin: [0, 0, 0, 6] });
+
+  content.push({
+    table: {
+      widths: ['*', 120],
+      body: [
+        [{ text: 'Wynagrodzenie netto (' + billingCycleLabel + ')', margin: [10, 5, 10, 5] }, { text: _ctrFmtPln(netVal), alignment: 'right', margin: [10, 5, 10, 5] }],
+        [{ text: 'VAT ' + vatRate + '%', margin: [10, 5, 10, 5] }, { text: _ctrFmtPln(vatVal), alignment: 'right', margin: [10, 5, 10, 5] }],
+        [{ text: 'Wynagrodzenie brutto (' + billingCycleLabel + ')', bold: true, color: '#fff', fillColor: '#0F3461', margin: [10, 8, 10, 8] }, { text: _ctrFmtPln(grossVal), bold: true, color: '#fff', fillColor: '#0F3461', alignment: 'right', margin: [10, 8, 10, 8] }]
+      ]
+    },
+    layout: { hLineColor: () => '#C7D8E8', vLineColor: () => '#C7D8E8', hLineWidth: () => 0.5, vLineWidth: () => 0.5 },
+    margin: [0, 0, 0, 10]
+  });
+
+  content.push({ text: '2.  Wynagrodzenie płatne będzie na podstawie faktury VAT wystawionej przez Wykonawcę, w terminie 14 dni od daty jej doręczenia, przelewem na rachunek bankowy wskazany na fakturze.', margin: [0, 4, 0, 6] });
+  content.push({ text: '3.  Usługi ponadstandardowe (poza zakresem abonamentu) rozliczane będą według następujących stawek: dodatkowa wizyta serwisowa — ' + _ctrFmtPln(d.extraVisitPrice || 350) + ' netto, roboczogodzina prac serwisowych — ' + _ctrFmtPln(d.extraWorkRate || 230) + ' netto, części zamienne — cena zakupu powiększona o narzut ' + (d.partsMarkupPercent || 20) + '%.', margin: [0, 0, 0, 12] });
+
+  // § 5 Okres obowiązywania
+  content.push({ text: '§ 5', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Okres obowiązywania i wypowiedzenie', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({
+    text: '1.  Umowa zostaje zawarta na okres od dnia ' + _ctrFmtDate(d.startDate) + (d.endDate ? ' do dnia ' + _ctrFmtDate(d.endDate) : ' na czas nieokreślony') + '.',
+    margin: [0, 0, 0, 6]
+  });
+  if (d.autoRenewal) {
+    content.push({ text: '2.  Umowa ulega automatycznemu przedłużeniu na kolejne 12 miesięcy, jeżeli żadna ze Stron nie złoży wypowiedzenia w terminie określonym w ust. 3.', margin: [0, 0, 0, 6] });
+  }
+  content.push({ text: (d.autoRenewal ? '3.' : '2.') + '  Każda ze Stron może rozwiązać umowę z zachowaniem ' + (d.noticePeriodMonths || 3) + '-miesięcznego okresu wypowiedzenia, ze skutkiem na koniec miesiąca kalendarzowego. Wypowiedzenie wymaga formy pisemnej pod rygorem nieważności.', margin: [0, 0, 0, 6] });
+  content.push({ text: (d.autoRenewal ? '4.' : '3.') + '  Wykonawca zastrzega sobie prawo do rozwiązania umowy ze skutkiem natychmiastowym w przypadku zwłoki Zleceniodawcy w płatności wynagrodzenia przekraczającej 30 dni.', margin: [0, 0, 0, 12] });
+
+  // § 6 Zobowiązania stron
+  content.push({ text: '§ 6', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Zobowiązania Stron', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: '1.  Wykonawca zobowiązuje się do:', margin: [0, 0, 0, 4] });
+  content.push({
+    ul: [
+      'wykonywania usług z należytą starannością, zgodnie z aktualną wiedzą techniczną i dokumentacją producenta urządzeń;',
+      'używania oryginalnych części zamiennych lub ich zamienników wysokiej jakości;',
+      'dokumentowania każdej wizyty serwisowej w formie protokołu podpisywanego przez Zleceniodawcę;',
+      'zachowania poufności danych i informacji uzyskanych podczas realizacji umowy.'
+    ],
+    margin: [10, 0, 0, 8]
+  });
+  content.push({ text: '2.  Zleceniodawca zobowiązuje się do:', margin: [0, 4, 0, 4] });
+  content.push({
+    ul: [
+      'terminowej zapłaty wynagrodzenia zgodnie z § 4 umowy;',
+      'zapewnienia Wykonawcy dostępu do urządzeń w uzgodnionych terminach przeglądów;',
+      'niezwłocznego zgłaszania wszelkich nieprawidłowości w pracy urządzeń;',
+      'niewykonywania samodzielnych ingerencji w układy freonowe, elektryczne i sterujące bez uzgodnienia z Wykonawcą.'
+    ],
+    margin: [10, 0, 0, 12]
+  });
+
+  // § 7 Postanowienia szczegółowe (jeśli są)
+  if (d.specialTerms && d.specialTerms.trim()) {
+    content.push({ text: '§ 7', bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+    content.push({ text: 'Postanowienia szczegółowe', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+    content.push({ text: d.specialTerms, margin: [0, 0, 0, 12] });
+  }
+
+  // Ostatni § — Postanowienia końcowe
+  const finalParagraph = d.specialTerms && d.specialTerms.trim() ? '§ 8' : '§ 7';
+  content.push({ text: finalParagraph, bold: true, alignment: 'center', margin: [0, 8, 0, 4] });
+  content.push({ text: 'Postanowienia końcowe', bold: true, alignment: 'center', margin: [0, 0, 0, 10] });
+  content.push({ text: '1.  W sprawach nieuregulowanych niniejszą umową zastosowanie mają przepisy Kodeksu cywilnego oraz ustawy z dnia 15 maja 2015 r. o substancjach zubożających warstwę ozonową oraz o niektórych fluorowanych gazach cieplarnianych.', margin: [0, 0, 0, 6] });
+  content.push({ text: '2.  Wszelkie zmiany i uzupełnienia niniejszej umowy wymagają formy pisemnej pod rygorem nieważności.', margin: [0, 0, 0, 6] });
+  content.push({ text: '3.  Ewentualne spory wynikające z realizacji umowy Strony będą rozstrzygać polubownie, a w przypadku braku porozumienia — przed sądem powszechnym właściwym dla siedziby Wykonawcy.', margin: [0, 0, 0, 6] });
+  content.push({ text: '4.  Umowa sporządzona została w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej ze Stron.', margin: [0, 0, 0, 20] });
+
+  // Podpisy
+  content.push({
+    margin: [0, 40, 0, 0],
+    columns: [
+      { width: '*', stack: [
+        { text: 'ZLECENIODAWCA', alignment: 'center', bold: true, fontSize: 11, margin: [0, 0, 0, 30] },
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' },
+        { text: client.name || '', alignment: 'center', fontSize: 9, color: '#94A3B8', italics: true, margin: [0, 4, 0, 0] }
+      ]},
+      { width: '*', stack: [
+        { text: 'WYKONAWCA', alignment: 'center', bold: true, fontSize: 11, margin: [0, 0, 0, 30] },
+        { text: '_______________________________', alignment: 'center', color: '#94A3B8' },
+        { text: company.representedBy || 'Tomasz Dobryniewski', alignment: 'center', fontSize: 9, color: '#94A3B8', italics: true, margin: [0, 4, 0, 0] }
+      ]}
+    ]
+  });
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [50, 50, 50, 50],
+    defaultStyle: { font: 'Roboto', fontSize: 10.5, color: '#1A2332', lineHeight: 1.4, alignment: 'justify' },
     content: content
   };
 }
@@ -21227,7 +21707,7 @@ function _iuRenderEditor() {
               </div>
             </div>
           </div>
-        ` : `
+        ` : u.device_type === 'ac_multi_zew' ? _iuRenderMultiBoxes(u) : `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
             <div>
               <label class="ss-label">Marka *</label>
@@ -21320,7 +21800,99 @@ function _iuRenderDatesPreview(u) {
 }
 
 /* Sekcja "Jednostki wewnętrzne" — pokazywana tylko dla ac_multi_zew (jedn. zewnętrzna multi) */
+/* Multisplit — spójny stylistycznie z edytorem splita:
+   niebieski (fioletowy nagłówek) box "JEDNOSTKA ZEWNĘTRZNA" (agregat)
+   + dynamiczna lista żółtych boxów per każda jednostka wewnętrzna
+   z przyciskiem "+ Dodaj kolejną".
+   Jednostki wewnętrzne są przechowywane w _indoor_units_draft i zapisywane
+   jako osobne rekordy z parent_unit_id (mechanizm bez zmian). */
+function _iuRenderMultiBoxes(u) {
+  const drafts = Array.isArray(u._indoor_units_draft) ? u._indoor_units_draft : [];
+  return `
+    <div style="margin-top:14px;padding:12px 14px;background:#F8FBFD;border:1px solid #DCE9F5;border-radius:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="background:#F3E8FF;color:#6B21A8;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-building" style="font-size:11px;"></i> JEDNOSTKA ZEWNĘTRZNA (AGREGAT)</div>
+        <div style="font-size:11px;color:#64748B;">Wspólna dla wszystkich jednostek wewnętrznych</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label class="ss-label">Marka *</label>
+          <input type="text" class="ss-input" value="${escapeHtml(u.marka || '')}" onchange="_iuSet('marka', this.value)" placeholder="np. DAIKIN" list="iuBrandsList">
+          <datalist id="iuBrandsList">
+            ${['HAIER','GREE','LG','PANASONIC','SAMSUNG','TOSHIBA','MITSUBISHI','DAIKIN','VIESSMANN','VAILLANT','KAISAI','SINCLAIR'].map(b => `<option value="${b}">`).join('')}
+          </datalist>
+        </div>
+        <div>
+          <label class="ss-label">Model *</label>
+          <input type="text" class="ss-input" value="${escapeHtml(u.model || '')}" onchange="_iuSet('model', this.value)" placeholder="np. 3MXM52A8">
+        </div>
+        <div>
+          <label class="ss-label">Numer seryjny</label>
+          <input type="text" class="ss-input" value="${escapeHtml(u.serial_number || '')}" onchange="_iuSet('serial_number', this.value)" placeholder="np. T026168">
+        </div>
+        <div>
+          <label class="ss-label">Konfiguracja</label>
+          <select class="ss-input" onchange="_iuSet('multi_config', this.value)">
+            <option value="">— nie ustawiono —</option>
+            <option value="2+1" ${u.multi_config === '2+1' ? 'selected' : ''}>2+1 (dwie jednostki wewnętrzne)</option>
+            <option value="3+1" ${u.multi_config === '3+1' ? 'selected' : ''}>3+1 (trzy jednostki wewnętrzne)</option>
+            <option value="4+1" ${u.multi_config === '4+1' ? 'selected' : ''}>4+1 (cztery jednostki wewnętrzne)</option>
+            <option value="5+1" ${u.multi_config === '5+1' ? 'selected' : ''}>5+1 (pięć jednostek wewnętrznych)</option>
+            <option value="6+1" ${u.multi_config === '6+1' ? 'selected' : ''}>6+1 (sześć jednostek wewnętrznych)</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#64748B;"><i class="ti ti-info-circle"></i> Moc agregatu (wpisana w polu „Moc" powyżej) to suma mocy jednostek wewnętrznych z uwzględnieniem współczynnika kompatybilności producenta.</div>
+    </div>
+
+    ${drafts.map((d, i) => `
+      <div style="margin-top:10px;padding:12px 14px;background:#FEFCE8;border:1px solid #FDE68A;border-radius:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <div style="background:#FEF3C7;color:#92400E;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.04em;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-home" style="font-size:11px;"></i> JEDNOSTKA WEWNĘTRZNA #${i+1}</div>
+          ${d._existing ? '<span style="padding:2px 6px;background:#F0FDF4;color:#166534;border-radius:4px;font-size:9.5px;font-weight:600;">W BAZIE</span>' : '<span style="padding:2px 6px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:9.5px;font-weight:600;">NOWA</span>'}
+          <div style="flex:1;"></div>
+          <button onclick="_iuRemoveIndoor(${i})" title="${d._existing ? 'Usuń z bazy przy zapisie' : 'Usuń'}" style="padding:5px 10px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-trash" style="font-size:12px;"></i> Usuń</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label class="ss-label">Marka</label>
+            <input type="text" class="ss-input" value="${escapeHtml(d.marka || '')}" onchange="_iuSetIndoor(${i}, 'marka', this.value)" placeholder="Zwykle ta sama co agregat">
+          </div>
+          <div>
+            <label class="ss-label">Model *</label>
+            <input type="text" class="ss-input" value="${escapeHtml(d.model || '')}" onchange="_iuSetIndoor(${i}, 'model', this.value)" placeholder="np. FTXA25C2V1BW">
+          </div>
+          <div>
+            <label class="ss-label">Numer seryjny</label>
+            <input type="text" class="ss-input" value="${escapeHtml(d.serial_number || '')}" onchange="_iuSetIndoor(${i}, 'serial_number', this.value)" placeholder="opcjonalnie">
+          </div>
+          <div>
+            <label class="ss-label">Moc (kW)</label>
+            <input type="number" step="0.1" class="ss-input" value="${d.power_kw || ''}" onchange="_iuSetIndoor(${i}, 'power_kw', this.value === '' ? null : parseFloat(this.value))" placeholder="np. 2.5">
+          </div>
+          <div style="grid-column:span 2;">
+            <label class="ss-label">Pomieszczenie *</label>
+            <input type="text" class="ss-input" value="${escapeHtml(d.location_room || '')}" onchange="_iuSetIndoor(${i}, 'location_room', this.value)" placeholder="np. Salon, sypialnia, gabinet">
+          </div>
+        </div>
+      </div>
+    `).join('')}
+
+    <button onclick="_iuAddIndoor()" style="margin-top:10px;width:100%;padding:11px;background:#fff;color:#0F3461;border:1.5px dashed #FDE68A;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+      <i class="ti ti-plus" style="font-size:14px;"></i> Dodaj kolejną jednostkę wewnętrzną
+    </button>
+    ${drafts.length === 0 ? '<div style="margin-top:8px;padding:10px 14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;font-size:11.5px;color:#92400E;"><i class="ti ti-alert-circle"></i> Multisplit wymaga przynajmniej jednej jednostki wewnętrznej. Dodaj pierwszą, klikając powyższy przycisk.</div>' : `<div style="margin-top:6px;font-size:11px;color:#64748B;">Zapisywane są jako osobne rekordy powiązane z tym agregatem (parent_unit_id). Przegląd zewnętrznej obejmuje całą instalację — dla wewnętrznych osobne przeglądy nie są dodawane.</div>`}
+  `;
+}
+
 function _iuRenderIndoorUnitsSection(u) {
+  // Dla multi jednostki wewnętrzne są już renderowane bezpośrednio pod agregatem
+  // w _iuRenderMultiBoxes (styl spójny z edytorem splita — dwa kolorowe boxy).
+  // Ta funkcja pozostaje wyłącznie dla wstecznej kompatybilności innych typów.
+  return '';
+}
+
+function _iuRenderIndoorUnitsSection_LEGACY(u) {
   if (u.device_type !== 'ac_multi_zew') return '';
   const drafts = Array.isArray(u._indoor_units_draft) ? u._indoor_units_draft : [];
   return `
