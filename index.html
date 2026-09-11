@@ -27568,10 +27568,17 @@ function wzCanGoNext() {
     if (wzState.basics.scope === 'ac' && wzState.basics.mode === 'split') {
       const vs = wzState.variants || [];
       if (vs.length === 0) return false;
-      return vs.every(v =>
-        v.displayName && v.displayName.trim().length > 1 &&
-        (parseFloat(v.priceNet) || 0) > 0
-      );
+      return vs.every(v => {
+        // Nazwa wariantu: dla wariantów z bazy wymagany displayName;
+        // dla ręcznych akceptujemy wypełnioną markę LUB model
+        // (auto-tytuł wtedy złoży nazwę dla PDF).
+        const hasName = (v.displayName && v.displayName.trim().length > 1)
+          || (v.isManual && (
+              (v.manualBrand && v.manualBrand.trim().length > 1) ||
+              (v.manualModel && v.manualModel.trim().length > 1)
+            ));
+        return hasName && (parseFloat(v.priceNet) || 0) > 0;
+      });
     }
     return true;
   }
@@ -27654,6 +27661,34 @@ function wzAttachInputListeners() {
       let val = el.value;
       if (el.type === 'number') val = parseFloat(val) || 0;
       v[key] = val;
+
+      // Dla wariantów ręcznych: gdy user zmienia markę/model/moc, a displayName jest puste,
+      // złóż nazwę automatycznie z brand + model + power. To zapewnia, że PDF, snapshot
+      // oferty i walidacja będą miały prawidłową nazwę bez konieczności edytowania osobno.
+      if (v.isManual && (key === 'manualBrand' || key === 'manualModel' || key === 'manualPower')) {
+        const currentName = (v.displayName || '').trim();
+        // Uzupełnij tylko jeśli puste LUB było wcześniej auto-uzupełnione (nie nadpisuj tego, co user wpisał ręcznie)
+        if (!currentName || v._displayNameAuto) {
+          const brand = (v.manualBrand || '').trim();
+          const model = (v.manualModel || '').trim();
+          const power = String(v.manualPower || '').trim();
+          const powerStr = power ? ' ' + power.replace('.', ',') + ' kW' : '';
+          const composed = ('Klimatyzator ' + brand + ' ' + model + powerStr).replace(/\s+/g, ' ').trim();
+          if (composed !== 'Klimatyzator') {
+            v.displayName = composed;
+            v._displayNameAuto = true;
+            // Zaktualizuj input displayName w DOM, jeśli jest widoczny i użytkownik go nie edytuje
+            const nameEl = document.querySelector('[data-wz-var-input="displayName"][data-vid="' + vid + '"]');
+            if (nameEl && document.activeElement !== nameEl) {
+              nameEl.value = v.displayName;
+            }
+          }
+        }
+      }
+      // Gdy user zmienił displayName ręcznie, wyłącz auto-uzupełnianie
+      if (key === 'displayName') {
+        v._displayNameAuto = false;
+      }
 
       // Auto-przelicz kat/rabat/po rabacie
       if (key === 'priceKatNet' || key === 'discount') {
