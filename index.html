@@ -2843,7 +2843,7 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
       <!-- SEKCJA: PRODUKTY KLIMATYZACJI -->
       <section id="v2-section-products" class="v2-section">
         <h1 class="v2-page-title">Produkty klimatyzacji</h1>
-        <p class="v2-page-subtitle">Baza urządzeń split, multi zewnętrzne i wewnętrzne — cenniki i marże. Ceny widoczne tylko dla handlowców.</p>
+        <p class="v2-page-subtitle">Baza urządzeń split, multi zewnętrzne i wewnętrzne — pogrupowane po producentach. Kliknij cenę, model lub link aby edytować bezpośrednio. Ceny widoczne tylko dla handlowców.</p>
         <div class="v2-toolbar">
           <label class="v2-toolbar__label">Kategoria:</label>
           <select id="acProdCatFilter" class="v2-toolbar__select" onchange="renderAcProductsList()">
@@ -2869,11 +2869,8 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
             <i class="ti ti-search" aria-hidden="true"></i>
             <input id="acProdSearch" type="text" placeholder="Szukaj po marce, modelu lub kolorze..." oninput="renderAcProductsList()">
           </div>
-          <button class="v2-btn v2-btn--primary" onclick="openAcProductEditor(null, null)" title="Dodaj nowe urządzenie do bazy własnych">
+          <button class="v2-btn v2-btn--primary" onclick="openAcProductEditor(null, null)" title="Dodaj nowe urządzenie do bazy — trafi do wybranego producenta">
             <i class="ti ti-plus"></i> Dodaj urządzenie
-          </button>
-          <button class="v2-btn v2-btn--ghost" onclick="showPriceEditor()" title="Edycja marż globalnych">
-            <i class="ti ti-percentage"></i> Marże
           </button>
         </div>
         <div class="v2-panel" id="acProductsListWrap" style="margin-top:16px;">
@@ -4991,9 +4988,12 @@ function onLoginSuccess() {
   // Wyczyść cache produktów żeby załadować świeże dane
   _productsCache = null;
   _productsCacheTime = 0;
-  // Załaduj produkty z Supabase, potem init
-  loadProductsFromSupabase().then(async () => {
-    // Załaduj też własne produkty z Supabase
+  // Załaduj produkty i marże z Supabase, potem init
+  Promise.all([
+    loadProductsFromSupabase(),
+    loadBrandMarginsFromSupabase()
+  ]).then(async () => {
+    // Załaduj też własne produkty z Supabase (legacy fallback)
     const customDb = await loadCustomDbFromSupabase();
     if (customDb) localStorage.setItem(CUSTOM_DB_KEY, JSON.stringify(customDb));
     init();
@@ -9424,6 +9424,107 @@ async function updateProductPrice(sbid, cena, cena_kat) {
   }
 }
 
+/* ============================================================
+   BRAND_MARGINS — ładowanie i zapis z Supabase
+   Nadpisuje globalny obiekt BRAND_MARGINS wartościami z bazy
+   ============================================================ */
+async function loadBrandMarginsFromSupabase() {
+  try {
+    const rows = await sbFetch('/rest/v1/brand_margins?select=*&order=marka.asc');
+    if (!rows || rows.length === 0) return false;
+    // Nadpisz hardcoded BRAND_MARGINS wartościami z bazy
+    // (nie zeruj obiektu — istniejące kluczy pozostają jako fallback)
+    rows.forEach(r => {
+      BRAND_MARGINS[r.marka] = {
+        buyDiscount: parseFloat(r.buy_discount),
+        sellDiscount: parseFloat(r.sell_discount)
+      };
+    });
+    console.log('✓ Marże załadowane z Supabase:', rows.length, 'marek');
+    return true;
+  } catch(e) {
+    console.warn('loadBrandMargins error:', e);
+    return false;
+  }
+}
+
+async function updateBrandMargin(marka, patch) {
+  if (!currentUser) { showToast('Zaloguj się ponownie'); return false; }
+  try {
+    // Sprawdź czy istnieje
+    const existing = await sbFetch('/rest/v1/brand_margins?marka=eq.' + encodeURIComponent(marka) + '&select=marka');
+    const payload = {
+      ...patch,
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.email
+    };
+    if (existing && existing.length > 0) {
+      await sbFetch('/rest/v1/brand_margins?marka=eq.' + encodeURIComponent(marka), 'PATCH', payload);
+    } else {
+      await sbFetch('/rest/v1/brand_margins', 'POST', { marka, buy_discount: patch.buy_discount ?? 0.4, sell_discount: patch.sell_discount ?? 0.10, ...payload });
+    }
+    // Aktualizuj też lokalny obiekt
+    if (!BRAND_MARGINS[marka]) BRAND_MARGINS[marka] = { buyDiscount: 0.4, sellDiscount: 0.10 };
+    if (patch.buy_discount !== undefined) BRAND_MARGINS[marka].buyDiscount = parseFloat(patch.buy_discount);
+    if (patch.sell_discount !== undefined) BRAND_MARGINS[marka].sellDiscount = parseFloat(patch.sell_discount);
+    return true;
+  } catch(e) {
+    console.warn('updateBrandMargin error:', e);
+    showToast('Błąd zapisu marży: ' + (e.message || e));
+    return false;
+  }
+}
+
+/* Zapis jednego pola produktu do Supabase (cena/cena_kat/link/moc_kw/konfig) */
+async function updateProductField(sbid, field, value) {
+  if (!currentUser) return false;
+  if (!sbid) { showToast('Brak identyfikatora produktu w bazie'); return false; }
+  const allowedFields = ['cena', 'cena_kat', 'link', 'moc_kw', 'konfig', 'marka', 'model'];
+  if (!allowedFields.includes(field)) return false;
+  try {
+    await sbFetch('/rest/v1/products?id=eq.' + sbid, 'PATCH', {
+      [field]: value,
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.email
+    });
+    _productsCache = null;
+    return true;
+  } catch(e) {
+    console.warn('updateProductField error:', e);
+    return false;
+  }
+}
+
+/* Dodaj nowy produkt do Supabase (nie do localStorage) */
+async function insertProductToSupabase(payload) {
+  if (!currentUser) return null;
+  try {
+    const res = await sbFetch('/rest/v1/products', 'POST', {
+      ...payload,
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.email
+    });
+    _productsCache = null;
+    return res && res[0] ? res[0] : null;
+  } catch(e) {
+    console.warn('insertProductToSupabase error:', e);
+    showToast('Błąd zapisu: ' + (e.message || e).toString().slice(0, 100));
+    return null;
+  }
+}
+
+async function deleteProductFromSupabase(sbid) {
+  if (!currentUser || !sbid) return false;
+  try {
+    await sbFetch('/rest/v1/products?id=eq.' + sbid, 'DELETE');
+    _productsCache = null;
+    return true;
+  } catch(e) {
+    console.warn('deleteProductFromSupabase error:', e);
+    return false;
+  }
+}
+
 /* ---- Panel edycji cen ---- */
 function showPriceEditor() {
   document.getElementById('priceEditorModal').classList.add('modal-backdrop--open');
@@ -9616,6 +9717,9 @@ function _acPopulateBrandFilter() {
   brandSel.value = sorted.includes(currentVal) ? currentVal : 'all';
 }
 
+// State: zwinięte/rozwinięte grupy marek (per sesja)
+let _acCollapsedBrands = new Set();
+
 function renderAcProductsList() {
   _acPopulateBrandFilter();
   const wrap = document.getElementById('acProductsListWrap');
@@ -9625,18 +9729,16 @@ function renderAcProductsList() {
   const powerFilter  = document.getElementById('acProdPowerFilter')?.value || 'all';
   const search       = (document.getElementById('acProdSearch')?.value || '').toLowerCase().trim();
 
-  // Zbuduj listę z odpowiednich pooli, otaguj kategorią
+  // Zbuduj listę z odpowiednich pooli (wyłącznie produkty z Supabase — bez custom localStorage)
   let items = [];
   const addItems = (type) => {
-    getMergedPool(type).forEach(p => items.push({ ...p, _type: type }));
+    (DB[type] || []).forEach((p, i) => items.push({ ...p, _type: type, _idx: i }));
   };
   if (catFilter === 'all') { addItems('split'); addItems('multi_zew'); addItems('multi_wew'); }
   else addItems(catFilter);
 
-  // Filtr marka
   if (brandFilter !== 'all') items = items.filter(p => p.marka === brandFilter);
 
-  // Filtr moc
   if (powerFilter !== 'all') {
     const [minStr, maxStr] = powerFilter.split('-');
     const min = parseFloat(minStr), max = parseFloat(maxStr);
@@ -9646,7 +9748,6 @@ function renderAcProductsList() {
     });
   }
 
-  // Wyszukiwarka po marka/model
   if (search) {
     items = items.filter(p => {
       const blob = [p.marka, p.model].filter(Boolean).join(' ').toLowerCase();
@@ -9654,7 +9755,6 @@ function renderAcProductsList() {
     });
   }
 
-  // Statystyki
   const stats = { all: items.length, split: 0, multi_zew: 0, multi_wew: 0 };
   items.forEach(p => { if (stats[p._type] !== undefined) stats[p._type]++; });
 
@@ -9669,89 +9769,341 @@ function renderAcProductsList() {
     return;
   }
 
-  const fmtPl = (x) => Number(x||0).toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2});
+  // Grupowanie po marce
+  const byBrand = new Map();
+  items.forEach(p => {
+    const b = (p.marka || 'INNE').toUpperCase();
+    if (!byBrand.has(b)) byBrand.set(b, []);
+    byBrand.get(b).push(p);
+  });
+  const brandsSorted = Array.from(byBrand.keys()).sort();
 
   // Statystyka na górze
   const statsHtml = `
-    <div style="padding:12px 16px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:12px;color:#475569;display:flex;gap:20px;flex-wrap:wrap;">
-      <span><strong style="color:#0A2647;">${stats.all}</strong> pozycji</span>
+    <div style="padding:12px 16px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:12px;color:#475569;display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+      <span><strong style="color:#0A2647;">${stats.all}</strong> pozycji &middot; <strong style="color:#0A2647;">${brandsSorted.length}</strong> ${brandsSorted.length === 1 ? 'producent' : 'producentów'}</span>
       ${stats.split > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${AC_CAT_COLORS.split};margin-right:4px;"></span> Split: <strong>${stats.split}</strong></span>` : ''}
       ${stats.multi_zew > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${AC_CAT_COLORS.multi_zew};margin-right:4px;"></span> Multi zew.: <strong>${stats.multi_zew}</strong></span>` : ''}
       ${stats.multi_wew > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${AC_CAT_COLORS.multi_wew};margin-right:4px;"></span> Multi wew.: <strong>${stats.multi_wew}</strong></span>` : ''}
+      <div style="flex:1;"></div>
+      <button onclick="_acToggleAllBrands(true)" style="padding:5px 10px;background:transparent;color:#0F3461;border:1px solid #E2E8F0;border-radius:5px;font-size:11px;cursor:pointer;">Rozwiń wszystko</button>
+      <button onclick="_acToggleAllBrands(false)" style="padding:5px 10px;background:transparent;color:#0F3461;border:1px solid #E2E8F0;border-radius:5px;font-size:11px;cursor:pointer;">Zwiń wszystko</button>
     </div>
   `;
 
-  // Ogranicz do 200 pozycji dla wydajności
-  const shown = items.slice(0, 200);
-  const hasMore = items.length > 200;
+  const fmtPl = (x) => Number(x||0).toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const groupsHtml = brandsSorted.map(brand => {
+    const brandItems = byBrand.get(brand);
+    const brandColor = AC_BRAND_COLORS[brand] || '#64748B';
+    const m = BRAND_MARGINS[brand] || getBrandMargin(brand);
+    const buyPct = m ? (m.buyDiscount * 100).toFixed(1) : '';
+    const sellPct = m ? (m.sellDiscount * 100).toFixed(1) : '';
+    const collapsed = _acCollapsedBrands.has(brand);
+    // Ogranicz do 200 pozycji per grupa (dla wydajności)
+    const shown = brandItems.slice(0, 200);
+    const hasMore = brandItems.length > 200;
+
+    return `
+      <div style="border-bottom:1px solid #E2E8F0;background:#fff;">
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:linear-gradient(to right, ${brandColor}08, transparent);border-left:4px solid ${brandColor};cursor:pointer;" onclick="_acToggleBrandGroup('${brand}')">
+          <i class="ti ${collapsed ? 'ti-chevron-right' : 'ti-chevron-down'}" style="font-size:16px;color:${brandColor};"></i>
+          <span style="padding:4px 10px;background:${brandColor}18;color:${brandColor};border-radius:6px;font-size:13px;font-weight:800;letter-spacing:0.02em;">${escapeHtml(brand)}</span>
+          <span style="font-size:11.5px;color:#475569;">${brandItems.length} ${brandItems.length === 1 ? 'pozycja' : (brandItems.length < 5 ? 'pozycje' : 'pozycji')}</span>
+          <div style="flex:1;"></div>
+          <div style="display:flex;gap:16px;align-items:center;" onclick="event.stopPropagation()">
+            <div title="Rabat zakupowy — o ile taniej 4Climat kupuje od dystrybutora">
+              <span style="font-size:10.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.03em;">Rabat zakupu:</span>
+              ${m ? `
+                <input type="number" step="0.1" min="0" max="99" value="${buyPct}"
+                  onblur="_acSaveBrandMargin('${brand}', 'buy_discount', this.value)"
+                  onkeydown="if(event.key==='Enter'){this.blur();}"
+                  style="width:56px;padding:3px 6px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;font-weight:700;text-align:right;color:#0A2647;background:#fff;margin-left:4px;"
+                >%
+              ` : '<span style="color:#94A3B8;font-size:11.5px;">nie ustawiono</span>'}
+            </div>
+            <div title="Rabat sprzedażowy — o ile taniej klient płaci od cennika">
+              <span style="font-size:10.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.03em;">Rabat klienta:</span>
+              ${m ? `
+                <input type="number" step="0.1" min="0" max="99" value="${sellPct}"
+                  onblur="_acSaveBrandMargin('${brand}', 'sell_discount', this.value)"
+                  onkeydown="if(event.key==='Enter'){this.blur();}"
+                  style="width:56px;padding:3px 6px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;font-weight:700;text-align:right;color:#166534;background:#fff;margin-left:4px;"
+                >%
+              ` : `<button onclick="_acAddBrandMargin('${brand}')" style="padding:3px 8px;background:#0F3461;color:#fff;border:none;border-radius:5px;font-size:10.5px;font-weight:600;cursor:pointer;margin-left:6px;">Ustaw</button>`}
+            </div>
+          </div>
+        </div>
+
+        ${!collapsed ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+                  <th style="padding:8px 12px;text-align:left;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:110px;">Kategoria</th>
+                  <th style="padding:8px 12px;text-align:left;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;">Model</th>
+                  <th style="padding:8px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:70px;">Moc</th>
+                  <th style="padding:8px 12px;text-align:right;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:130px;" title="Cena netto dla klienta">Cena klienta</th>
+                  <th style="padding:8px 12px;text-align:right;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:120px;" title="Cena katalogowa netto — do liczenia marży">Cena kat.</th>
+                  <th style="padding:8px 12px;text-align:right;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:110px;" title="Twój koszt zakupu">Koszt / marża</th>
+                  <th style="padding:8px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:70px;">Link</th>
+                  <th style="padding:8px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:60px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${shown.map(p => {
+                  const catColor = AC_CAT_COLORS[p._type] || '#64748B';
+                  const catLabel = AC_CAT_LABELS[p._type] || p._type;
+                  const kw = _acExtractPower(p);
+                  const kwLabel = kw !== null ? kw.toString().replace('.', ',') + ' kW' : '—';
+                  const konfig = p.konfig ? ` (${p.konfig})` : '';
+                  const costs = calcCosts(p.cena, p.marka || '', p.cena_kat);
+                  const margeStr = costs && costs.marza != null ? costs.marza.toFixed(1) + '%' : '—';
+                  const kosztStr = costs && costs.marza != null ? fmtPl(costs.koszt) + ' zł' : '—';
+                  const modelClean = String(p.model || '').replace(/^(SPLIT|MULTI\+?|J\.WEW|J\.ZEW)\s+/i, '');
+                  const hasSbid = !!p._sbid;
+                  const rowKey = p._sbid || `${p._type}_${p._idx}`;
+                  return `
+                    <tr id="acProdRow_${rowKey}" style="border-bottom:1px solid #F1F5F9;">
+                      <td style="padding:6px 12px;font-size:10.5px;white-space:nowrap;">
+                        <span style="padding:2px 8px;background:${catColor}15;color:${catColor};border-radius:10px;font-weight:600;">${escapeHtml(catLabel)}${escapeHtml(konfig)}</span>
+                      </td>
+                      <td style="padding:6px 12px;font-size:12px;color:#334155;">
+                        ${hasSbid ? `
+                          <span contenteditable="true" spellcheck="false"
+                            onblur="_acSaveProductField(${p._sbid}, 'model', this.textContent.trim(), '${rowKey}')"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                            style="display:inline-block;min-width:180px;padding:3px 6px;border-radius:4px;border:1px solid transparent;"
+                            onfocus="this.style.background='#F0F9FF';this.style.borderColor='#93C5FD';"
+                            onmouseover="if(document.activeElement!==this)this.style.background='#FAFCFF';"
+                            onmouseout="if(document.activeElement!==this)this.style.background='transparent';"
+                          >${escapeHtml(modelClean)}</span>
+                        ` : `<span>${escapeHtml(modelClean)}</span>`}
+                      </td>
+                      <td style="padding:6px 12px;font-size:11.5px;text-align:center;color:#0A2647;font-weight:600;white-space:nowrap;">${kwLabel}</td>
+                      <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
+                        ${hasSbid ? `
+                          <div style="display:inline-flex;align-items:center;gap:2px;">
+                            <input type="number" step="0.01" min="0" value="${p.cena || ''}"
+                              onblur="_acSaveProductField(${p._sbid}, 'cena', this.value, '${rowKey}')"
+                              onkeydown="if(event.key==='Enter'){this.blur();}"
+                              style="width:88px;padding:4px 6px;border:1px solid transparent;border-radius:4px;font-size:12px;font-weight:700;color:#1B4F8C;text-align:right;background:transparent;"
+                              onfocus="this.style.background='#F0F9FF';this.style.borderColor='#93C5FD';"
+                              onmouseover="if(document.activeElement!==this)this.style.background='#FAFCFF';"
+                              onmouseout="if(document.activeElement!==this)this.style.background='transparent';"
+                            >
+                            <span style="font-size:11px;color:#94A3B8;">zł</span>
+                          </div>
+                        ` : `<span style="font-size:12.5px;font-weight:700;color:#1B4F8C;">${fmtPl(p.cena)} zł</span>`}
+                      </td>
+                      <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
+                        ${hasSbid ? `
+                          <div style="display:inline-flex;align-items:center;gap:2px;">
+                            <input type="number" step="0.01" min="0" value="${p.cena_kat || ''}"
+                              onblur="_acSaveProductField(${p._sbid}, 'cena_kat', this.value, '${rowKey}')"
+                              onkeydown="if(event.key==='Enter'){this.blur();}"
+                              style="width:80px;padding:4px 6px;border:1px solid transparent;border-radius:4px;font-size:11.5px;color:#64748B;text-align:right;background:transparent;"
+                              onfocus="this.style.background='#F0F9FF';this.style.borderColor='#93C5FD';"
+                              onmouseover="if(document.activeElement!==this)this.style.background='#FAFCFF';"
+                              onmouseout="if(document.activeElement!==this)this.style.background='transparent';"
+                            >
+                            <span style="font-size:11px;color:#94A3B8;">zł</span>
+                          </div>
+                        ` : `<span style="font-size:11px;color:#94A3B8;">${p.cena_kat ? fmtPl(p.cena_kat) + ' zł' : '—'}</span>`}
+                      </td>
+                      <td style="padding:6px 12px;font-size:11.5px;text-align:right;white-space:nowrap;">
+                        <div style="color:#334155;">${kosztStr}</div>
+                        <span style="padding:1px 6px;background:#F0FDF4;color:#166534;border-radius:4px;font-weight:700;font-size:10.5px;">${margeStr}</span>
+                      </td>
+                      <td style="padding:6px 12px;text-align:center;white-space:nowrap;">
+                        ${hasSbid ? `
+                          <button onclick="_acEditProductLink(${p._sbid}, '${rowKey}', \`${escapeHtml(p.link || '')}\`)" title="${p.link ? 'Edytuj link: ' + escapeHtml(p.link) : 'Dodaj link'}" style="padding:4px 8px;background:${p.link ? '#F0FDF4' : 'transparent'};color:${p.link ? '#166534' : '#64748B'};border:1px solid ${p.link ? '#BBF7D0' : '#E2E8F0'};border-radius:4px;font-size:11px;cursor:pointer;">
+                            <i class="ti ${p.link ? 'ti-link' : 'ti-link-off'}" style="font-size:12px;"></i>
+                          </button>
+                        ` : ''}
+                        ${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Otwórz" style="padding:4px 6px;color:#0F3461;display:inline-block;"><i class="ti ti-external-link" style="font-size:12px;"></i></a>` : ''}
+                      </td>
+                      <td style="padding:6px 12px;text-align:center;white-space:nowrap;">
+                        ${hasSbid ? `
+                          <button onclick="_acDeleteProduct(${p._sbid}, '${escapeHtml(modelClean).replace(/'/g, '&#39;')}')" title="Usuń pozycję" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;">
+                            <i class="ti ti-trash" style="font-size:12px;"></i>
+                          </button>
+                        ` : ''}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            ${hasMore ? `<div style="padding:10px;text-align:center;color:#64748B;font-size:11px;background:#F8FAFC;">Pokazano pierwsze 200 z ${brandItems.length}. Zawęź filtry, aby zobaczyć konkretne pozycje.</div>` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
 
   wrap.innerHTML = `
     ${statsHtml}
     <div style="max-height:calc(100vh - 340px);overflow-y:auto;">
-      <table style="width:100%;border-collapse:collapse;">
-        <thead style="position:sticky;top:0;z-index:1;">
-          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
-            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Kategoria</th>
-            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Marka</th>
-            <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Model</th>
-            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Moc</th>
-            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;" title="Cena netto dla klienta (już po rabacie od katalogowej)">Cena klienta</th>
-            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;" title="Twój koszt zakupu od dystrybutora">Twój koszt</th>
-            <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Marża</th>
-            <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Akcje</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${shown.map(p => {
-            const catColor = AC_CAT_COLORS[p._type] || '#64748B';
-            const catLabel = AC_CAT_LABELS[p._type] || p._type;
-            const brandColor = AC_BRAND_COLORS[p.marka] || '#64748B';
-            const kw = _acExtractPower(p);
-            const kwLabel = kw !== null ? kw.toString().replace('.', ',') + ' kW' : '—';
-            const konfig = p.konfig ? ` (${p.konfig})` : '';
-            // Marża — używamy calcCosts() (tak samo jak wizard) żeby wartości zgadzały się z listą urządzeń
-            let margeStr = '—';
-            let kosztStr = '—';
-            const costs = (typeof calcCosts === 'function') ? calcCosts(p.cena, p.marka || '', p.cena_kat) : null;
-            if (costs && costs.marza != null) {
-              margeStr = costs.marza.toFixed(1) + '%';
-              kosztStr = fmtPl(costs.koszt) + ' zł';
-            }
-            // Model — usuń prefixy typu "SPLIT " / "MULTI " dla czytelności
-            const modelClean = String(p.model || '').replace(/^(SPLIT|MULTI\+?|J\.WEW|J\.ZEW)\s+/i, '');
-            return `
-              <tr style="border-bottom:1px solid #F1F5F9;" onmouseover="this.style.background='#FAFCFF'" onmouseout="this.style.background='transparent'">
-                <td style="padding:9px 14px;font-size:11px;white-space:nowrap;">
-                  <span style="padding:2px 8px;background:${catColor}15;color:${catColor};border-radius:10px;font-weight:600;">${escapeHtml(catLabel)}${escapeHtml(konfig)}</span>
-                </td>
-                <td style="padding:9px 14px;font-size:11.5px;white-space:nowrap;">
-                  <span style="padding:2px 8px;background:${brandColor}15;color:${brandColor};border-radius:5px;font-weight:700;">${escapeHtml(p.marka || '')}</span>
-                </td>
-                <td style="padding:9px 14px;font-size:12px;color:#334155;">${escapeHtml(modelClean)}${p._custom ? ' <span style="padding:1px 5px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:9.5px;font-weight:700;margin-left:6px;">WŁASNY</span>' : ''}</td>
-                <td style="padding:9px 14px;font-size:12px;text-align:center;color:#0A2647;font-weight:600;white-space:nowrap;">${kwLabel}</td>
-                <td style="padding:9px 14px;font-size:12.5px;font-weight:700;color:#1B4F8C;text-align:right;white-space:nowrap;">
-                  ${fmtPl(p.cena)} zł
-                  ${p.cena_kat ? `<div style="font-size:10px;color:#94A3B8;font-weight:500;margin-top:1px;">kat. ${fmtPl(p.cena_kat)} zł</div>` : ''}
-                </td>
-                <td style="padding:9px 14px;font-size:12px;color:#334155;text-align:right;white-space:nowrap;">${kosztStr}</td>
-                <td style="padding:9px 14px;font-size:11.5px;text-align:right;white-space:nowrap;">
-                  <span style="padding:2px 7px;background:#F0FDF4;color:#166534;border-radius:5px;font-weight:700;">${margeStr}</span>
-                </td>
-                <td style="padding:9px 14px;text-align:center;white-space:nowrap;">
-                  ${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Otwórz stronę producenta" style="display:inline-block;padding:4px 8px;color:#0F3461;text-decoration:none;"><i class="ti ti-external-link" style="font-size:14px;"></i></a>` : ''}
-                  ${p._custom ? `
-                    <button onclick="openAcProductEditor('${p._type}', ${p._idx})" style="padding:4px 8px;background:#F1F5F9;color:#334155;border:none;border-radius:5px;font-size:11px;cursor:pointer;margin-right:2px;" title="Edytuj"><i class="ti ti-pencil" style="font-size:12px;"></i></button>
-                    <button onclick="deleteCustomAcProduct('${p._type}', ${p._idx})" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;" title="Usuń"><i class="ti ti-trash" style="font-size:12px;"></i></button>
-                  ` : ''}
-                </td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-      ${hasMore ? `<div style="padding:12px;text-align:center;color:#64748B;font-size:11.5px;background:#F8FAFC;border-top:1px solid #E2E8F0;">Wyświetlono pierwsze <strong>200 z ${items.length}</strong> pozycji. Zawęź filtry aby zobaczyć konkretne modele.</div>` : ''}
+      ${groupsHtml}
     </div>
   `;
+}
+
+/* Zwijanie/rozwijanie grup marek */
+function _acToggleBrandGroup(brand) {
+  if (_acCollapsedBrands.has(brand)) _acCollapsedBrands.delete(brand);
+  else _acCollapsedBrands.add(brand);
+  renderAcProductsList();
+}
+function _acToggleAllBrands(expand) {
+  if (expand) {
+    _acCollapsedBrands.clear();
+  } else {
+    // Zwiń wszystkie widoczne marki
+    const items = [];
+    ['split', 'multi_zew', 'multi_wew'].forEach(t => (DB[t] || []).forEach(p => items.push(p.marka)));
+    new Set(items.map(m => (m || 'INNE').toUpperCase())).forEach(b => _acCollapsedBrands.add(b));
+  }
+  renderAcProductsList();
+}
+
+/* Zapis marży producenta (buy/sell discount).
+   Przy zmianie sell_discount: pyta o przeliczenie cen klienta dla wszystkich
+   pozycji tej marki, wg wzoru: cena_klienta = cena_katalogowa × (1 − sell_discount) */
+async function _acSaveBrandMargin(brand, field, valueStr) {
+  const val = parseFloat(String(valueStr).replace(',', '.'));
+  if (isNaN(val) || val < 0 || val > 99) { showToast('Nieprawidłowa wartość (0-99%)'); return; }
+  const dec = Math.round(val * 10) / 1000; // np. 20% -> 0.200
+
+  // Dla rabatu klienta: przelicz automatycznie ceny wszystkich pozycji tej marki
+  if (field === 'sell_discount') {
+    // Zbierz pozycje z Supabase (_sbid) z ceną katalogową
+    const affected = [];
+    for (const cat of ['split', 'multi_zew', 'multi_wew']) {
+      (DB[cat] || []).forEach(p => {
+        if ((p.marka || '').toUpperCase() === brand && p._sbid && p.cena_kat && p.cena_kat > 0) {
+          affected.push({ p, cat });
+        }
+      });
+    }
+
+    if (affected.length > 0) {
+      const proceed = confirm(
+        `Zmieniasz rabat klienta dla ${brand} na ${val}%.\n\n` +
+        `Czy przeliczyć również ceny klienta dla wszystkich ${affected.length} ${affected.length === 1 ? 'pozycji' : 'pozycji'} tej marki?\n\n` +
+        `Nowa cena klienta = cena katalogowa × (1 − ${val}%)\n\n` +
+        `OK — przelicz ceny\n` +
+        `Anuluj — zmień tylko rabat (ceny bez zmian)`
+      );
+
+      if (proceed) {
+        showToast('Przeliczam ' + affected.length + ' cen...');
+        // Zapisz najpierw nowy rabat w brand_margins
+        const marginOk = await updateBrandMargin(brand, { [field]: dec });
+        if (!marginOk) { showToast('Nie zapisano rabatu — przerywam'); return; }
+
+        // Przelicz ceny — batches po 15 równoległych requestów
+        let ok = 0, fail = 0;
+        const BATCH = 15;
+        for (let i = 0; i < affected.length; i += BATCH) {
+          const batch = affected.slice(i, i + BATCH);
+          const results = await Promise.all(batch.map(async ({ p, cat }) => {
+            const newCena = Math.round(p.cena_kat * (1 - dec) * 100) / 100;
+            const success = await updateProductField(p._sbid, 'cena', newCena);
+            if (success) {
+              // Aktualizuj lokalny DB
+              const arr = DB[cat] || [];
+              const idx = arr.findIndex(x => x._sbid === p._sbid);
+              if (idx >= 0) arr[idx].cena = newCena;
+            }
+            return success;
+          }));
+          ok += results.filter(r => r).length;
+          fail += results.filter(r => !r).length;
+        }
+        showToast(fail > 0
+          ? `Zaktualizowano ${ok} cen, ${fail} błędów — sprawdź konsolę`
+          : `Zaktualizowano ${ok} cen dla marki ${brand}`);
+        renderAcProductsList();
+        return;
+      }
+    }
+  }
+
+  // Zapisz sam rabat (bez przeliczania cen)
+  const ok = await updateBrandMargin(brand, { [field]: dec });
+  if (ok) {
+    showToast('Marża zapisana');
+    renderAcProductsList();
+  }
+}
+
+async function _acAddBrandMargin(brand) {
+  const buyStr = prompt('Rabat zakupowy dla marki ' + brand + ' (%)', '40');
+  if (!buyStr) return;
+  const sellStr = prompt('Rabat dla klienta (%)', '10');
+  if (!sellStr) return;
+  const buy = parseFloat(String(buyStr).replace(',', '.')) / 100;
+  const sell = parseFloat(String(sellStr).replace(',', '.')) / 100;
+  if (isNaN(buy) || isNaN(sell)) { showToast('Nieprawidłowe wartości'); return; }
+  const ok = await updateBrandMargin(brand, { buy_discount: buy, sell_discount: sell });
+  if (ok) {
+    showToast('Marża dodana');
+    renderAcProductsList();
+  }
+}
+
+/* Zapis pola produktu inline (cena/cena_kat/link/model) */
+async function _acSaveProductField(sbid, field, valueRaw, rowKey) {
+  let value = valueRaw;
+  if (field === 'cena' || field === 'cena_kat') {
+    value = parseFloat(String(valueRaw).replace(',', '.'));
+    if (isNaN(value) || value < 0) { showToast('Nieprawidłowa cena'); return; }
+  }
+  if (field === 'link') {
+    value = String(valueRaw || '').trim() || null;
+  }
+  if (field === 'model') {
+    value = String(valueRaw || '').trim();
+    if (!value) { showToast('Model nie może być pusty'); renderAcProductsList(); return; }
+  }
+  const ok = await updateProductField(sbid, field, value);
+  if (!ok) { showToast('Nie zapisano — spróbuj ponownie'); return; }
+  // Aktualizuj lokalny obiekt w DB
+  for (const cat of ['split', 'multi_zew', 'multi_wew']) {
+    const arr = DB[cat] || [];
+    const idx = arr.findIndex(x => x._sbid === sbid);
+    if (idx >= 0) {
+      arr[idx][field] = value;
+      break;
+    }
+  }
+  // Zaktualizuj wiersz w tabeli (koszty/marża się przeliczą)
+  renderAcProductsList();
+  showToast('Zapisano');
+}
+
+/* Edycja linku w prostym prompcie */
+async function _acEditProductLink(sbid, rowKey, currentLink) {
+  const newLink = prompt('Link do strony producenta (puste = usuń):', currentLink || '');
+  if (newLink === null) return; // anulowano
+  await _acSaveProductField(sbid, 'link', newLink, rowKey);
+}
+
+/* Usuwanie produktu */
+async function _acDeleteProduct(sbid, modelName) {
+  if (!confirm('Usunąć pozycję "' + modelName + '" z bazy? Ta operacja jest nieodwracalna.')) return;
+  const ok = await deleteProductFromSupabase(sbid);
+  if (!ok) { showToast('Nie udało się usunąć'); return; }
+  // Usuń z lokalnego DB
+  for (const cat of ['split', 'multi_zew', 'multi_wew']) {
+    const arr = DB[cat] || [];
+    const idx = arr.findIndex(x => x._sbid === sbid);
+    if (idx >= 0) arr.splice(idx, 1);
+  }
+  showToast('Usunięto');
+  renderAcProductsList();
 }
 
 /* ============================================================
@@ -9800,7 +10152,7 @@ function _acProductEditorRender(type, data) {
       <div class="modal__head" style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div style="font-size:14px;font-weight:700;color:#0A2647;">${_acProductEditing.isNew ? 'Nowe urządzenie' : 'Edycja urządzenia'}</div>
-          <div style="font-size:11px;color:#64748B;margin-top:2px;">Własna pozycja w bazie ${AC_CAT_LABELS[type] || type}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">Pozycja w bazie ${AC_CAT_LABELS[type] || type} — trafi do producenta ${_acProductEditing.isNew ? '' : '(edycja)'}</div>
         </div>
         <button onclick="closeAcProductEditor()" style="background:transparent;border:none;color:#64748B;font-size:22px;cursor:pointer;line-height:1;">×</button>
       </div>
@@ -9927,7 +10279,7 @@ function closeAcProductEditor() {
   _acProductEditing = null;
 }
 
-function saveAcProductFromEditor() {
+async function saveAcProductFromEditor() {
   if (!_acProductEditing) return;
   const type = document.getElementById('acEditType')?.value || _acProductEditing.type;
   const marka = document.getElementById('acEditMarka')?.value.trim() || '';
@@ -9947,32 +10299,53 @@ function saveAcProductFromEditor() {
   if (cenaKatRaw && (isNaN(cenaKat) || cenaKat <= 0)) { showToast('Cena katalogowa musi być liczbą dodatnią'); return; }
   const moc = mocRaw ? parseFloat(mocRaw.replace(',', '.')) : null;
 
-  const newRow = {
+  const payload = {
     marka: marka.toUpperCase(),
     model,
     cena,
-    cena_kat: cenaKat || cena,   // fallback jeśli brak katalogowej — do liczenia marży
+    cena_kat: cenaKat || cena,
     link: link || null,
-    typ: type === 'split' ? 'split' : (type === 'multi_zew' ? 'multi_zew' : 'multi_wew'),
+    category: type,
     moc_kw: moc
   };
-  if (type === 'multi_zew' && konfig) newRow.konfig = konfig;
+  if (type === 'multi_zew' && konfig) payload.konfig = konfig;
 
-  // Zapisz do custom DB
-  const customDb = loadCustomDb();
-  if (!customDb[type]) customDb[type] = [];
   if (_acProductEditing.isNew) {
-    customDb[type].push(newRow);
+    // Nowe urządzenie — zapis do Supabase products
+    const inserted = await insertProductToSupabase(payload);
+    if (!inserted) return;
+    // Dodaj do lokalnego DB (dla natychmiastowego wyświetlenia)
+    const newRow = {
+      marka: payload.marka,
+      model: payload.model,
+      cena: payload.cena,
+      cena_kat: payload.cena_kat,
+      link: payload.link,
+      moc_kw: payload.moc_kw,
+      konfig: payload.konfig,
+      _sbid: inserted.id,
+      _idx: (DB[type] || []).length,
+      _origIdx: (DB[type] || []).length,
+      category: type
+    };
+    if (!DB[type]) DB[type] = [];
+    DB[type].push(newRow);
+    showToast('Urządzenie dodane');
   } else {
+    // Edycja istniejącego — jeśli _sbid to update w Supabase, inaczej fallback localStorage
     const localIdx = _acProductEditing.idx - 10000;
-    if (localIdx >= 0 && localIdx < customDb[type].length) {
-      customDb[type][localIdx] = newRow;
-    } else {
-      customDb[type].push(newRow);
+    const customDb = loadCustomDb();
+    if (customDb[type] && customDb[type][localIdx]) {
+      // Legacy custom pozycja — zapisz w localStorage (wsteczna kompatybilność)
+      customDb[type][localIdx] = {
+        marka: payload.marka, model, cena, cena_kat: payload.cena_kat,
+        link: link || null, typ: type, moc_kw: moc,
+        ...(type === 'multi_zew' && konfig ? { konfig } : {})
+      };
+      saveCustomDb(customDb);
     }
+    showToast('Urządzenie zaktualizowane');
   }
-  saveCustomDb(customDb);
-  showToast(_acProductEditing.isNew ? 'Urządzenie dodane' : 'Urządzenie zaktualizowane');
   closeAcProductEditor();
   renderAcProductsList();
 }
@@ -13119,7 +13492,14 @@ function populateBrandFilter() {
   const sel = document.getElementById('pickerBrand');
   sel.innerHTML = '<option value="">Wszystkie marki</option>';
   if (!currentPickerCtx) return;
-  const brands = [...new Set(currentPickerCtx.pool.map(p => p.marka))].sort();
+  // Deduplikacja case-insensitive — łączymy "Daikin" i "DAIKIN" w jedną pozycję
+  const brandMap = new Map();
+  currentPickerCtx.pool.forEach(p => {
+    if (!p.marka) return;
+    const key = String(p.marka).toUpperCase().trim();
+    if (!brandMap.has(key)) brandMap.set(key, key);
+  });
+  const brands = Array.from(brandMap.values()).sort();
   brands.forEach(b => {
     const o = document.createElement('option');
     o.value = b; o.textContent = b;
@@ -13173,7 +13553,7 @@ function renderPicker() {
     ...p,
     _idx: p._idx !== undefined ? p._idx : i
   }));
-  if (brand) list = list.filter(p => p.marka === brand);
+  if (brand) list = list.filter(p => String(p.marka || '').toUpperCase() === brand);
   if (color) list = list.filter(p => (_pickerExtractColor(p.model) === color));
   if (power) {
     list = list.filter(p => {
@@ -13202,10 +13582,11 @@ function renderPicker() {
     'DAIKIN': '#0F766E', 'VIESSMANN': '#B45309'
   };
 
-  // Grupowanie po markach dla lepszej czytelności
+  // Grupowanie po markach — case-insensitive, klucz UPPERCASE
+  // (żeby "Daikin" i "DAIKIN" trafiły do jednej grupy)
   const grouped = {};
   list.slice(0, 200).forEach(p => {
-    const key = p.marka || 'Inne';
+    const key = String(p.marka || 'INNE').toUpperCase().trim();
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(p);
   });
@@ -26511,27 +26892,28 @@ function wzRenderSharedExtras() {
 function wzRenderVariantsSummary() {
   const variants = wzState.variants || [];
   const vatRate = wzState.basics.vatRate || 8;
-  const sharedNetPerVariant = wzSharedExtrasTotal();
   const fmtPl = (x) => x.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   return `
     <div class="wz-summary">
-      <div class="wz-summary__h"><i class="ti ti-report-money" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>Podsumowanie cen wariantów</div>
+      <div class="wz-summary__h"><i class="ti ti-report-money" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>Podsumowanie cen wariantów <span style="font-size:10.5px;font-weight:500;color:#64748B;margin-left:4px;">(sam sprzęt — montaż doliczysz w kolejnym kroku)</span></div>
       ${variants.map((v, idx) => {
         const t = wzVariantTotals(v, vatRate);
-        const finalNet = t.totalNet + sharedNetPerVariant;
-        const finalGross = finalNet * (1 + vatRate / 100);
+        // Tylko cena sprzętu — bez montażu, bez prac dodatkowych.
+        // Montaż i prace dodatkowe są dodawane w kroku "Montaż" i "Dodatki".
+        const deviceNet = t.devicesNet;
+        const deviceGross = deviceNet * (1 + vatRate / 100);
         const displayLabel = v.displayName || v.name || (v.type === 'multi' ? wzMultiDisplayName(v) : '') || '—';
         return `
           <div class="wz-summary__row">
             <div>
               <div class="wz-summary__row-label">Wariant ${idx+1}: ${escapeHtml(displayLabel)}</div>
               <div class="wz-summary__extra-info" style="color:#64748B;">
-                Zestaw: ${fmtPl(t.totalNet)} zł netto${sharedNetPerVariant > 0 ? ' + prace dod.: ' + fmtPl(sharedNetPerVariant) + ' zł netto' : ''}
+                Zestaw urządzeń: ${fmtPl(deviceNet)} zł netto
               </div>
             </div>
             <div style="text-align:right;">
-              <div class="wz-summary__row-val" style="color:#0C447C;">${fmtPl(finalGross)} zł brutto</div>
-              <div style="font-size:10px;color:#64748B;">${fmtPl(finalNet)} zł netto + VAT ${vatRate}%</div>
+              <div class="wz-summary__row-val" style="color:#0C447C;">${fmtPl(deviceGross)} zł brutto</div>
+              <div style="font-size:10px;color:#64748B;">${fmtPl(deviceNet)} zł netto + VAT ${vatRate}%</div>
             </div>
           </div>
         `;
