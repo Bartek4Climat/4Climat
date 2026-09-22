@@ -2266,6 +2266,14 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         <i class="ti ti-flame v2-sidebar__item-icon" aria-hidden="true"></i>
         <span class="v2-sidebar__item-label">Produkty HP</span>
       </button>
+      <button class="v2-sidebar__item" data-section="extras_ac" onclick="v2ShowSection('extras_ac')">
+        <i class="ti ti-tool v2-sidebar__item-icon" aria-hidden="true"></i>
+        <span class="v2-sidebar__item-label">Prace dod. klima</span>
+      </button>
+      <button class="v2-sidebar__item" data-section="extras_hp" onclick="v2ShowSection('extras_hp')">
+        <i class="ti ti-tools v2-sidebar__item-icon" aria-hidden="true"></i>
+        <span class="v2-sidebar__item-label">Prace dod. HP</span>
+      </button>
       <button class="v2-sidebar__item" data-section="ows" onclick="v2ShowSection('ows')">
         <i class="ti ti-file-text v2-sidebar__item-icon" aria-hidden="true"></i>
         <span class="v2-sidebar__item-label">OWH</span>
@@ -2910,6 +2918,42 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         </div>
       </section>
 
+      <!-- SEKCJA: PRACE DODATKOWE KLIMATYZACJA -->
+      <section id="v2-section-extras_ac" class="v2-section">
+        <h1 class="v2-page-title">Prace dodatkowe — klimatyzacja</h1>
+        <p class="v2-page-subtitle">Katalog pozycji dostępnych w kalkulatorze prac dodatkowych oferty klimatyzacji. Kliknij pole aby edytować bezpośrednio. Cena pusta = pozycja "do indywidualnej wyceny".</p>
+        <div class="v2-toolbar">
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input id="extrasAcSearch" type="text" placeholder="Szukaj po nazwie..." oninput="renderExtrasCatalogList('ac')">
+          </div>
+          <button class="v2-btn v2-btn--primary" onclick="addExtraToCatalog('ac')">
+            <i class="ti ti-plus"></i> Dodaj pozycję
+          </button>
+        </div>
+        <div class="v2-panel" id="extrasAcListWrap" style="margin-top:16px;">
+          <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
+        </div>
+      </section>
+
+      <!-- SEKCJA: PRACE DODATKOWE POMPY CIEPŁA -->
+      <section id="v2-section-extras_hp" class="v2-section">
+        <h1 class="v2-page-title">Prace dodatkowe — pompy ciepła</h1>
+        <p class="v2-page-subtitle">Katalog pozycji dostępnych w kalkulatorze prac dodatkowych oferty pomp ciepła. Kliknij pole aby edytować bezpośrednio. Cena pusta = pozycja "do indywidualnej wyceny".</p>
+        <div class="v2-toolbar">
+          <div class="v2-toolbar__search v2-toolbar__search--flex">
+            <i class="ti ti-search" aria-hidden="true"></i>
+            <input id="extrasHpSearch" type="text" placeholder="Szukaj po nazwie..." oninput="renderExtrasCatalogList('hp')">
+          </div>
+          <button class="v2-btn v2-btn--primary" onclick="addExtraToCatalog('hp')">
+            <i class="ti ti-plus"></i> Dodaj pozycję
+          </button>
+        </div>
+        <div class="v2-panel" id="extrasHpListWrap" style="margin-top:16px;">
+          <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
+        </div>
+      </section>
+
       <!-- SEKCJA: OWS -->
       <section id="v2-section-ows" class="v2-section">
         <h1 class="v2-page-title">Ogólne Warunki Handlowe</h1>
@@ -2927,8 +2971,8 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
         <h1 class="v2-page-title">Przypomnienia i komunikacja</h1>
         <p class="v2-page-subtitle">Program przygotowuje wiadomości z odpowiednim wyprzedzeniem — Ty wysyłasz jednym kliknięciem przez swoją pocztę lub telefon.</p>
 
-        <!-- Tabs -->
-        <div style="border-bottom:1px solid #E2E8F0;background:#fff;padding:0 4px;display:flex;gap:0;margin-bottom:16px;">
+        <!-- Tabs + akcja "Nowa wiadomość" -->
+        <div style="border-bottom:1px solid #E2E8F0;background:#fff;padding:0 4px;display:flex;gap:0;margin-bottom:16px;align-items:center;">
           <button id="automationTab-queue" class="automation-tab" onclick="_autoShowTab('queue')" style="padding:12px 20px;background:transparent;border:none;border-bottom:2px solid #0F3461;color:#0F3461;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
             <i class="ti ti-mailbox" style="font-size:15px;"></i> Do wysłania
             <span id="autoQueueCount" style="background:#DC2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;"></span>
@@ -2938,6 +2982,10 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
           </button>
           <button id="automationTab-api" class="automation-tab" onclick="_autoShowTab('api')" style="padding:12px 20px;background:transparent;border:none;border-bottom:2px solid transparent;color:#64748B;font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
             <i class="ti ti-help-circle" style="font-size:15px;"></i> Jak to działa
+          </button>
+          <div style="flex:1;"></div>
+          <button onclick="_autoOpenNewMessageModal()" style="margin:8px 4px;padding:8px 14px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" title="Utwórz wiadomość ad-hoc do wybranego klienta">
+            <i class="ti ti-mail-plus" style="font-size:14px;"></i> Nowa wiadomość
           </button>
         </div>
 
@@ -3304,8 +3352,19 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
           <p style="font-size:12px; color:var(--c-text-muted); margin-bottom:14px;">
             Bufor, zasobnik CWU, sterownik, dodatkowe metry instalacji, prace związane z modernizacją instalacji CO/CWU.
           </p>
-          <div id="hpExtraList"></div>
-          <button class="btn btn--ghost btn--small" onclick="addHpExtra()" style="margin-top:6px;">+ Dodaj pozycję</button>
+
+          <!-- Katalog HP jako klikalne kafelki -->
+          <div id="hpExtrasCatalog" class="extras-catalog"></div>
+
+          <div style="margin-top:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="font-size:11px; font-weight:700; color:var(--c-primary); text-transform:uppercase; letter-spacing:.06em;">
+                Pozycje wybrane do oferty
+              </div>
+            </div>
+            <div id="hpExtraList"></div>
+            <button class="btn btn--ghost btn--small" onclick="addHpExtra()" style="margin-top:6px;">+ Pozycja własna (spoza katalogu)</button>
+          </div>
         </div>
       </div>
 
@@ -4628,7 +4687,11 @@ const HP_BRAND_LOGOS = {
 
 
 /* ----- KATALOG USŁUG DODATKOWYCH (cennik 4Climat) ----- */
-const EXTRAS_CATALOG = [
+/* ----- KATALOG PRAC DODATKOWYCH — klimatyzacja i pompy ciepła -----
+   Domyślne wartości używane jako fallback zanim załadują się dane z Supabase.
+   Po zalogowaniu funkcja loadExtrasCatalogFromSupabase() nadpisuje obie listy
+   aktualnym stanem z bazy — edytowalnym z sekcji "Prace dodatkowe" w sidebarze. */
+let EXTRAS_CATALOG = [
   {id:'e01', nazwa:'Dodatkowy metr instalacji freonowej', jednostka:'mb', priceNet:140},
   {id:'e02', nazwa:'Dodatkowy metr instalacji bruzdy (nie w żelbetonie)', jednostka:'mb', priceNet:120},
   {id:'e03', nazwa:'Dodatkowy metr instalacji bruzdy (żelbeton)', jednostka:'mb', priceNet:250},
@@ -4642,6 +4705,8 @@ const EXTRAS_CATALOG = [
   {id:'e11', nazwa:'Instalacja jednostki zewnętrznej z rusztowania', jednostka:'kpl', priceNet:null, quote:true},
   {id:'e12', nazwa:'Instalacja jednostki zewnętrznej ze zwyżki (powyżej 3 m wysokości)', jednostka:'kpl', priceNet:null, quote:true},
 ];
+
+let HP_EXTRAS_CATALOG = [];  // wypełniane z Supabase
 
 /* ----- STATE -----
    ZAKRES OFERTY (scope): 'ac' | 'hp' | 'both'
@@ -4988,10 +5053,11 @@ function onLoginSuccess() {
   // Wyczyść cache produktów żeby załadować świeże dane
   _productsCache = null;
   _productsCacheTime = 0;
-  // Załaduj produkty i marże z Supabase, potem init
+  // Załaduj produkty, marże i katalog prac dodatkowych z Supabase, potem init
   Promise.all([
     loadProductsFromSupabase(),
-    loadBrandMarginsFromSupabase()
+    loadBrandMarginsFromSupabase(),
+    loadExtrasCatalogFromSupabase()
   ]).then(async () => {
     // Załaduj też własne produkty z Supabase (legacy fallback)
     const customDb = await loadCustomDbFromSupabase();
@@ -7149,6 +7215,7 @@ function init() {
   renderExtrasCatalog();
   renderExtras();
   renderHpVariants();
+  renderHpExtrasCatalog();
   renderHpExtras();
   renderCustomServices();
   renderCustomOfferImagePreview();
@@ -8963,9 +9030,61 @@ function removeHpVariant(vIdx) {
   recompute();
 }
 
-/* HP EXTRAS - prosty model, dowolna pozycja z nazwą i ceną */
+/* HP EXTRAS - katalog + dodawanie z katalogu lub ręcznie */
+function renderHpExtrasCatalog() {
+  const wrap = document.getElementById('hpExtrasCatalog');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!HP_EXTRAS_CATALOG || HP_EXTRAS_CATALOG.length === 0) {
+    wrap.innerHTML = '<div style="padding:12px;color:#94A3B8;font-size:12px;font-style:italic;">Katalog HP jest pusty. Dodaj pozycje w sekcji <strong>Prace dod. HP</strong> w menu bocznym.</div>';
+    return;
+  }
+  HP_EXTRAS_CATALOG.forEach(c => {
+    const isAdded = state.hpExtras.some(e => !e.isCustom && e.catalogId === c.id);
+    const tile = document.createElement('button');
+    tile.className = 'extra-tile' + (isAdded ? ' extra-tile--added' : '') + (c.quote ? ' extra-tile--quote' : '');
+    tile.type = 'button';
+    tile.onclick = () => addHpExtraFromCatalog(c.id);
+    tile.innerHTML = `
+      <div class="extra-tile__name">${escapeHtml(c.nazwa)}</div>
+      <div class="extra-tile__meta">
+        ${c.quote
+          ? `<span class="extra-tile__price extra-tile__price--quote">Do uzgodnienia</span>`
+          : `<span class="extra-tile__price">${fmtPLN(c.priceNet)} <small>netto / ${c.jednostka}</small></span>`
+        }
+        <span class="extra-tile__badge">${isAdded ? '' : '+ Dodaj'}</span>
+      </div>
+    `;
+    wrap.appendChild(tile);
+  });
+}
+
+function addHpExtraFromCatalog(catalogId) {
+  const cat = HP_EXTRAS_CATALOG.find(c => c.id === catalogId);
+  if (!cat) return;
+  const existing = state.hpExtras.findIndex(e => !e.isCustom && e.catalogId === catalogId);
+  if (existing >= 0) {
+    if (!state.hpExtras[existing].quoteFixed) {
+      state.hpExtras[existing].qty = (state.hpExtras[existing].qty || 1) + 1;
+    }
+  } else {
+    state.hpExtras.push({
+      catalogId,
+      name: cat.nazwa,
+      priceNet: cat.priceNet,
+      jednostka: cat.jednostka,
+      qty: 1,
+      isCustom: false,
+      quoteFixed: !!cat.quote
+    });
+  }
+  renderHpExtrasCatalog();
+  renderHpExtras();
+  recompute();
+}
+
 function addHpExtra() {
-  state.hpExtras.push({name:'', priceNet:0, qty:1, jednostka:'kpl'});
+  state.hpExtras.push({name:'', priceNet:0, qty:1, jednostka:'kpl', isCustom:true});
   renderHpExtras();
 }
 function renderHpExtras() {
@@ -8973,25 +9092,30 @@ function renderHpExtras() {
   if (!list) return;
   list.innerHTML = '';
   if (state.hpExtras.length === 0) {
-    list.innerHTML = '<div class="empty" style="padding:12px;">Brak pozycji. Możesz dodać np. bufor 200L, zasobnik CWU 300L, dodatkowe metry rur.</div>';
+    list.innerHTML = '<div class="empty" style="padding:12px;">Brak pozycji. Wybierz pozycję z katalogu powyżej lub kliknij "Pozycja własna" aby dodać spoza katalogu.</div>';
     return;
   }
   state.hpExtras.forEach((ex, idx) => {
     const row = document.createElement('div');
     row.className = 'install-row';
+    const isCatalog = !ex.isCustom && ex.catalogId;
+    const isQuote = ex.quoteFixed || ex.priceNet == null;
     const totalNet = (parseFloat(ex.priceNet)||0) * (parseInt(ex.qty)||1);
     row.innerHTML = `
       <div class="install-row__name">
-        <input type="text" placeholder="Nazwa pozycji (np. Bufor 200L)" value="${escapeHtml(ex.name)}" onchange="updateHpExtraField(${idx}, 'name', this.value)">
-        <div class="install-row__name-meta">Dodatkowa pozycja oferty pompy</div>
+        <input type="text" placeholder="Nazwa pozycji (np. Bufor 200L)" value="${escapeHtml(ex.name)}" onchange="updateHpExtraField(${idx}, 'name', this.value)" ${isCatalog ? 'readonly style="background:#F1F5F9;color:#334155;cursor:not-allowed;"' : ''}>
+        <div class="install-row__name-meta">${isCatalog ? '<span style="color:#059669;font-weight:600;">Z katalogu HP</span>' : 'Dodatkowa pozycja oferty pompy (własna)'}</div>
       </div>
       <div class="install-row__qty">
-        <input type="number" min="1" value="${ex.qty}" onchange="updateHpExtraField(${idx}, 'qty', parseInt(this.value)||1)">
-        <span class="install-row__qty-unit">${escapeHtml(ex.jednostka)}</span>
+        <input type="number" min="1" value="${ex.qty || 1}" onchange="updateHpExtraField(${idx}, 'qty', parseInt(this.value)||1)" ${ex.quoteFixed ? 'disabled title="Pozycja do wyceny — bez ilości"' : ''}>
+        <span class="install-row__qty-unit">${escapeHtml(ex.jednostka || 'kpl')}</span>
       </div>
       <div class="install-row__price">
-        <input type="number" min="0" step="50" value="${ex.priceNet}" onchange="updateHpExtraField(${idx}, 'priceNet', parseFloat(this.value)||0)">
-        <small>${fmtPLN(totalNet)} łącznie</small>
+        ${isQuote
+          ? '<div style="padding:6px 8px;background:#FEF3C7;color:#92400E;border-radius:4px;font-size:11px;font-weight:600;text-align:center;">Do uzgodnienia</div>'
+          : `<input type="number" min="0" step="50" value="${ex.priceNet || 0}" onchange="updateHpExtraField(${idx}, 'priceNet', parseFloat(this.value)||0)" ${isCatalog ? 'readonly style="background:#F1F5F9;color:#334155;cursor:not-allowed;"' : ''}>
+             <small>${fmtPLN(totalNet)} łącznie</small>`
+        }
       </div>
       <button class="btn btn--danger" onclick="removeHpExtra(${idx})">Usuń</button>
     `;
@@ -9002,12 +9126,14 @@ function updateHpExtraField(idx, field, value) {
   state.hpExtras[idx][field] = value;
   if (field === 'priceNet' || field === 'qty') {
     renderHpExtras();
+    if (typeof renderHpExtrasCatalog === 'function') renderHpExtrasCatalog();
     recompute();
   }
 }
 function removeHpExtra(idx) {
   state.hpExtras.splice(idx, 1);
   renderHpExtras();
+  if (typeof renderHpExtrasCatalog === 'function') renderHpExtrasCatalog();
   recompute();
 }
 
@@ -9521,6 +9647,103 @@ async function deleteProductFromSupabase(sbid) {
     return true;
   } catch(e) {
     console.warn('deleteProductFromSupabase error:', e);
+    return false;
+  }
+}
+
+/* ============================================================
+   EXTRAS_CATALOG — katalog prac dodatkowych (AC + HP)
+   ============================================================ */
+async function loadExtrasCatalogFromSupabase() {
+  try {
+    const rows = await sbFetch('/rest/v1/extras_catalog?select=*&active=eq.true&order=kind.asc,sort_order.asc,nazwa.asc');
+    if (!rows) return false;
+    const acRows = rows.filter(r => r.kind === 'ac').map(r => ({
+      id: r.id,
+      nazwa: r.nazwa,
+      jednostka: r.jednostka,
+      priceNet: r.price_net != null ? parseFloat(r.price_net) : null,
+      quote: r.price_net == null,
+      _sortOrder: r.sort_order
+    }));
+    const hpRows = rows.filter(r => r.kind === 'hp').map(r => ({
+      id: r.id,
+      nazwa: r.nazwa,
+      jednostka: r.jednostka,
+      priceNet: r.price_net != null ? parseFloat(r.price_net) : null,
+      quote: r.price_net == null,
+      _sortOrder: r.sort_order
+    }));
+    if (acRows.length > 0) EXTRAS_CATALOG = acRows;
+    HP_EXTRAS_CATALOG = hpRows;
+    console.log('✓ Katalog prac dodatkowych załadowany:', acRows.length, 'AC +', hpRows.length, 'HP');
+    return true;
+  } catch(e) {
+    console.warn('loadExtrasCatalog error:', e);
+    return false;
+  }
+}
+
+async function insertExtraToCatalog(payload) {
+  if (!currentUser) { showToast('Zaloguj się ponownie'); return null; }
+  try {
+    // Wygeneruj kolejny id (np. e13, hp25)
+    const prefix = payload.kind === 'hp' ? 'hp' : 'e';
+    const existing = payload.kind === 'hp' ? HP_EXTRAS_CATALOG : EXTRAS_CATALOG;
+    let maxNum = 0;
+    existing.forEach(e => {
+      const m = String(e.id || '').match(new RegExp('^' + prefix + '(\\d+)$'));
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+    });
+    const newId = prefix + String(maxNum + 1).padStart(2, '0');
+    const res = await sbFetch('/rest/v1/extras_catalog', 'POST', {
+      id: newId,
+      kind: payload.kind,
+      nazwa: payload.nazwa,
+      jednostka: payload.jednostka || 'kpl',
+      price_net: payload.price_net,  // NULL = quote-only
+      sort_order: payload.sort_order || 999,
+      active: true,
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.email
+    });
+    return res && res[0] ? res[0] : null;
+  } catch(e) {
+    console.warn('insertExtra error:', e);
+    showToast('Błąd zapisu: ' + (e.message || e).toString().slice(0, 100));
+    return null;
+  }
+}
+
+async function updateExtraField(id, field, value) {
+  if (!currentUser) return false;
+  const allowed = ['nazwa', 'jednostka', 'price_net', 'sort_order', 'active'];
+  if (!allowed.includes(field)) return false;
+  try {
+    await sbFetch('/rest/v1/extras_catalog?id=eq.' + encodeURIComponent(id), 'PATCH', {
+      [field]: value,
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.email
+    });
+    return true;
+  } catch(e) {
+    console.warn('updateExtraField error:', e);
+    return false;
+  }
+}
+
+async function deleteExtraFromCatalog(id) {
+  if (!currentUser) return false;
+  try {
+    // Soft delete — active=false — zachowuje ID dla starych ofert
+    await sbFetch('/rest/v1/extras_catalog?id=eq.' + encodeURIComponent(id), 'PATCH', {
+      active: false,
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.email
+    });
+    return true;
+  } catch(e) {
+    console.warn('deleteExtra error:', e);
     return false;
   }
 }
@@ -10104,6 +10327,204 @@ async function _acDeleteProduct(sbid, modelName) {
   }
   showToast('Usunięto');
   renderAcProductsList();
+}
+
+/* ============================================================
+   KATALOG PRAC DODATKOWYCH — renderer i CRUD
+   kind = 'ac' | 'hp'
+   ============================================================ */
+function renderExtrasCatalogList(kind) {
+  const wrap = document.getElementById(kind === 'ac' ? 'extrasAcListWrap' : 'extrasHpListWrap');
+  if (!wrap) return;
+  const searchEl = document.getElementById(kind === 'ac' ? 'extrasAcSearch' : 'extrasHpSearch');
+  const search = (searchEl?.value || '').toLowerCase().trim();
+  const list = (kind === 'ac' ? EXTRAS_CATALOG : HP_EXTRAS_CATALOG).slice();
+
+  let items = list;
+  if (search) items = list.filter(e =>
+    (e.nazwa || '').toLowerCase().includes(search) ||
+    (e.jednostka || '').toLowerCase().includes(search) ||
+    (e.id || '').toLowerCase().includes(search)
+  );
+
+  const fmtPl = (x) => Number(x || 0).toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const priced = items.filter(e => e.priceNet != null).length;
+  const quoteOnly = items.filter(e => e.priceNet == null).length;
+
+  const stats = `
+    <div style="padding:12px 16px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:12px;color:#475569;display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+      <span><strong style="color:#0A2647;">${items.length}</strong> pozycji w katalogu</span>
+      ${priced > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#059669;margin-right:4px;"></span> Z ceną: <strong>${priced}</strong></span>` : ''}
+      ${quoteOnly > 0 ? `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#D97706;margin-right:4px;"></span> Do wyceny: <strong>${quoteOnly}</strong></span>` : ''}
+    </div>
+  `;
+
+  if (items.length === 0) {
+    wrap.innerHTML = stats + `
+      <div style="padding:40px 20px;text-align:center;color:#64748B;">
+        <i class="ti ti-package-off" style="font-size:32px;color:#CBD5E1;"></i>
+        <div style="margin-top:10px;font-size:13px;font-weight:600;color:#334155;">Brak pozycji</div>
+        <div style="margin-top:6px;font-size:12px;">Kliknij "Dodaj pozycję" powyżej aby stworzyć pierwszą.</div>
+      </div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = stats + `
+    <div style="max-height:calc(100vh - 340px);overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;z-index:1;">
+          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:50px;">Lp.</th>
+            <th style="padding:9px 12px;text-align:left;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;">Nazwa pozycji</th>
+            <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:90px;">Jednostka</th>
+            <th style="padding:9px 12px;text-align:right;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:150px;">Cena netto</th>
+            <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:80px;">Kolejność</th>
+            <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;width:60px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((e, i) => `
+            <tr id="extraRow_${e.id}" style="border-bottom:1px solid #F1F5F9;">
+              <td style="padding:8px 12px;text-align:center;font-size:11.5px;color:#94A3B8;font-weight:600;" title="ID w bazie: ${escapeHtml(e.id)}">${i + 1}</td>
+              <td style="padding:8px 12px;font-size:12.5px;color:#334155;">
+                <input type="text" value="${escapeHtml(e.nazwa || '')}"
+                  onblur="_extraSaveField('${e.id}', 'nazwa', this.value, '${kind}')"
+                  onkeydown="if(event.key==='Enter'){this.blur();}"
+                  style="width:100%;padding:5px 8px;border:1px solid transparent;border-radius:4px;font-size:12.5px;color:#334155;background:transparent;"
+                  onfocus="this.style.background='#F0F9FF';this.style.borderColor='#93C5FD';"
+                  onmouseover="if(document.activeElement!==this)this.style.background='#FAFCFF';"
+                  onmouseout="if(document.activeElement!==this)this.style.background='transparent';"
+                >
+              </td>
+              <td style="padding:8px 12px;text-align:center;">
+                <select onchange="_extraSaveField('${e.id}', 'jednostka', this.value, '${kind}')"
+                  style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:4px;font-size:11.5px;color:#334155;background:#fff;font-weight:600;">
+                  ${['mb', 'szt', 'kpl', 'godz', 'm2', 'm3'].map(u => `<option value="${u}" ${e.jednostka === u ? 'selected' : ''}>${u}</option>`).join('')}
+                </select>
+              </td>
+              <td style="padding:8px 12px;text-align:right;white-space:nowrap;">
+                <div style="display:inline-flex;align-items:center;gap:4px;">
+                  <input type="number" step="0.01" min="0" value="${e.priceNet != null ? e.priceNet : ''}"
+                    placeholder="do wyceny"
+                    onblur="_extraSaveField('${e.id}', 'price_net', this.value, '${kind}')"
+                    onkeydown="if(event.key==='Enter'){this.blur();}"
+                    style="width:100px;padding:5px 8px;border:1px solid transparent;border-radius:4px;font-size:12px;font-weight:700;color:${e.priceNet != null ? '#166534' : '#D97706'};text-align:right;background:transparent;"
+                    onfocus="this.style.background='#F0F9FF';this.style.borderColor='#93C5FD';"
+                    onmouseover="if(document.activeElement!==this)this.style.background='#FAFCFF';"
+                    onmouseout="if(document.activeElement!==this)this.style.background='transparent';"
+                  >
+                  <span style="font-size:11px;color:#94A3B8;">zł</span>
+                </div>
+              </td>
+              <td style="padding:8px 12px;text-align:center;">
+                <input type="number" step="10" value="${e._sortOrder || 100}"
+                  onblur="_extraSaveField('${e.id}', 'sort_order', this.value, '${kind}')"
+                  onkeydown="if(event.key==='Enter'){this.blur();}"
+                  title="Kolejność wyświetlania — mniejsza wartość = wyżej na liście"
+                  style="width:60px;padding:4px 6px;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;color:#64748B;text-align:center;background:#fff;"
+                >
+              </td>
+              <td style="padding:8px 12px;text-align:center;">
+                <button onclick="_extraDelete('${e.id}', \`${escapeHtml(e.nazwa || '').replace(/`/g, '\\`')}\`, '${kind}')" title="Usuń pozycję z katalogu"
+                  style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;">
+                  <i class="ti ti-trash" style="font-size:12px;"></i>
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:10px 16px;background:#F8FAFC;border-top:1px solid #E2E8F0;font-size:11px;color:#64748B;">
+      <i class="ti ti-info-circle" style="font-size:12px;vertical-align:-1px;"></i>
+      Kliknij nazwę, cenę lub kolejność aby edytować bezpośrednio. Pusta cena = pozycja "do indywidualnej wyceny" (nie sumuje się do total). Usunięcie deaktywuje pozycję (nie łamie starych ofert).
+    </div>
+  `;
+}
+
+async function _extraSaveField(id, field, valueRaw, kind) {
+  let value = valueRaw;
+  if (field === 'price_net') {
+    const trimmed = String(valueRaw || '').trim();
+    if (trimmed === '') {
+      value = null;  // pusta cena = quote-only
+    } else {
+      value = parseFloat(trimmed.replace(',', '.'));
+      if (isNaN(value) || value < 0) { showToast('Nieprawidłowa cena'); return; }
+    }
+  }
+  if (field === 'sort_order') {
+    value = parseInt(valueRaw) || 100;
+  }
+  if (field === 'nazwa') {
+    value = String(valueRaw || '').trim();
+    if (!value) { showToast('Nazwa nie może być pusta'); renderExtrasCatalogList(kind); return; }
+  }
+  const ok = await updateExtraField(id, field, value);
+  if (!ok) { showToast('Nie zapisano — spróbuj ponownie'); return; }
+  // Aktualizuj lokalny katalog
+  const catalog = kind === 'ac' ? EXTRAS_CATALOG : HP_EXTRAS_CATALOG;
+  const idx = catalog.findIndex(e => e.id === id);
+  if (idx >= 0) {
+    if (field === 'nazwa') catalog[idx].nazwa = value;
+    if (field === 'jednostka') catalog[idx].jednostka = value;
+    if (field === 'price_net') {
+      catalog[idx].priceNet = value;
+      catalog[idx].quote = value == null;
+    }
+    if (field === 'sort_order') catalog[idx]._sortOrder = value;
+  }
+  showToast('Zapisano');
+  // Ponowny render jeśli zmiana kolejności (żeby przesortować)
+  if (field === 'sort_order') renderExtrasCatalogList(kind);
+}
+
+async function _extraDelete(id, nazwa, kind) {
+  if (!confirm('Usunąć pozycję "' + nazwa + '" z katalogu?\n\nStare oferty, które używały tej pozycji, nadal będą działać (usunięcie tylko wyłącza pozycję z katalogu).')) return;
+  const ok = await deleteExtraFromCatalog(id);
+  if (!ok) { showToast('Nie udało się usunąć'); return; }
+  // Usuń z lokalnego katalogu
+  const catalog = kind === 'ac' ? EXTRAS_CATALOG : HP_EXTRAS_CATALOG;
+  const idx = catalog.findIndex(e => e.id === id);
+  if (idx >= 0) {
+    if (kind === 'ac') EXTRAS_CATALOG.splice(idx, 1);
+    else HP_EXTRAS_CATALOG.splice(idx, 1);
+  }
+  showToast('Usunięto z katalogu');
+  renderExtrasCatalogList(kind);
+}
+
+async function addExtraToCatalog(kind) {
+  const nazwa = prompt('Nazwa nowej pozycji ' + (kind === 'ac' ? 'klimatyzacji' : 'pompy ciepła') + ':', '');
+  if (!nazwa || !nazwa.trim()) return;
+  const jednostka = prompt('Jednostka (mb / szt / kpl / godz / m2 / m3):', 'kpl') || 'kpl';
+  const priceRaw = prompt('Cena netto w zł (pozostaw puste dla pozycji "do wyceny"):', '');
+  let priceNet = null;
+  if (priceRaw && priceRaw.trim()) {
+    priceNet = parseFloat(priceRaw.replace(',', '.'));
+    if (isNaN(priceNet) || priceNet < 0) { showToast('Nieprawidłowa cena'); return; }
+  }
+  // Ustal sort_order tak, aby nowa pozycja pojawiła się na końcu
+  const catalog = kind === 'ac' ? EXTRAS_CATALOG : HP_EXTRAS_CATALOG;
+  const maxSort = catalog.reduce((m, e) => Math.max(m, e._sortOrder || 100), 100);
+  const inserted = await insertExtraToCatalog({
+    kind, nazwa: nazwa.trim(), jednostka: jednostka.trim(), price_net: priceNet, sort_order: maxSort + 10
+  });
+  if (!inserted) return;
+  // Dodaj do lokalnego katalogu (dla natychmiastowego wyświetlenia)
+  const newEntry = {
+    id: inserted.id,
+    nazwa: inserted.nazwa,
+    jednostka: inserted.jednostka,
+    priceNet: inserted.price_net != null ? parseFloat(inserted.price_net) : null,
+    quote: inserted.price_net == null,
+    _sortOrder: inserted.sort_order
+  };
+  if (kind === 'ac') EXTRAS_CATALOG.push(newEntry);
+  else HP_EXTRAS_CATALOG.push(newEntry);
+  showToast('Pozycja dodana');
+  renderExtrasCatalogList(kind);
 }
 
 /* ============================================================
@@ -16666,7 +17087,10 @@ const V2_SECTION_LABELS = {
   'services': 'Serwisy',
   'products': 'Produkty klimatyzacji',
   'hp_products': 'Produkty pomp ciepła',
+  'extras_ac': 'Prace dodatkowe — klimatyzacja',
+  'extras_hp': 'Prace dodatkowe — pompy ciepła',
   'tasks': 'Zadania',
+  'automation': 'Przypomnienia i komunikacja',
   'ows': 'Ogólne Warunki Handlowe',
   'settings': 'Ustawienia'
 };
@@ -16774,6 +17198,19 @@ function v2ShowSection(id) {
       await Promise.all([loadAutomationSettings(), loadCommunicationsQueue()]);
       _autoRenderContent();
       _autoRefreshBadge();
+    }, 50);
+  }
+  // Hook: Prace dodatkowe klimatyzacja/HP — załaduj katalog i wyrenderuj tabelę
+  if (id === 'extras_ac') {
+    setTimeout(async () => {
+      await loadExtrasCatalogFromSupabase();
+      renderExtrasCatalogList('ac');
+    }, 50);
+  }
+  if (id === 'extras_hp') {
+    setTimeout(async () => {
+      await loadExtrasCatalogFromSupabase();
+      renderExtrasCatalogList('hp');
     }, 50);
   }
 }
@@ -22074,6 +22511,7 @@ function _autoRenderSettings() {
 function _autoRenderQueue() {
   const now = new Date();
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // Podział wiadomości pending na: do wysłania teraz (scheduled <= dziś) i później
   const pendingDueNow = communicationsQueue.filter(q =>
@@ -22083,6 +22521,10 @@ function _autoRenderQueue() {
   const pendingLater = communicationsQueue.filter(q =>
     q.status === 'pending' && new Date(q.scheduled_at) > todayEnd
   ).sort((a,b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+
+  const sentThisMonth = communicationsQueue.filter(q =>
+    q.status === 'sent' && q.sent_at && new Date(q.sent_at) >= monthStart
+  ).length;
 
   const filtered = _autoQueueFilter === 'all'
     ? communicationsQueue
@@ -22094,7 +22536,29 @@ function _autoRenderQueue() {
     cancelled: communicationsQueue.filter(q => q.status === 'cancelled').length
   };
 
+  const monthLabel = now.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+
   return `
+    <!-- STATYSTYKI MIESIĘCZNE -->
+    <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Do wysłania dziś</div>
+        <div style="font-size:22px;font-weight:800;color:${pendingDueNow.length > 0 ? '#DC2626' : '#059669'};margin-top:4px;">${pendingDueNow.length}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Zaplanowane później</div>
+        <div style="font-size:22px;font-weight:800;color:#0F3461;margin-top:4px;">${pendingLater.length}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Wysłano — ${monthLabel}</div>
+        <div style="font-size:22px;font-weight:800;color:#059669;margin-top:4px;">${sentThisMonth}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Wysłano łącznie</div>
+        <div style="font-size:22px;font-weight:800;color:#334155;margin-top:4px;">${counts.sent}</div>
+      </div>
+    </div>
+
     ${pendingDueNow.length > 0 ? `
       <!-- SEKCJA PRIORYTETOWA: DO WYSŁANIA TERAZ -->
       <div style="background:linear-gradient(to bottom right, #FEF2F2, #FFF7ED);border:2px solid #FCA5A5;border-radius:10px;padding:14px 16px;margin-bottom:18px;">
@@ -22468,6 +22932,232 @@ async function _autoMarkSent(id) {
     _autoRefreshBadge();
   } catch (e) {
     showToast('Błąd: ' + (e.message || e));
+  }
+}
+
+// ==================== MODAL: Nowa wiadomość ad-hoc ====================
+// Pozwala utworzyć wiadomość do dowolnego klienta ręcznie —
+// z gotowego szablonu (przypomnienie/opinia) lub od zera.
+
+let _autoNewMsg = null;  // { clientId, kind, purpose, subject, body, scheduledAt }
+
+function _autoOpenNewMessageModal() {
+  _autoNewMsg = {
+    clientId: '',
+    kind: 'email',
+    purpose: 'manual',
+    subject: '',
+    body: '',
+    scheduledAt: 'now'  // 'now' | 'today9' | 'tomorrow9' | 'custom'
+  };
+  const mod = document.createElement('div');
+  mod.id = 'autoNewMsgModal';
+  mod.className = 'modal-backdrop';
+  mod.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  mod.onclick = (e) => { if (e.target === mod) _autoCloseNewMessageModal(); };
+  document.body.appendChild(mod);
+  _autoRenderNewMessageModal();
+}
+
+function _autoCloseNewMessageModal() {
+  const mod = document.getElementById('autoNewMsgModal');
+  if (mod) mod.remove();
+  _autoNewMsg = null;
+}
+
+function _autoRenderNewMessageModal() {
+  const mod = document.getElementById('autoNewMsgModal');
+  if (!mod || !_autoNewMsg) return;
+  const clients = (typeof clientsDb !== 'undefined' ? clientsDb : []).slice()
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const selectedClient = clients.find(c => c.id === _autoNewMsg.clientId);
+  const canSubmit = _autoNewMsg.clientId && _autoNewMsg.body && _autoNewMsg.body.trim().length > 3
+    && (_autoNewMsg.kind === 'email' ? !!selectedClient?.email : !!selectedClient?.phone);
+
+  mod.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:640px;width:92%;max-height:90vh;overflow:auto;">
+      <div style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;background:#EFF6FF;color:#0F3461;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+          <i class="ti ti-mail-plus" style="font-size:18px;"></i>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:700;color:#0A2647;">Nowa wiadomość ad-hoc</div>
+          <div style="font-size:11.5px;color:#64748B;margin-top:1px;">Trafi do kolejki „Do wysłania" — wyślesz jednym kliknięciem</div>
+        </div>
+        <button onclick="_autoCloseNewMessageModal()" style="padding:6px 10px;background:transparent;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;cursor:pointer;color:#64748B;">✕</button>
+      </div>
+
+      <div style="padding:16px 18px;">
+        <!-- Klient -->
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Klient *</label>
+          <select onchange="_autoNewMsg.clientId = this.value; _autoRenderNewMessageModal()"
+            style="width:100%;padding:8px 10px;border:1.5px solid ${_autoNewMsg.clientId ? '#E2E8F0' : '#FCA5A5'};border-radius:6px;font-size:12.5px;">
+            <option value="">— wybierz klienta z bazy —</option>
+            ${clients.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === _autoNewMsg.clientId ? 'selected' : ''}>${escapeHtml(c.name || '')}${c.email ? ' · ' + escapeHtml(c.email) : ''}${c.phone && !c.email ? ' · ' + escapeHtml(c.phone) : ''}</option>`).join('')}
+          </select>
+          ${selectedClient && !selectedClient.email && !selectedClient.phone ? '<div style="margin-top:6px;padding:6px 10px;background:#FEF2F2;color:#991B1B;border-radius:5px;font-size:11px;">Ten klient nie ma email ani telefonu — uzupełnij kartę klienta.</div>' : ''}
+        </div>
+
+        <!-- Kanał + cel -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Kanał *</label>
+            <select onchange="_autoNewMsg.kind = this.value; _autoNewMsg.body=''; _autoNewMsg.subject=''; _autoRenderNewMessageModal()"
+              style="width:100%;padding:8px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+              <option value="email" ${_autoNewMsg.kind === 'email' ? 'selected' : ''}>Email ${selectedClient && !selectedClient.email ? '(brak adresu)' : ''}</option>
+              <option value="sms" ${_autoNewMsg.kind === 'sms' ? 'selected' : ''}>SMS ${selectedClient && !selectedClient.phone ? '(brak numeru)' : ''}</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Cel wiadomości</label>
+            <select onchange="_autoNewMsg.purpose = this.value; _autoFillFromTemplate(); _autoRenderNewMessageModal()"
+              style="width:100%;padding:8px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+              <option value="manual" ${_autoNewMsg.purpose === 'manual' ? 'selected' : ''}>Wiadomość dowolna</option>
+              <option value="service_reminder" ${_autoNewMsg.purpose === 'service_reminder' ? 'selected' : ''}>Przypomnienie o serwisie (szablon)</option>
+              <option value="review_request" ${_autoNewMsg.purpose === 'review_request' ? 'selected' : ''}>Prośba o opinię Google (szablon)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Temat (dla email) -->
+        ${_autoNewMsg.kind === 'email' ? `
+          <div style="margin-bottom:12px;">
+            <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Temat</label>
+            <input type="text" value="${escapeHtml(_autoNewMsg.subject || '')}"
+              oninput="_autoNewMsg.subject = this.value"
+              placeholder="np. Przypomnienie o wizycie serwisowej"
+              style="width:100%;padding:8px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+          </div>
+        ` : ''}
+
+        <!-- Treść -->
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Treść wiadomości *</label>
+          <textarea rows="8" oninput="_autoNewMsg.body = this.value; _autoRenderCharCount()"
+            placeholder="${_autoNewMsg.kind === 'email' ? 'Szanowni Państwo…' : 'Krótka wiadomość SMS'}"
+            style="width:100%;padding:10px;border:1.5px solid ${(_autoNewMsg.body || '').trim().length > 3 ? '#E2E8F0' : '#FCA5A5'};border-radius:6px;font-size:12.5px;font-family:inherit;line-height:1.5;">${escapeHtml(_autoNewMsg.body || '')}</textarea>
+          <div id="autoCharCount" style="margin-top:4px;font-size:10.5px;color:#64748B;text-align:right;">${(_autoNewMsg.body || '').length} znaków${_autoNewMsg.kind === 'sms' ? ' · SMS = 160 znaków (polskie znaki liczą się podwójnie)' : ''}</div>
+        </div>
+
+        <!-- Kiedy wysłać -->
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Kiedy pojawi się w „Do wysłania"</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${[
+              {key: 'now', label: 'Od razu', icon: 'ti-bolt'},
+              {key: 'today9', label: 'Dziś 9:00', icon: 'ti-sun'},
+              {key: 'tomorrow9', label: 'Jutro 9:00', icon: 'ti-sunrise'},
+              {key: 'nextweek', label: 'Za tydzień 9:00', icon: 'ti-calendar'}
+            ].map(o => `
+              <button onclick="_autoNewMsg.scheduledAt = '${o.key}'; _autoRenderNewMessageModal()"
+                style="padding:7px 12px;background:${_autoNewMsg.scheduledAt === o.key ? '#0F3461' : '#fff'};color:${_autoNewMsg.scheduledAt === o.key ? '#fff' : '#0F3461'};border:1px solid ${_autoNewMsg.scheduledAt === o.key ? '#0F3461' : '#E2E8F0'};border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                <i class="ti ${o.icon}" style="font-size:12px;"></i> ${o.label}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Akcje -->
+        <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid #E2E8F0;">
+          <button onclick="_autoCloseNewMessageModal()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button onclick="_autoSubmitNewMessage()" ${canSubmit ? '' : 'disabled'}
+            style="padding:9px 18px;background:${canSubmit ? '#0F3461' : '#CBD5E1'};color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:${canSubmit ? 'pointer' : 'not-allowed'};display:inline-flex;align-items:center;gap:6px;">
+            <i class="ti ti-plus" style="font-size:14px;"></i> Dodaj do kolejki
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* Wypełnij treść z szablonu na podstawie celu i klienta */
+function _autoFillFromTemplate() {
+  if (!_autoNewMsg || !automationSettings) return;
+  const client = (typeof clientsDb !== 'undefined' ? clientsDb : []).find(c => c.id === _autoNewMsg.clientId);
+  const clientName = client?.name || '';
+  const s = automationSettings;
+  const replacePlaceholders = (tpl) => (tpl || '')
+    .replace(/\{\{klient\}\}/g, clientName)
+    .replace(/\{\{data\}\}/g, new Date().toLocaleDateString('pl-PL'))
+    .replace(/\{\{godzina\}\}/g, '')
+    .replace(/\{\{typ_serwisu\}\}/g, 'przegląd')
+    .replace(/\{\{urzadzenie\}\}/g, 'wykonanej instalacji')
+    .replace(/\{\{adres\}\}/g, client?.address ? '\nAdres: ' + client.address : '')
+    .replace(/\{\{data_montazu\}\}/g, new Date().toLocaleDateString('pl-PL'))
+    .replace(/\{\{link\}\}/g, s.review_google_link || '');
+
+  if (_autoNewMsg.purpose === 'service_reminder') {
+    if (_autoNewMsg.kind === 'email') {
+      _autoNewMsg.subject = replacePlaceholders(s.service_reminder_email_subject);
+      _autoNewMsg.body = replacePlaceholders(s.service_reminder_email_body);
+    } else {
+      _autoNewMsg.body = replacePlaceholders(s.service_reminder_sms_body);
+    }
+  } else if (_autoNewMsg.purpose === 'review_request') {
+    if (_autoNewMsg.kind === 'email') {
+      _autoNewMsg.subject = replacePlaceholders(s.review_email_subject);
+      _autoNewMsg.body = replacePlaceholders(s.review_email_body);
+    } else {
+      _autoNewMsg.body = replacePlaceholders(s.review_sms_body);
+    }
+  }
+  // dla purpose='manual' zostawiamy puste — user pisze od zera
+}
+
+function _autoRenderCharCount() {
+  const el = document.getElementById('autoCharCount');
+  if (!el || !_autoNewMsg) return;
+  const len = (_autoNewMsg.body || '').length;
+  el.textContent = len + ' znaków' + (_autoNewMsg.kind === 'sms' ? ' · SMS = 160 znaków (polskie znaki liczą się podwójnie)' : '');
+}
+
+async function _autoSubmitNewMessage() {
+  if (!_autoNewMsg) return;
+  const client = (typeof clientsDb !== 'undefined' ? clientsDb : []).find(c => c.id === _autoNewMsg.clientId);
+  if (!client) { showToast('Wybierz klienta'); return; }
+  if (!(_autoNewMsg.body || '').trim()) { showToast('Uzupełnij treść wiadomości'); return; }
+  if (_autoNewMsg.kind === 'email' && !client.email) { showToast('Klient nie ma email — użyj SMS lub uzupełnij dane'); return; }
+  if (_autoNewMsg.kind === 'sms' && !client.phone) { showToast('Klient nie ma telefonu — użyj email lub uzupełnij dane'); return; }
+
+  // Wylicz scheduled_at
+  const now = new Date();
+  let scheduledAt = new Date(now);
+  if (_autoNewMsg.scheduledAt === 'today9') {
+    scheduledAt.setHours(9, 0, 0, 0);
+    if (scheduledAt < now) scheduledAt = new Date(now); // gdy już po 9:00, ustaw na teraz
+  } else if (_autoNewMsg.scheduledAt === 'tomorrow9') {
+    scheduledAt.setDate(scheduledAt.getDate() + 1);
+    scheduledAt.setHours(9, 0, 0, 0);
+  } else if (_autoNewMsg.scheduledAt === 'nextweek') {
+    scheduledAt.setDate(scheduledAt.getDate() + 7);
+    scheduledAt.setHours(9, 0, 0, 0);
+  }
+
+  const payload = {
+    kind: _autoNewMsg.kind,
+    purpose: _autoNewMsg.purpose,
+    recipient_email: _autoNewMsg.kind === 'email' ? client.email : null,
+    recipient_phone: _autoNewMsg.kind === 'sms' ? client.phone : null,
+    recipient_name: client.name || null,
+    subject: _autoNewMsg.kind === 'email' ? (_autoNewMsg.subject || null) : null,
+    body: _autoNewMsg.body.trim(),
+    scheduled_at: scheduledAt.toISOString(),
+    status: 'pending',
+    related_client_id: client.id,
+    created_by: currentUser?.email || 'manual'
+  };
+
+  try {
+    await sbFetch('/rest/v1/communications_queue', 'POST', payload);
+    showToast('Dodano do kolejki');
+    _autoCloseNewMessageModal();
+    await loadCommunicationsQueue();
+    _autoShowTab('queue');
+    _autoRenderContent();
+    _autoRefreshBadge();
+  } catch(e) {
+    showToast('Błąd zapisu: ' + (e.message || e).toString().slice(0, 100));
   }
 }
 
@@ -23356,6 +24046,12 @@ async function saveInstalledUnit() {
     await Promise.all([loadInstalledUnits(), loadServiceVisits()]);
     renderInstalledUnitsList();
     if (document.getElementById('v2-section-services')?.classList.contains('v2-section--active')) renderServicesList();
+    // Odśwież kolejkę — DB trigger mógł dodać prośbę o opinię Google
+    if (typeof loadCommunicationsQueue === 'function') {
+      loadCommunicationsQueue().then(() => {
+        if (typeof _autoRefreshBadge === 'function') _autoRefreshBadge();
+      });
+    }
   } catch(e) {
     console.error('saveInstalledUnit error:', e);
     showToast('Błąd zapisu: ' + String(e.message || e).slice(0, 100));
@@ -24002,6 +24698,11 @@ async function saveServiceVisit() {
       } else if (savedId && payload.status !== 'planned') {
         // Serwis nie jest już „planned" — anuluj pending
         await autoCancelServiceReminders(savedId);
+      }
+      // Odśwież kolejkę komunikacji i badge w sidebarze
+      if (typeof loadCommunicationsQueue === 'function') {
+        await loadCommunicationsQueue();
+        if (typeof _autoRefreshBadge === 'function') _autoRefreshBadge();
       }
     } catch(e) {
       console.warn('Auto-schedule error:', e);
