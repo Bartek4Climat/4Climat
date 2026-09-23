@@ -28288,6 +28288,27 @@ function wzRenderStepFinalize() {
         Generuj PDF
       </button>
     </div>
+
+    <!-- Wyślij ofertę do klienta -->
+    <div style="display:flex;gap:14px;align-items:center;padding:18px 20px;background:#fff;border:1.5px solid #BFDBFE;border-radius:10px;margin-top:12px;">
+      <div style="width:44px;height:44px;background:#EFF6FF;color:#0F3461;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="ti ti-mail-forward" style="font-size:22px;"></i>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:700;color:#0A2647;">Wyślij ofertę do klienta</div>
+        <div style="font-size:11.5px;color:#64748B;margin-top:2px;">
+          ${wzState.client && wzState.client.email
+            ? 'Otwiera Twój klient poczty z gotową treścią. PDF załączasz ręcznie z folderu Pobrane.'
+            : '<span style="color:#DC2626;">Klient nie ma emaila w kroku „Klient" — uzupełnij, żeby móc wysłać.</span>'}
+        </div>
+      </div>
+      <button ${wzState.client && wzState.client.email ? '' : 'disabled'}
+        onclick="wzOpenSendOfferModal()"
+        style="padding:12px 22px;background:${wzState.client && wzState.client.email ? '#0F3461' : '#CBD5E1'};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:${wzState.client && wzState.client.email ? 'pointer' : 'not-allowed'};display:inline-flex;align-items:center;gap:6px;">
+        <i class="ti ti-send" style="font-size:15px;"></i>
+        Wyślij email
+      </button>
+    </div>
     </div>
   `;
 }
@@ -28600,6 +28621,211 @@ async function wzGeneratePdf() {
     console.error('wzGeneratePdf error:', e);
     if (typeof showToast === 'function') showToast('Błąd generowania: ' + (e.message || e));
   }
+}
+
+/* ============================================================
+   WYSŁANIE OFERTY DO KLIENTA
+   Otwiera modal z prefilled treścią maila, pozwala go otworzyć
+   w kliencie poczty (mailto:) lub skopiować do webmail.
+   PDF załącznik użytkownik dokłada ręcznie z folderu Pobrane —
+   protokół mailto: nie pozwala na programowe załączanie plików.
+   ============================================================ */
+
+let _wzOfferSendMsg = null;
+
+function wzOpenSendOfferModal() {
+  if (!wzState.client || !wzState.client.email) {
+    showToast('Klient nie ma emaila');
+    return;
+  }
+  const client = wzState.client;
+  const scope = wzState.basics.scope || 'ac';
+  const offerNo = wzState.basics.reservedOfferNo || '';
+  const scopeLabel = scope === 'hp'
+    ? 'pompy ciepła'
+    : (scope === 'rec' ? 'rekuperacji' : 'klimatyzacji');
+
+  const senderName = (currentUser?.name || currentUser?.email?.split('@')[0] || 'Zespół 4Climat')
+    .replace(/\b[a-ząćęłńóśźż]/g, ch => ch.toUpperCase());
+
+  const salutation = _wzExtractFirstName(client.name);
+  const salutLine = salutation ? 'Szanowni Państwo ' + salutation : 'Szanowni Państwo';
+
+  const defaultSubject = 'Oferta 4Climat' + (offerNo ? ' — ' + offerNo : '') + ' — ' + (client.name || '');
+
+  const defaultBody = `${salutLine},
+
+W załączeniu przesyłam ofertę na wykonanie instalacji ${scopeLabel}${offerNo ? ' (nr ' + offerNo + ')' : ''}, przygotowaną zgodnie z omawianymi założeniami.
+
+W ofercie znajdą Państwo:
+- specyfikację proponowanych urządzeń wraz z parametrami technicznymi,
+- kosztorys wykonania instalacji (z rozbiciem na sprzęt i montaż),
+- warunki gwarancji i serwisu.
+
+Cena oferty ważna przez 30 dni od daty wystawienia. W przypadku pytań lub potrzeby doprecyzowania zakresu prac — pozostaję do Państwa dyspozycji telefonicznie lub mailowo.
+
+Z poważaniem,
+${senderName}
+4Climat
+tel. [uzupełnij numer]
+${currentUser?.email || 'kontakt@4climat.pl'}
+www.4climat.pl`;
+
+  _wzOfferSendMsg = {
+    to: client.email,
+    subject: defaultSubject,
+    body: defaultBody
+  };
+
+  const mod = document.createElement('div');
+  mod.id = 'wzSendOfferModal';
+  mod.className = 'modal-backdrop';
+  mod.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  mod.onclick = (e) => { if (e.target === mod) wzCloseSendOfferModal(); };
+  document.body.appendChild(mod);
+  wzRenderSendOfferModal();
+}
+
+function wzCloseSendOfferModal() {
+  const mod = document.getElementById('wzSendOfferModal');
+  if (mod) mod.remove();
+  _wzOfferSendMsg = null;
+}
+
+function _wzExtractFirstName(fullName) {
+  if (!fullName) return '';
+  // "Firma Jan Kowalski" -> "Jan Kowalski"
+  const cleaned = fullName.replace(/^\s*(Firma|Sp\.?\s*z\s*o\.?\s*o\.?|Sp\.?\s*z\.o\.o\.?)\s+/i, '').trim();
+  return cleaned;
+}
+
+function wzRenderSendOfferModal() {
+  const mod = document.getElementById('wzSendOfferModal');
+  if (!mod || !_wzOfferSendMsg) return;
+  const m = _wzOfferSendMsg;
+
+  mod.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:680px;width:92%;max-height:92vh;overflow:auto;">
+      <div style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;background:#EFF6FF;color:#0F3461;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+          <i class="ti ti-mail-forward" style="font-size:18px;"></i>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:700;color:#0A2647;">Wyślij ofertę do klienta</div>
+          <div style="font-size:11.5px;color:#64748B;margin-top:1px;">Sprawdź treść, kliknij „Otwórz email" — załącz PDF ręcznie z folderu Pobrane</div>
+        </div>
+        <button onclick="wzCloseSendOfferModal()" style="padding:6px 10px;background:transparent;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;cursor:pointer;color:#64748B;">✕</button>
+      </div>
+
+      <div style="padding:16px 18px;">
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Do</label>
+          <input type="email" value="${escapeHtml(m.to || '')}"
+            oninput="_wzOfferSendMsg.to = this.value"
+            style="width:100%;padding:8px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-family:monospace;">
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Temat</label>
+          <input type="text" value="${escapeHtml(m.subject || '')}"
+            oninput="_wzOfferSendMsg.subject = this.value"
+            style="width:100%;padding:8px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:600;display:block;margin-bottom:4px;">Treść wiadomości</label>
+          <textarea rows="14"
+            oninput="_wzOfferSendMsg.body = this.value"
+            style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-family:inherit;line-height:1.55;">${escapeHtml(m.body || '')}</textarea>
+        </div>
+
+        <div style="padding:10px 12px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;font-size:11.5px;color:#92400E;margin-bottom:14px;line-height:1.5;">
+          <b><i class="ti ti-paperclip"></i> Załącznik PDF:</b> Program otworzy Twój klient poczty z gotowym tekstem, ale <b>nie może automatycznie dołączyć pliku PDF</b>. Po otwarciu wiadomości przeciągnij PDF z folderu Pobrane do okna maila lub użyj przycisku „Załącz plik".
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid #E2E8F0;">
+          <button onclick="wzCloseSendOfferModal()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button onclick="wzCopyOfferMessage()" style="padding:9px 16px;background:#fff;color:#0F3461;border:1px solid #0F3461;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+            <i class="ti ti-copy" style="font-size:14px;"></i> Kopiuj treść
+          </button>
+          <button onclick="wzSendOfferByMailto()" style="padding:9px 22px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+            <i class="ti ti-send" style="font-size:14px;"></i> Otwórz email
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function wzSendOfferByMailto() {
+  if (!_wzOfferSendMsg) return;
+  const m = _wzOfferSendMsg;
+  if (!m.to || !m.body) { showToast('Uzupełnij adresata i treść'); return; }
+
+  const to = encodeURIComponent(m.to);
+  const subject = encodeURIComponent(m.subject || '');
+  const body = encodeURIComponent(m.body || '');
+  const mailtoUrl = `mailto:${to}?subject=${subject}&body=${body}`;
+
+  if (mailtoUrl.length > 8000) {
+    // Za długi — kopiuj do schowka i otwórz sam adres
+    _autoCopyToClipboard(m.body || '');
+    showToast('Treść za długa dla mailto — skopiowano do schowka. Otwieram adres…');
+    window.location.href = `mailto:${to}?subject=${subject}`;
+  } else {
+    window.location.href = mailtoUrl;
+  }
+
+  setTimeout(() => {
+    if (confirm('Czy wysłałeś ofertę (razem z załączonym PDF)?\n\nJeśli tak — zapiszę to w historii oferty.')) {
+      wzMarkOfferAsSent();
+    }
+  }, 1500);
+}
+
+async function wzCopyOfferMessage() {
+  if (!_wzOfferSendMsg) return;
+  const m = _wzOfferSendMsg;
+  const text = (m.subject ? 'Temat: ' + m.subject + '\n\n' : '') + (m.body || '');
+  await _autoCopyToClipboard(text);
+  showToast('Skopiowano treść wiadomości');
+}
+
+async function wzMarkOfferAsSent() {
+  // Zapisz fakt wysyłki: dodaje wpis do communications_queue jako 'sent'
+  // (do statystyk i historii kontaktów z klientem).
+  if (!_wzOfferSendMsg || !wzState.client) return;
+  const clientId = wzState.client.linkedId || null;
+  if (!clientId) {
+    showToast('Zaznaczono. (Brak ID klienta — wpis w kolejce nie utworzony)');
+    wzCloseSendOfferModal();
+    return;
+  }
+  try {
+    const now = new Date().toISOString();
+    await sbFetch('/rest/v1/communications_queue', 'POST', {
+      kind: 'email',
+      purpose: 'manual',
+      recipient_email: _wzOfferSendMsg.to,
+      recipient_name: wzState.client.name || null,
+      subject: _wzOfferSendMsg.subject,
+      body: _wzOfferSendMsg.body,
+      scheduled_at: now,
+      status: 'sent',
+      sent_at: now,
+      related_client_id: clientId,
+      created_by: currentUser?.email || 'wizard'
+    });
+    showToast('Zapisano w historii wysyłek');
+    if (typeof loadCommunicationsQueue === 'function') {
+      loadCommunicationsQueue().then(() => {
+        if (typeof _autoRefreshBadge === 'function') _autoRefreshBadge();
+      });
+    }
+  } catch(e) {
+    console.warn('markOfferAsSent error:', e);
+  }
+  wzCloseSendOfferModal();
 }
 
 /* Nawigacja i walidacja */
