@@ -8553,11 +8553,15 @@ function variantNetTotal(v) {
   if (v.type === 'install') {
     return parseFloat(v.priceNet) || 0;
   }
+  // Dodatkowe pozycje własne (sterowanie, akcesoria) — wspólny komponent
+  const extrasNet = (v.extraItems || []).reduce((s, it) =>
+    s + (parseFloat(it.priceNet) || 0) * (parseInt(it.qty) || 1), 0);
+
   if (v.type === 'hp_kit') {
     // Wariant z wizarda HP — priceNet = suma pozycji, installPrice = montaż
     let s = parseFloat(v.priceNet) || 0;
     if (v.includeInstall !== false) s += parseFloat(v.installPrice) || 0;
-    return s;
+    return s + extrasNet;
   }
   if (v.type === 'split') {
     let s = 0;
@@ -8579,7 +8583,7 @@ function variantNetTotal(v) {
         if (ms.includeInstall) s += ms.installPrice||0;
       });
     }
-    return s;
+    return s + extrasNet;
   } else {
     if (!v.outdoor) return 0;    // uszkodzony wariant multi — nie zawalaj sumowania
     const out = getProductFromPool('multi_zew', v.outdoor.productIdx) || DB.multi_zew[v.outdoor.productIdx] || {cena:0};
@@ -8591,7 +8595,7 @@ function variantNetTotal(v) {
       s += effP * u.qty;
     });
     if (v.includeInstall) s += v.installPrice;
-    return s;
+    return s + extrasNet;
   }
 }
 
@@ -14718,10 +14722,14 @@ function generatePdf() {
   const includeHp     = state.scope === 'hp' || state.scope === 'both';
   const includeCustom = state.scope === 'custom';
 
-  // Dla oferty dowolnej wystarczy że są pozycje w customServices
+  // Dla oferty dowolnej — nowy flow: warianty w state.variants (type='custom_kit')
+  // Fallback: stary flow z state.customServices (dla ofert zapisanych wcześniej)
   if (includeCustom) {
-    if (state.customServices.length === 0) {
-      showToast('Dodaj przynajmniej jedną pozycję do oferty dowolnej'); return;
+    const hasNewFlow = state.variants && state.variants.length > 0 &&
+      state.variants.some(v => v.type === 'custom_kit');
+    const hasOldFlow = state.customServices && state.customServices.length > 0;
+    if (!hasNewFlow && !hasOldFlow) {
+      showToast('Dodaj przynajmniej jeden wariant z pozycjami'); return;
     }
   } else {
     if (includeAc && !includeHp && state.variants.length === 0) {
@@ -14847,6 +14855,83 @@ function generatePdf() {
 
   /* ---- Jeden wariant klimy (styl Projekt A: L.p./Marka/Nazwa/Kolor/Ilość/Link) ---- */
   /* ---- Jeden wariant klimy (styl Projekt A: L.p./Marka/Nazwa/Kolor/Ilość/Link + opcj. Cena) ---- */
+  /* Zbuduj komórkę z nazwą pozycji + opcjonalnie kolor i link
+     Dla PDF: główna linia to nazwa, pod spodem drobne szczegóły (kolor, link) */
+  function buildCustomItemNameCell(it) {
+    const name = (it.name || '—').trim();
+    const parts = [];
+
+    // Główna linia: nazwa pozycji
+    parts.push({ text: name, style: 'cellModel' });
+
+    // Druga linia: kolor + link (jeśli są)
+    const extras = [];
+    if (it.color && it.color.trim()) {
+      extras.push({ text: 'Kolor: ' + it.color.trim(), fontSize: 8.5, color: '#64748B', italics: true });
+    }
+    if (it.link && it.link.trim()) {
+      extras.push({ text: it.link.trim(), link: it.link.trim(), fontSize: 8.5, color: '#1B4F8C', decoration: 'underline' });
+    }
+    if (extras.length > 0) {
+      // Rozdziel kolor od linku separatorem "·"
+      const line = [];
+      extras.forEach((e, i) => {
+        if (i > 0) line.push({ text: ' · ', fontSize: 8.5, color: '#CBD5E1' });
+        line.push(e);
+      });
+      parts.push({ text: line, margin: [0, 2, 0, 0] });
+    }
+
+    return { stack: parts };
+  }
+
+  /* Zbuduj blok z dodatkowymi pozycjami wariantu (sterowanie, akcesoria, itp.) */
+  function buildVariantExtraItemsBlock(v) {
+    const items = Array.isArray(v.extraItems) ? v.extraItems.filter(it => it && (it.name || '').trim()) : [];
+    if (items.length === 0) return null;
+    const fmtPl = (x) => Number(x || 0).toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    const headerRow = [
+      { text: 'Lp.', style: 'intMetaBold', alignment: 'center', fillColor: '#F0F6FA', margin: [4, 6, 4, 6] },
+      { text: 'Pozycja', style: 'intMetaBold', fillColor: '#F0F6FA', margin: [6, 6, 6, 6] },
+      { text: 'Ilość', style: 'intMetaBold', alignment: 'center', fillColor: '#F0F6FA', margin: [4, 6, 4, 6] },
+      { text: 'Cena netto', style: 'intMetaBold', alignment: 'right', fillColor: '#F0F6FA', margin: [4, 6, 4, 6] },
+      { text: 'Wartość netto', style: 'intMetaBold', alignment: 'right', fillColor: '#F0F6FA', margin: [4, 6, 4, 6] }
+    ];
+
+    const rows = items.map((it, i) => {
+      const q = parseInt(it.qty) || 1;
+      const p = parseFloat(it.priceNet) || 0;
+      return [
+        { text: String(i + 1), alignment: 'center', fontSize: 10, color: '#64748B', margin: [4, 6, 4, 6] },
+        { text: it.name, fontSize: 10.5, color: '#0A2647', margin: [6, 6, 6, 6] },
+        { text: String(q), alignment: 'center', fontSize: 10.5, color: '#334155', margin: [4, 6, 4, 6] },
+        { text: fmtPl(p) + ' zł', alignment: 'right', fontSize: 10.5, color: '#334155', margin: [4, 6, 4, 6] },
+        { text: fmtPl(p * q) + ' zł', alignment: 'right', fontSize: 10.5, color: '#1B4F8C', bold: true, margin: [4, 6, 4, 6] }
+      ];
+    });
+
+    return {
+      margin: [0, 4, 0, 10],
+      stack: [
+        { text: 'DODATKOWE POZYCJE', fontSize: 9, color: '#1B4F8C', bold: true, characterSpacing: 1.5, margin: [0, 0, 0, 4] },
+        {
+          table: {
+            widths: [30, '*', 40, 70, 85],
+            headerRows: 1,
+            body: [headerRow, ...rows]
+          },
+          layout: {
+            hLineWidth: () => 0.5,
+            vLineWidth: () => 0.5,
+            hLineColor: () => '#E2EAF2',
+            vLineColor: () => '#E2EAF2'
+          }
+        }
+      ]
+    };
+  }
+
   function buildAcVariant(v, vIdx) {
     const variantNet = variantNetTotal(v);
     const variantBr  = variantBrTotal(v);
@@ -15520,47 +15605,267 @@ function generatePdf() {
 
   /* ======== OFERTA DOWOLNA (scope=custom) ======== */
   if (includeCustom) {
-    const customTitle = (state.customOfferTitle || '').trim() || 'OFERTA USŁUG';
-    content.push({text: customTitle.toUpperCase(), style: 'sectionHeader', color: '#1B4F8C', fontSize: 13, margin: [0, 0, 0, 12]});
+    // NOWY FLOW — warianty z state.variants (type='custom_kit')
+    const customVariants = state.variants.filter(v => v && v.type === 'custom_kit');
 
-    const tBody = [[
-      {text: 'NAZWA USŁUGI / PRODUKTU', style: 'thBlue'},
-      {text: 'ILOŚĆ',  style: 'thBlue', alignment: 'center'},
-      {text: 'JEDN.',  style: 'thBlue', alignment: 'center'},
-      {text: 'CENA NETTO', style: 'thBlue', alignment: 'right'},
-      {text: `BRUTTO (VAT ${state.vatRate}%)`, style: 'thBlue', alignment: 'right'},
-    ]];
-    let totalNet = 0;
-    state.customServices.forEach(s => {
-      const net = (parseFloat(s.priceNet) || 0) * (parseInt(s.qty) || 1);
-      totalNet += net;
-      tBody.push([
-        {text: s.name || '—', style: 'cellModel'},
-        {text: String(s.qty), alignment: 'center', style: 'cellNum'},
-        {text: s.unit || 'kpl', alignment: 'center', style: 'cellNum'},
-        {text: fmtPLN(parseFloat(s.priceNet) || 0), alignment: 'right', style: 'cellNum'},
-        {text: fmtPLN(roundUp(net * vatMult)), alignment: 'right', style: 'cellNumBold'},
-      ]);
-    });
-    const customTableBlock = { table: { headerRows: 1, widths: ['*', 40, 40, 80, 110], body: tBody }, layout: blueLayout };
-    // Karta produktu: zdjęcia + opis — PRZED tabelą, cena NA DOLE
-    const customImgs = Array.isArray(state.customOfferImages) && state.customOfferImages.length > 0
-      ? state.customOfferImages
-      : (state.customOfferImage ? [state.customOfferImage] : []);
-    const customProductCard = buildProductCard(customImgs, state.customOfferDescription || '');
-    const customStack = [];
-    if (customProductCard) customStack.push(customProductCard);
-    customStack.push(customTableBlock);
-    content.push({ unbreakable: true, stack: customStack });
-    content.push(buildSumBlock(totalNet, vatMult, '#1B4F8C'));
+    if (customVariants.length > 0) {
+      content.push({text:'OFERTA', style:'sectionHeader', color:'#1B4F8C', fontSize:13, margin:[0,0,0,12]});
 
-    if (noteBlock) content.push(noteBlock);
+      customVariants.forEach((v, vIdx) => {
+        // Każdy wariant od drugiego — na nowej stronie
+        if (vIdx > 0) content.push({ text: '', pageBreak: 'before' });
 
-    const owsCustom = buildOwsBlock(owsText, 'OGÓLNE WARUNKI HANDLOWE');
-    if (owsCustom) owsBlocks.push(owsCustom);
+        const variantStack = [];
+        const items = v.customItems || [];
+        // Suma pozycji — każda po rabacie per pozycja
+        const itemsNet = items.reduce((s, it) => {
+          const price = parseFloat(it.priceNet) || 0;
+          const disc = parseFloat(it.discount) || 0;
+          const qty = parseInt(it.qty) || 1;
+          return s + price * (1 - disc / 100) * qty;
+        }, 0);
+        const installNet = v.excludeInstall ? 0 : (parseFloat(v.installPrice) || 0);
+        const beforeVariantDiscount = itemsNet + installNet;
+        const variantDisc = parseFloat(v.variantDiscount) || 0;
+        const variantDiscountSaving = beforeVariantDiscount * (variantDisc / 100);
+        const totalNet = beforeVariantDiscount - variantDiscountSaving;
+        const totalBr = roundUp(totalNet * vatMult);
 
-    if (customServicesOws) {
-      owsBlocks.push(buildOwsBlock(customServicesOws, 'DODATKOWE WARUNKI'));
+        // Nagłówek wariantu — spójny ze stylem split/multi/HP
+        variantStack.push({
+          text: `Wariant ${vIdx + 1} — ${v.name || 'Konfiguracja ' + (vIdx + 1)}`,
+          fontSize: 14, bold: true, color: '#1B4F8C', characterSpacing: 0.3,
+          margin: [0, 0, 0, 10]
+        });
+
+        // Opis handlowy pod nagłówkiem
+        if (v.description && v.description.trim()) {
+          variantStack.push({
+            text: v.description.trim(),
+            fontSize: 10.5, color: '#475569', lineHeight: 1.45,
+            margin: [0, 0, 0, 10]
+          });
+        }
+
+        // Helpers — jednolity styl HP/split (bez obramowania, naprzemienne tła)
+        const th = (t, align) => ({
+          text: t, fontSize: 8.5, bold: true, color: '#1B4F8C', fillColor: '#DCE9F5',
+          border: [false, false, false, false], margin: [6, 6, 6, 6], alignment: align || 'left'
+        });
+        const cell = (t, align, extra) => Object.assign({
+          text: t, fontSize: 9.5, color: '#1A2332',
+          border: [false, false, false, false], margin: [6, 5, 6, 5], alignment: align || 'left'
+        }, extra || {});
+        const nameCell = (it) => {
+          const stack = [{ text: it.name || '—', fontSize: 10, color: '#1A2332' }];
+          // Kolor pod nazwą (jeśli jest), drobnym fontem
+          if (it.color && it.color.trim()) {
+            stack.push({ text: 'Kolor: ' + it.color.trim(), fontSize: 8, color: '#64748B', italics: true, margin: [0, 1, 0, 0] });
+          }
+          return { stack, border: [false, false, false, false], margin: [6, 5, 6, 5] };
+        };
+        const linkCell = (it) => ({
+          text: (it.link && it.link.trim())
+            ? { text: 'Link', link: it.link.trim(), fontSize: 9.5, color: '#1B4F8C', decoration: 'underline' }
+            : { text: '—', fontSize: 9.5, color: '#94A3B8' },
+          alignment: 'center', border: [false, false, false, false], margin: [6, 5, 6, 5]
+        });
+
+        // Tabela pozycji — z cenami jednostkowymi albo bez (zależnie od v.hideItemPrices)
+        const hidePrices = !!v.hideItemPrices;
+        if (hidePrices) {
+          // Wersja uproszczona: Lp. / Pozycja / Link / Ilość / Jedn.
+          const headerRow = [
+            th('L.p.', 'center'),
+            th('Pozycja'),
+            th('Link', 'center'),
+            th('Ilość', 'center'),
+            th('Jedn.', 'center'),
+          ];
+          const rows = items.map((it, i) => [
+            cell(String(i + 1) + '.', 'center'),
+            nameCell(it),
+            linkCell(it),
+            cell(String(parseInt(it.qty) || 1), 'center'),
+            cell(it.unit || 'szt', 'center'),
+          ]);
+          variantStack.push({
+            table: { headerRows: 1, widths: [26, '*', 42, 44, 44], body: [headerRow, ...rows] },
+            layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0,
+              fillColor: (ri) => ri === 0 ? null : (ri % 2 === 0 ? '#F8FBFD' : null) },
+            margin: [0, 0, 0, 8]
+          });
+        } else {
+          // Pełna tabela: Lp. / Pozycja / Link / Ilość / Jedn. / Cena netto / Wartość brutto
+          const headerRow = [
+            th('L.p.', 'center'),
+            th('Pozycja'),
+            th('Link', 'center'),
+            th('Ilość', 'center'),
+            th('Jedn.', 'center'),
+            th('Cena netto', 'right'),
+            th('Wartość brutto', 'right'),
+          ];
+          const rows = [];
+          let lpCounter = 0;
+          items.forEach((it) => {
+            lpCounter++;
+            const q = parseInt(it.qty) || 1;
+            const p = parseFloat(it.priceNet) || 0;
+            const d = parseFloat(it.discount) || 0;
+            const unitAfter = p * (1 - d / 100);
+            const netAfter = unitAfter * q;
+            // Komórka ceny jednostkowej — jeżeli jest rabat, pokaż cenę katalogową przekreśloną + po rabacie
+            const priceCell = d > 0 ? {
+              stack: [
+                { text: fmtPLN(p), fontSize: 8, color: '#94A3B8', decoration: 'lineThrough', alignment: 'right' },
+                { text: fmtPLN(unitAfter), fontSize: 9.5, color: '#1A2332', alignment: 'right' },
+                { text: '-' + (d.toString().replace('.', ',')) + '%', fontSize: 7.5, color: '#16A34A', alignment: 'right', bold: true }
+              ],
+              border: [false, false, false, false], margin: [6, 4, 6, 4]
+            } : cell(fmtPLN(p), 'right');
+            rows.push([
+              cell(String(lpCounter) + '.', 'center'),
+              nameCell(it),
+              linkCell(it),
+              cell(String(q), 'center'),
+              cell(it.unit || 'szt', 'center'),
+              priceCell,
+              cell(fmtPLN(roundUp(netAfter * vatMult)), 'right', { bold: true, color: '#0F3461' }),
+            ]);
+
+            // Montaż per pozycja — osobny wiersz pod pozycją
+            const instPerUnit = parseFloat(it.installPrice) || 0;
+            if (!v.excludeInstall && instPerUnit > 0) {
+              lpCounter++;
+              const instNet = instPerUnit * q;
+              rows.push([
+                cell(String(lpCounter) + '.', 'center'),
+                { stack: [
+                    { text: 'Montaż: ' + (it.name || 'pozycja'), fontSize: 9.5, color: '#1A2332', italics: true }
+                  ],
+                  border: [false, false, false, false], margin: [6, 5, 6, 5]
+                },
+                { text: '—', fontSize: 9.5, color: '#94A3B8', alignment: 'center', border: [false, false, false, false], margin: [6, 5, 6, 5] },
+                cell(String(q), 'center'),
+                cell(it.unit || 'szt', 'center'),
+                cell(fmtPLN(instPerUnit), 'right'),
+                cell(fmtPLN(roundUp(instNet * vatMult)), 'right', { bold: true, color: '#0F3461' })
+              ]);
+            }
+          });
+          variantStack.push({
+            table: { headerRows: 1, widths: [26, '*', 42, 44, 44, 62, 76], body: [headerRow, ...rows] },
+            layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0,
+              fillColor: (ri) => ri === 0 ? null : (ri % 2 === 0 ? '#F8FBFD' : null) },
+            margin: [0, 0, 0, 8]
+          });
+        }
+
+        // Dodatkowy montaż ogólny (ten co nie został rozdzielony per pozycja)
+        const generalInstall = v.excludeInstall ? 0 : (parseFloat(v.variantInstallExtra) || 0);
+        if (generalInstall > 0) {
+          variantStack.push({
+            table: {
+              widths: ['*', 110],
+              body: [[
+                {text: 'Dodatkowy montaż', fontSize: 10, bold: true, color: '#1B4F8C', border: [false, false, false, false], margin: [8, 7, 6, 7]},
+                {text: fmtPLN(generalInstall) + ' netto', fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', border: [false, false, false, false], margin: [6, 7, 8, 7]}
+              ]]
+            },
+            layout: { hLineWidth: () => 0, vLineWidth: () => 0, fillColor: () => '#F0F6FA' },
+            margin: [0, 0, 0, 4]
+          });
+        }
+
+        // Rabat na cały wariant (jeśli jest)
+        if (variantDisc > 0) {
+          variantStack.push({
+            table: {
+              widths: ['*', 110],
+              body: [[
+                {text: 'Rabat dodatkowy (' + variantDisc.toString().replace('.', ',') + '%)', fontSize: 10, bold: true, color: '#16A34A', border: [false, false, false, false], margin: [8, 7, 6, 7]},
+                {text: '− ' + fmtPLN(variantDiscountSaving) + ' netto', fontSize: 10, bold: true, color: '#16A34A', alignment: 'right', border: [false, false, false, false], margin: [6, 7, 8, 7]}
+              ]]
+            },
+            layout: { hLineWidth: () => 0, vLineWidth: () => 0, fillColor: () => '#F0FDF4' },
+            margin: [0, 0, 0, 4]
+          });
+        }
+
+        // Krótkie podsumowanie: netto / VAT / brutto
+        const vatAmount = totalBr - totalNet;
+        variantStack.push({
+          table: {
+            widths: ['*', 110],
+            body: [
+              [
+                {text: 'Razem netto', fontSize: 10, color: '#475569', border: [false, false, false, false], margin: [8, 5, 6, 2]},
+                {text: fmtPLN(totalNet) + ' zł', fontSize: 10, color: '#475569', alignment: 'right', border: [false, false, false, false], margin: [6, 5, 8, 2]}
+              ],
+              [
+                {text: 'VAT ' + state.vatRate + '%', fontSize: 10, color: '#475569', border: [false, false, false, false], margin: [8, 2, 6, 2]},
+                {text: fmtPLN(vatAmount) + ' zł', fontSize: 10, color: '#475569', alignment: 'right', border: [false, false, false, false], margin: [6, 2, 8, 2]}
+              ],
+              [
+                {text: 'Razem brutto', fontSize: 12, bold: true, color: '#0F3461', border: [false, true, false, false], borderColor: ['', '#1B4F8C', '', ''], margin: [8, 6, 6, 6]},
+                {text: fmtPLN(totalBr) + ' zł', fontSize: 12, bold: true, color: '#0F3461', alignment: 'right', border: [false, true, false, false], borderColor: ['', '#1B4F8C', '', ''], margin: [6, 6, 8, 6]}
+              ]
+            ]
+          },
+          layout: { hLineWidth: (i) => i === 2 ? 1 : 0, vLineWidth: () => 0, hLineColor: () => '#1B4F8C' },
+          margin: [0, 6, 0, 0]
+        });
+
+        content.push({ stack: variantStack });
+      });
+
+      if (noteBlock) content.push(noteBlock);
+      const owsCustom = buildOwsBlock(owsText, 'OGÓLNE WARUNKI HANDLOWE');
+      if (owsCustom) owsBlocks.push(owsCustom);
+    } else if (state.customServices && state.customServices.length > 0) {
+      // STARY FLOW (wsteczna kompatybilność dla ofert zapisanych przed wprowadzeniem wariantów custom)
+      const customTitle = (state.customOfferTitle || '').trim() || 'OFERTA USŁUG';
+      content.push({text: customTitle.toUpperCase(), style: 'sectionHeader', color: '#1B4F8C', fontSize: 13, margin: [0, 0, 0, 12]});
+
+      const tBody = [[
+        {text: 'NAZWA USŁUGI / PRODUKTU', style: 'thBlue'},
+        {text: 'ILOŚĆ',  style: 'thBlue', alignment: 'center'},
+        {text: 'JEDN.',  style: 'thBlue', alignment: 'center'},
+        {text: 'CENA NETTO', style: 'thBlue', alignment: 'right'},
+        {text: `BRUTTO (VAT ${state.vatRate}%)`, style: 'thBlue', alignment: 'right'},
+      ]];
+      let totalNet = 0;
+      state.customServices.forEach(s => {
+        const net = (parseFloat(s.priceNet) || 0) * (parseInt(s.qty) || 1);
+        totalNet += net;
+        tBody.push([
+          {text: s.name || '—', style: 'cellModel'},
+          {text: String(s.qty), alignment: 'center', style: 'cellNum'},
+          {text: s.unit || 'kpl', alignment: 'center', style: 'cellNum'},
+          {text: fmtPLN(parseFloat(s.priceNet) || 0), alignment: 'right', style: 'cellNum'},
+          {text: fmtPLN(roundUp(net * vatMult)), alignment: 'right', style: 'cellNumBold'},
+        ]);
+      });
+      const customTableBlock = { table: { headerRows: 1, widths: ['*', 40, 40, 80, 110], body: tBody }, layout: blueLayout };
+      const customImgs = Array.isArray(state.customOfferImages) && state.customOfferImages.length > 0
+        ? state.customOfferImages
+        : (state.customOfferImage ? [state.customOfferImage] : []);
+      const customProductCard = buildProductCard(customImgs, state.customOfferDescription || '');
+      const customStack = [];
+      if (customProductCard) customStack.push(customProductCard);
+      customStack.push(customTableBlock);
+      content.push({ unbreakable: true, stack: customStack });
+      content.push(buildSumBlock(totalNet, vatMult, '#1B4F8C'));
+
+      if (noteBlock) content.push(noteBlock);
+
+      const owsCustom = buildOwsBlock(owsText, 'OGÓLNE WARUNKI HANDLOWE');
+      if (owsCustom) owsBlocks.push(owsCustom);
+
+      if (customServicesOws) {
+        owsBlocks.push(buildOwsBlock(customServicesOws, 'DODATKOWE WARUNKI'));
+      }
     }
 
   } else {
@@ -15578,7 +15883,15 @@ function generatePdf() {
 
     if (state.offerType === 'final') {
       // Tryb "final" — wszystkie warianty + jedna tabela prac dod. + jedna suma końcowa
-      sortedVariants.forEach((v, vIdx) => content.push(buildAcVariant(v, vIdx)));
+      sortedVariants.forEach((v, vIdx) => {
+        // Każdy wariant od drugiego — na nowej stronie, żeby nie rozjechał się między stronami
+        if (vIdx > 0) content.push({ text: '', pageBreak: 'before' });
+        // Grupujemy całą zawartość wariantu w jeden stack
+        const variantStack = [ buildAcVariant(v, vIdx) ];
+        const extraBlock = buildVariantExtraItemsBlock(v);
+        if (extraBlock) variantStack.push(extraBlock);
+        content.push({ stack: variantStack });
+      });
       const extrasBlock = buildExtrasBlock(state.extras, vatMult, includeHp ? 'PRACE DODATKOWE (KLIMATYZACJA)' : 'PRACE DODATKOWE');
       if (extrasBlock) content.push(extrasBlock);
       let finalNet = 0;
@@ -15586,18 +15899,31 @@ function generatePdf() {
       state.extras.forEach(e => finalNet += getExtraTotalNet(e));
       content.push(buildSumBlock(finalNet, vatMult, '#1B4F8C'));
     } else {
-      // Tryb wariantowy — dla KAŻDEGO wariantu: tabela produktów → tabela prac dod. → cena końcowa
+      // Tryb wariantowy — każdy wariant od drugiego na nowej stronie.
+      // Zawartość wariantu (urządzenie + dodatkowe pozycje + prace dod. + cena końcowa) trzymamy razem.
       sortedVariants.forEach((v, vIdx) => {
-        content.push(buildAcVariant(v, vIdx));
+        if (vIdx > 0) content.push({ text: '', pageBreak: 'before' });
+        const variantStack = [ buildAcVariant(v, vIdx) ];
+        const extraBlock = buildVariantExtraItemsBlock(v);
+        if (extraBlock) variantStack.push(extraBlock);
         if (hasSharedExtras) {
           const extrasBlockPerVariant = buildExtrasBlock(state.extras, vatMult, includeHp ? 'PRACE DODATKOWE (KLIMATYZACJA)' : 'PRACE DODATKOWE');
-          if (extrasBlockPerVariant) content.push(extrasBlockPerVariant);
+          if (extrasBlockPerVariant) variantStack.push(extrasBlockPerVariant);
           const varNet = variantNetTotal(v);
           const finalNet = varNet + extrasNet;
           const finalBr = roundUp(finalNet * vatMult);
           const label = v.name || `Wariant ${vIdx+1}`;
-          content.push(buildPriceLineBlock(finalNet, finalBr, label + ' — łącznie z pracami dodatkowymi'));
+          // Jeśli wariant bez montażu — zmień etykietę na "cena urządzeń"
+          const sumSuffix = v.excludeInstall ? ' — cena urządzeń' : ' — łącznie z pracami dodatkowymi';
+          variantStack.push(buildPriceLineBlock(finalNet, finalBr, label + sumSuffix));
+        } else if (v.excludeInstall) {
+          // Wariant bez montażu i bez wspólnych prac dodatkowych — pokaż "cena urządzeń"
+          const varNet = variantNetTotal(v);
+          const varBr = roundUp(varNet * vatMult);
+          const label = v.name || `Wariant ${vIdx+1}`;
+          variantStack.push(buildPriceLineBlock(varNet, varBr, label + ' — cena urządzeń'));
         }
+        content.push({ stack: variantStack });
       });
     }
     // Uwagi przed OWS dla klimy
@@ -15615,6 +15941,9 @@ function generatePdf() {
     content.push({text:'OFERTA POMPA CIEPŁA', style:'sectionHeader', color:'#1B4F8C', fontSize:13, margin:[0,0,0,12]});
 
     state.hpVariants.forEach((v, vIdx) => {
+      // Każdy wariant HP od drugiego — na nowej stronie
+      if (vIdx > 0) content.push({ text: '', pageBreak: 'before' });
+
       const variantNet = hpVariantNetTotal(v);
       const variantBr  = hpVariantBrTotal(v);
       const isInstall  = v.type === 'install';
@@ -15628,7 +15957,7 @@ function generatePdf() {
           {text: v.name || `Wariant pompy ${vIdx+1}`, style:'variantHeader',
            fillColor:'#1B4F8C', color:'white', margin:[10,7,10,7], border:[false,false,false,false]}
         ]]},
-        margin:[0, vIdx>0 ? 14 : 0, 0, 0]
+        margin:[0, 0, 0, 0]
       });
 
       if (isInstall) {
@@ -18938,14 +19267,58 @@ function wzRenderStepVariants() {
   }
 
   if (scope === 'custom') {
-    return `
-      <div class="wzn-root">
-      <h1 class="wzn-page-h">Warianty (oferta dowolna)</h1>
-      <p class="wzn-page-sub">Ten zakres pojawi się w kolejnej iteracji — najpierw stabilizujemy Split, Multisplit i Pompy ciepła.</p>
+    const variants = wzState.variants || [];
+    const variantsHtml = variants.length === 0 ? `
       <div class="wzn-card wzn-card--muted" style="padding:32px;text-align:center;color:#64748B;">
         <svg class="wzn-icon wzn-icon--xl" style="color:#CBD5E1;"><use href="#wzn-i-package"/></svg>
-        <div style="font-size:14px;font-weight:600;margin-top:10px;">Sekcja w budowie</div>
+        <div style="font-size:14px;font-weight:600;margin-top:10px;">Brak wariantów</div>
+        <div style="font-size:12px;color:#94A3B8;margin-top:4px;">Dodaj wariant i wprowadź własne pozycje: urządzenia, sterowanie, kanały, akcesoria.</div>
       </div>
+    ` : variants.map((v, idx) => wzRenderCustomVariantCard(v, idx)).join('');
+
+    return `
+      <div class="wzn-root">
+      <h1 class="wzn-page-h">Oferta dowolna — warianty</h1>
+      <p class="wzn-page-sub">Każdy wariant to zestaw pozycji wprowadzonych ręcznie (bez wyboru z bazy). Idealne dla instalacji kanałowej, VRV, rekuperacji, usług serwisowych lub nietypowych zestawień.</p>
+
+      <div class="wzn-section-h">
+        <svg class="wzn-icon"><use href="#wzn-i-plus"/></svg>
+        Dodaj wariant
+      </div>
+      <div class="wzn-card">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="wzn-btn wzn-btn--primary" onclick="wzAddCustomVariant()">
+            <svg class="wzn-icon wzn-icon--sm"><use href="#wzn-i-plus"/></svg>
+            Dodaj wariant
+          </button>
+        </div>
+        <div class="wzn-info" style="margin-top:12px;">
+          <svg class="wzn-icon"><use href="#wzn-i-info"/></svg>
+          <span>W każdym wariancie wpisujesz nazwę (np. „Instalacja kanałowa Daikin FBA60A9") i listę pozycji z własnymi cenami. Montaż opcjonalny — możesz go pominąć dla samej dostawy sprzętu.</span>
+        </div>
+      </div>
+
+      <div class="wzn-section-h">
+        <svg class="wzn-icon"><use href="#wzn-i-list-check"/></svg>
+        Warianty w ofercie (${variants.length})
+      </div>
+
+      <div id="wzVariantsList">
+        ${variantsHtml}
+      </div>
+
+      ${variants.length > 0 ? `
+        <div class="wzn-card" style="margin-top:16px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+            <button class="wzn-btn wzn-btn--primary" onclick="wzAddCustomVariant()">
+              <svg class="wzn-icon wzn-icon--sm"><use href="#wzn-i-plus"/></svg>
+              Dodaj kolejny wariant
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
+      ${variants.length > 0 ? wzRenderVariantsSummary() : ''}
       </div>
     `;
   }
@@ -19099,6 +19472,587 @@ function wzAddManualVariant() {
   wzSaveDraft();
   wzRenderStepContent();
   wzUpdateNav();
+}
+
+/* ==================== OFERTA DOWOLNA — WARIANTY CUSTOM ====================
+   Model wariantu custom:
+     { id, type:'custom', name, description, items:[{name, qty, unit, priceNet}],
+       installNet, excludeInstall }
+   Zero wyboru z bazy — wszystkie pozycje wpisywane ręcznie. */
+
+function wzAddCustomVariant() {
+  const id = wzGenVariantId();
+  wzState.variants.push({
+    id: id,
+    type: 'custom',
+    name: 'Wariant ' + (wzState.variants.length + 1),
+    description: '',
+    items: [],                 // lista pozycji — każda {name, qty, unit, priceNet}
+    installNet: 0,
+    excludeInstall: false,
+    qty: 1
+  });
+  wzState._uiState.expandedVariantId = id;
+  wzSaveDraft();
+  wzRenderStepContent();
+  wzUpdateNav();
+}
+
+function wzRemoveCustomVariant(vid) {
+  if (!confirm('Usunąć ten wariant?')) return;
+  wzState.variants = (wzState.variants || []).filter(v => v.id !== vid);
+  wzSaveDraft();
+  wzRenderStepContent();
+  wzUpdateNav();
+}
+
+function wzCustomVariantAddItem(vid) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || v.type !== 'custom') return;
+  if (!Array.isArray(v.items)) v.items = [];
+  v.items.push({ name: '', qty: 1, unit: 'szt', priceNet: 0 });
+  wzSaveDraft();
+  wzRenderStepContent();
+  if (typeof wzUpdateNav === 'function') wzUpdateNav();
+}
+
+function wzCustomVariantRemoveItem(vid, idx) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || !Array.isArray(v.items)) return;
+  v.items.splice(idx, 1);
+  wzSaveDraft();
+  wzRenderStepContent();
+  if (typeof wzUpdateNav === 'function') wzUpdateNav();
+}
+
+/* Przesuń pozycję w górę lub w dół w liście pozycji wariantu custom */
+function wzCustomVariantMoveItem(vid, idx, direction) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || !Array.isArray(v.items)) return;
+  const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (newIdx < 0 || newIdx >= v.items.length) return;
+  const [moved] = v.items.splice(idx, 1);
+  v.items.splice(newIdx, 0, moved);
+  wzSaveDraft();
+  wzRenderStepContent();
+  if (typeof wzUpdateNav === 'function') wzUpdateNav();
+}
+
+function wzCustomVariantUpdateItem(vid, idx, field, value) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || !Array.isArray(v.items) || !v.items[idx]) return;
+  if (field === 'qty') v.items[idx].qty = Math.max(1, parseInt(value) || 1);
+  else if (field === 'priceNet') v.items[idx].priceNet = parseFloat(String(value).replace(',', '.')) || 0;
+  else if (field === 'discount') v.items[idx].discount = Math.max(0, Math.min(100, parseFloat(String(value).replace(',', '.')) || 0));
+  else if (field === 'installPrice') v.items[idx].installPrice = parseFloat(String(value).replace(',', '.')) || 0;
+  else v.items[idx][field] = value;
+  wzSaveDraft();
+  // Odśwież stan nawigacji — przycisk "Dalej" ma się odblokować gdy walidacja przechodzi
+  if (typeof wzUpdateNav === 'function') wzUpdateNav();
+}
+
+function wzCustomVariantUpdateField(vid, field, value) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v) return;
+  if (field === 'installNet') v.installNet = parseFloat(String(value).replace(',', '.')) || 0;
+  else if (field === 'variantDiscount') v.variantDiscount = Math.max(0, Math.min(100, parseFloat(String(value).replace(',', '.')) || 0));
+  else v[field] = value;
+  wzSaveDraft();
+  if (typeof wzUpdateNav === 'function') wzUpdateNav();
+}
+
+/* Oblicz cenę jednostkową po rabacie pozycji */
+function _customItemUnitAfterDiscount(it) {
+  const p = parseFloat(it.priceNet) || 0;
+  const d = parseFloat(it.discount) || 0;
+  return p * (1 - d / 100);
+}
+
+/* Oblicz wartość netto pozycji (po rabacie, × ilość) */
+function _customItemNet(it) {
+  return _customItemUnitAfterDiscount(it) * (parseInt(it.qty) || 1);
+}
+
+/* Oblicz całkowity montaż z pozycji per-item (installPrice × qty) */
+function _customItemsInstallTotal(items) {
+  return (items || []).reduce((s, it) =>
+    s + ((parseFloat(it.installPrice) || 0) * (parseInt(it.qty) || 1)), 0);
+}
+
+function wzCustomVariantToggleInstall(vid, checked) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v) return;
+  v.excludeInstall = !!checked;
+  wzSaveDraft();
+  wzRenderStepContent();
+}
+
+function wzCustomVariantToggleHidePrices(vid, checked) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v) return;
+  v.hideItemPrices = !!checked;
+  wzSaveDraft();
+  wzRenderStepContent();
+}
+
+/* Otwórz picker z bazy klimatyzacji — po wyborze wstaw pozycję do wariantu custom */
+function wzCustomVariantPickFromDb(vid, poolType) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || v.type !== 'custom') return;
+
+  // Zbierz pulę produktów z DB
+  const pool = (typeof getMergedPool === 'function') ? getMergedPool(poolType) : (DB[poolType] || []).map((p, i) => ({...p, _idx: i}));
+  if (!pool || pool.length === 0) {
+    showToast('Brak produktów w bazie: ' + poolType);
+    return;
+  }
+
+  const titles = {
+    'split': 'Wybierz klimatyzator Split',
+    'multi_zew': 'Wybierz agregat Multisplit',
+    'multi_wew': 'Wybierz jednostkę wewnętrzną Multisplit'
+  };
+  const badges = { 'split': 'split', 'multi_zew': 'zew', 'multi_wew': 'wew' };
+
+  openPicker({
+    pool: pool.map(p => ({...p, _origIdx: p._idx})),
+    title: titles[poolType] || 'Wybierz urządzenie',
+    subtitle: 'Zostanie dodane jako pozycja wariantu z aktualną ceną klienta',
+    badge: badges[poolType] || 'split',
+    useOrigIdx: true,
+    onPick: (productIdx) => {
+      const prod = (typeof getProductFromPool === 'function')
+        ? getProductFromPool(poolType, productIdx)
+        : (DB[poolType] && DB[poolType][productIdx]);
+      if (!prod) { showToast('Nie udało się pobrać produktu'); return; }
+
+      // Zbuduj nazwę pozycji
+      const modelClean = String(prod.model || '').replace(/^(SPLIT|MULTI\+?|J\.WEW|J\.ZEW)\s+/i, '');
+      const categoryLabel = poolType === 'multi_zew' ? ' (agregat)' : (poolType === 'multi_wew' ? ' (jedn. wew.)' : '');
+      const itemName = (prod.marka || '') + ' ' + modelClean + categoryLabel;
+
+      // Cena klienta (po rabacie z brand_margins)
+      const price = parseFloat(prod.cena) || 0;
+
+      if (!Array.isArray(v.items)) v.items = [];
+      v.items.push({
+        name: itemName.trim(),
+        qty: 1,
+        unit: 'szt',
+        priceNet: price,
+        link: prod.link || '',    // przenieś link z bazy
+        color: '',
+        _fromDb: true,
+        _dbCategory: poolType
+      });
+      wzSaveDraft();
+      wzRenderStepContent();
+      showToast('Dodano: ' + itemName);
+    }
+  });
+}
+
+/* Otwórz picker z bazy pomp ciepła — po wyborze wstaw pozycję do wariantu custom */
+function wzCustomVariantPickHpFromDb(vid) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || v.type !== 'custom') return;
+
+  const hpPool = typeof hpProductsDb !== 'undefined' ? hpProductsDb : [];
+  if (hpPool.length === 0) {
+    // Spróbuj załadować
+    if (typeof loadHpProducts === 'function') {
+      showToast('Ładuję bazę pomp ciepła...');
+      loadHpProducts().then(() => wzCustomVariantPickHpFromDb(vid));
+      return;
+    }
+    showToast('Brak produktów w bazie pomp ciepła');
+    return;
+  }
+
+  // Zbuduj prosty modal wyboru HP (pattern podobny do pickera, ale prostszy — bez marki/koloru)
+  const modal = document.createElement('div');
+  modal.id = 'wzHpCustomPicker';
+  modal.className = 'modal-backdrop modal-backdrop--open';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  const rows = hpPool.map(p => `
+    <tr style="border-bottom:1px solid #F1F5F9;cursor:pointer;" onmouseover="this.style.background='#FAFCFF'" onmouseout="this.style.background='transparent'"
+      onclick="(function(){
+        const v = (wzState.variants || []).find(x => x.id === '${v.id}');
+        if (!v) return;
+        if (!Array.isArray(v.items)) v.items = [];
+        v.items.push({
+          name: ${JSON.stringify((p.brand || '') + ' ' + (p.model || '') + ' (pompa ciepła)').replace(/'/g, '&#39;')},
+          qty: 1,
+          unit: 'szt',
+          priceNet: ${parseFloat(p.price_net) || 0},
+          _fromDb: true,
+          _dbCategory: 'hp'
+        });
+        wzSaveDraft();
+        document.getElementById('wzHpCustomPicker').remove();
+        wzRenderStepContent();
+        showToast('Dodano pompę ciepła');
+      })()">
+      <td style="padding:8px 12px;font-size:12px;">
+        <strong style="color:#0A2647;">${escapeHtml(p.brand || '')}</strong> ${escapeHtml(p.model || '')}
+      </td>
+      <td style="padding:8px 12px;font-size:11.5px;color:#64748B;">${p.power_kw ? p.power_kw + ' kW' : '—'}</td>
+      <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#1B4F8C;text-align:right;">${Number(p.price_net || 0).toLocaleString('pl-PL', {minimumFractionDigits: 2})} zł</td>
+    </tr>
+  `).join('');
+
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:720px;width:100%;max-height:85vh;overflow:auto;">
+      <div style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;background:#EFF6FF;color:#0F3461;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+          <i class="ti ti-flame" style="font-size:18px;"></i>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:14.5px;font-weight:700;color:#0A2647;">Wybierz pompę ciepła</div>
+          <div style="font-size:11px;color:#64748B;margin-top:1px;">Zostanie dodana jako pozycja wariantu</div>
+        </div>
+        <button onclick="document.getElementById('wzHpCustomPicker').remove()" style="padding:6px 10px;background:transparent;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;cursor:pointer;color:#64748B;">✕</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <th style="padding:8px 12px;text-align:left;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;">Marka / Model</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;">Moc</th>
+            <th style="padding:8px 12px;text-align:right;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;">Cena klienta</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+/* Suma netto wariantu custom (pozycje + ewentualnie montaż) */
+function wzCustomVariantNetTotal(v) {
+  if (!v) return 0;
+  const itemsNet = (v.items || []).reduce((s, it) =>
+    s + (parseFloat(it.priceNet) || 0) * (parseInt(it.qty) || 1), 0);
+  const installNet = v.excludeInstall ? 0 : (parseFloat(v.installNet) || 0);
+  return itemsNet + installNet;
+}
+
+function wzRenderCustomVariantCard(v, idx) {
+  const fmtPl = (x) => Number(x || 0).toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const items = v.items || [];
+  const vatRate = wzState.basics.vatRate || 8;
+
+  // Suma pozycji po rabatach per pozycja (katalogowo bez montażu)
+  const itemsCatalogNet = items.reduce((s, it) => s + (parseFloat(it.priceNet) || 0) * (parseInt(it.qty) || 1), 0);
+  const itemsNet = items.reduce((s, it) => s + _customItemNet(it), 0);
+  const itemsDiscountSaving = itemsCatalogNet - itemsNet;
+
+  // Montaż: suma montaży per pozycja + ogólny montaż wariantu (chyba że excludeInstall)
+  const itemsInstallNet = v.excludeInstall ? 0 : _customItemsInstallTotal(items);
+  const variantInstallNet = v.excludeInstall ? 0 : (parseFloat(v.installNet) || 0);
+  const installNet = itemsInstallNet + variantInstallNet;
+
+  // Rabat na cały wariant (po sumowaniu pozycji + montażu)
+  const variantDisc = parseFloat(v.variantDiscount) || 0;
+  const beforeVariantDiscount = itemsNet + installNet;
+  const variantDiscountSaving = beforeVariantDiscount * (variantDisc / 100);
+  const totalNet = beforeVariantDiscount - variantDiscountSaving;
+  const totalGross = totalNet * (1 + vatRate / 100);
+  const expanded = wzState._uiState.expandedVariantId === v.id;
+
+  return `
+    <div class="wzn-variant" style="margin-bottom:12px;border:1px solid #DCE9F5;border-radius:10px;overflow:hidden;background:#fff;">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#F8FBFD;border-bottom:${expanded ? '1px solid #DCE9F5' : 'none'};cursor:pointer;"
+        onclick="wzState._uiState.expandedVariantId = wzState._uiState.expandedVariantId === '${v.id}' ? null : '${v.id}'; wzSaveDraft(); wzRenderStepContent();">
+        <i class="ti ${expanded ? 'ti-chevron-down' : 'ti-chevron-right'}" style="font-size:16px;color:#1B4F8C;"></i>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13.5px;font-weight:700;color:#0A2647;">
+            Wariant ${idx + 1}: ${escapeHtml(v.name || '—')}
+          </div>
+          <div style="font-size:11px;color:#64748B;margin-top:2px;">
+            ${items.length} ${items.length === 1 ? 'pozycja' : (items.length < 5 ? 'pozycje' : 'pozycji')}
+            ${v.excludeInstall ? ' · bez montażu' : ''}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:800;color:#0C447C;">${fmtPl(totalGross)} zł brutto</div>
+          <div style="font-size:10.5px;color:#64748B;">${fmtPl(totalNet)} zł netto + VAT ${vatRate}%</div>
+        </div>
+        <button onclick="event.stopPropagation();wzRemoveCustomVariant('${v.id}')" title="Usuń wariant"
+          style="padding:6px 10px;background:#fff;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;">
+          <i class="ti ti-trash" style="font-size:13px;"></i>
+        </button>
+      </div>
+
+      ${expanded ? `
+        <div style="padding:16px;">
+          <!-- Nazwa + opis wariantu -->
+          <div class="wz-grid-2" style="margin-bottom:14px;">
+            <div style="grid-column:1/-1;">
+              <label class="wz-lbl">Nazwa wariantu (widoczna w PDF)</label>
+              <input class="wz-in" type="text" value="${escapeHtml(v.name || '')}"
+                onblur="wzCustomVariantUpdateField('${v.id}', 'name', this.value); wzRenderStepContent();"
+                placeholder="np. Instalacja kanałowa Daikin FBA60A9 — zestaw podstawowy">
+            </div>
+            <div style="grid-column:1/-1;">
+              <label class="wz-lbl">Opis handlowy (opcjonalnie, pojawi się pod nazwą w PDF)</label>
+              <textarea class="wz-in" rows="2"
+                onblur="wzCustomVariantUpdateField('${v.id}', 'description', this.value); wzRenderStepContent();"
+                placeholder="np. Jednostka kanałowa niskiego sprężu, dostosowana do pracy z systemem kanałów wywiewnych 160 mm. Sterowanie przewodowe BRC1E53B z czujnikiem temperatury powietrza nawiewanego.">${escapeHtml(v.description || '')}</textarea>
+            </div>
+          </div>
+
+          <!-- Lista pozycji -->
+          <div style="background:#F8FBFD;border:1px solid #E2E8F0;border-radius:8px;padding:12px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="flex:1;font-size:11px;font-weight:700;color:#0F172A;text-transform:uppercase;letter-spacing:.05em;">
+                <i class="ti ti-package" style="font-size:14px;color:#1B4F8C;vertical-align:-2px;margin-right:4px;"></i>
+                Pozycje wariantu
+              </div>
+              ${items.length > 0 ? `<div style="font-size:11.5px;color:#166534;font-weight:700;">Suma: ${fmtPl(itemsNet)} zł netto</div>` : ''}
+            </div>
+
+            ${items.length === 0 ? `
+              <div style="padding:16px;text-align:center;color:#94A3B8;font-size:11.5px;background:#fff;border-radius:6px;border:1px dashed #CBD5E1;">
+                Brak pozycji. Dodaj np. jednostkę wewnętrzną, agregat, sterowanie, czerpnię, kanały, anemostaty.
+              </div>
+            ` : `
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="display:grid;grid-template-columns:40px 1fr 60px 70px 110px 100px 32px;gap:6px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;padding:0 4px;">
+                  <div style="text-align:center;">Lp.</div>
+                  <div>Nazwa pozycji</div>
+                  <div style="text-align:center;">Ilość</div>
+                  <div style="text-align:center;">Jedn.</div>
+                  <div style="text-align:right;">Cena netto</div>
+                  <div style="text-align:right;">Wartość</div>
+                  <div></div>
+                </div>
+                ${items.map((it, i) => {
+                  const q = parseInt(it.qty) || 1;
+                  const p = parseFloat(it.priceNet) || 0;
+                  const disc = parseFloat(it.discount) || 0;
+                  const unitAfter = p * (1 - disc / 100);
+                  const itemNet = unitAfter * q;
+                  const installPerItem = parseFloat(it.installPrice) || 0;
+                  const installTotal = installPerItem * q;
+                  return `
+                    <div style="background:#fff;padding:8px;border-radius:5px;${disc > 0 ? 'border-left:3px solid #16A34A;' : ''}${installPerItem > 0 ? 'border-right:3px solid #D97706;' : ''}">
+                      <div style="display:grid;grid-template-columns:40px 1fr 60px 70px 110px 100px 76px;gap:6px;align-items:center;">
+                        <div style="text-align:center;font-size:11.5px;color:#64748B;font-weight:600;">${i + 1}</div>
+                        <input type="text" value="${escapeHtml(it.name || '')}"
+                          onblur="wzCustomVariantUpdateItem('${v.id}', ${i}, 'name', this.value); wzRenderStepContent();"
+                          placeholder="Nazwa pozycji"
+                          style="padding:7px 10px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;">
+                        <input type="number" min="1" step="1" value="${q}"
+                          onblur="wzCustomVariantUpdateItem('${v.id}', ${i}, 'qty', this.value); wzRenderStepContent();"
+                          style="padding:7px 8px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;text-align:center;">
+                        <select onchange="wzCustomVariantUpdateItem('${v.id}', ${i}, 'unit', this.value); wzRenderStepContent();"
+                          style="padding:6px 4px;border:1px solid #E2E8F0;border-radius:5px;font-size:11.5px;background:#fff;">
+                          ${['szt', 'kpl', 'mb', 'm2', 'godz'].map(u => `<option value="${u}" ${(it.unit || 'szt') === u ? 'selected' : ''}>${u}</option>`).join('')}
+                        </select>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <input type="number" min="0" step="0.01" value="${p}"
+                            onblur="wzCustomVariantUpdateItem('${v.id}', ${i}, 'priceNet', this.value); wzRenderStepContent();"
+                            style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;text-align:right;">
+                          <span style="font-size:10.5px;color:#94A3B8;">zł</span>
+                        </div>
+                        <div style="text-align:right;white-space:nowrap;">
+                          <div style="font-size:12px;font-weight:700;color:#1B4F8C;">${fmtPl(itemNet)} zł</div>
+                          ${disc > 0 ? `<div style="font-size:9.5px;color:#16A34A;font-weight:600;">po rabacie ${disc.toString().replace('.', ',')}%</div>` : ''}
+                        </div>
+                        <div style="display:flex;gap:2px;justify-content:flex-end;">
+                          <button onclick="wzCustomVariantMoveItem('${v.id}', ${i}, 'up')" title="Przesuń w górę"
+                            ${i === 0 ? 'disabled' : ''}
+                            style="padding:5px 6px;background:transparent;color:${i === 0 ? '#CBD5E1' : '#0F3461'};border:1px solid ${i === 0 ? '#F1F5F9' : '#DBEAFE'};border-radius:4px;font-size:10px;cursor:${i === 0 ? 'not-allowed' : 'pointer'};">
+                            <i class="ti ti-chevron-up" style="font-size:11px;"></i>
+                          </button>
+                          <button onclick="wzCustomVariantMoveItem('${v.id}', ${i}, 'down')" title="Przesuń w dół"
+                            ${i === items.length - 1 ? 'disabled' : ''}
+                            style="padding:5px 6px;background:transparent;color:${i === items.length - 1 ? '#CBD5E1' : '#0F3461'};border:1px solid ${i === items.length - 1 ? '#F1F5F9' : '#DBEAFE'};border-radius:4px;font-size:10px;cursor:${i === items.length - 1 ? 'not-allowed' : 'pointer'};">
+                            <i class="ti ti-chevron-down" style="font-size:11px;"></i>
+                          </button>
+                          <button onclick="wzCustomVariantRemoveItem('${v.id}', ${i})" title="Usuń pozycję"
+                            style="padding:5px 6px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:10px;cursor:pointer;">
+                            <i class="ti ti-x" style="font-size:11px;"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <!-- Druga linia: Link + Kolor + Rabat % + Montaż netto -->
+                      <div style="display:grid;grid-template-columns:40px 1fr 160px 110px 130px 76px;gap:6px;align-items:center;margin-top:5px;">
+                        <div></div>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <i class="ti ti-link" style="font-size:11px;color:#94A3B8;flex-shrink:0;"></i>
+                          <input type="url" value="${escapeHtml(it.link || '')}"
+                            onblur="wzCustomVariantUpdateItem('${v.id}', ${i}, 'link', this.value); wzRenderStepContent();"
+                            placeholder="Link (opc.)"
+                            style="width:100%;padding:5px 8px;border:1px solid #F1F5F9;border-radius:4px;font-size:11px;background:#FAFCFF;color:${it.link ? '#0F3461' : '#64748B'};">
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <i class="ti ti-palette" style="font-size:11px;color:#94A3B8;flex-shrink:0;"></i>
+                          <input type="text" value="${escapeHtml(it.color || '')}"
+                            onblur="wzCustomVariantUpdateItem('${v.id}', ${i}, 'color', this.value); wzRenderStepContent();"
+                            placeholder="Kolor (opc.)"
+                            style="width:100%;padding:5px 8px;border:1px solid #F1F5F9;border-radius:4px;font-size:11px;background:#FAFCFF;color:${it.color ? '#0F3461' : '#64748B'};">
+                        </div>
+                        <div style="display:flex;align-items:center;gap:3px;" title="Rabat na tę pozycję w %">
+                          <i class="ti ti-tag" style="font-size:11px;color:${disc > 0 ? '#16A34A' : '#94A3B8'};flex-shrink:0;"></i>
+                          <input type="number" min="0" max="100" step="0.1" value="${disc || ''}"
+                            onblur="wzCustomVariantUpdateItem('${v.id}', ${i}, 'discount', this.value); wzRenderStepContent();"
+                            placeholder="Rabat"
+                            style="width:60px;padding:5px 6px;border:1px solid #F1F5F9;border-radius:4px;font-size:11px;background:#FAFCFF;color:${disc > 0 ? '#16A34A' : '#64748B'};text-align:right;font-weight:${disc > 0 ? '700' : 'normal'};">
+                          <span style="font-size:10.5px;color:${disc > 0 ? '#16A34A' : '#94A3B8'};font-weight:${disc > 0 ? '700' : 'normal'};">%</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:3px;" title="Montaż tej pozycji — zostaw 0 jeżeli bez montażu">
+                          <i class="ti ti-tool" style="font-size:11px;color:${installPerItem > 0 ? '#D97706' : '#94A3B8'};flex-shrink:0;"></i>
+                          <input type="number" min="0" step="0.01" value="${installPerItem || ''}"
+                            onblur="wzCustomVariantUpdateItem('${v.id}', ${i}, 'installPrice', this.value); wzRenderStepContent();"
+                            placeholder="Montaż"
+                            style="width:76px;padding:5px 6px;border:1px solid #F1F5F9;border-radius:4px;font-size:11px;background:#FAFCFF;color:${installPerItem > 0 ? '#D97706' : '#64748B'};text-align:right;font-weight:${installPerItem > 0 ? '700' : 'normal'};">
+                          <span style="font-size:10.5px;color:${installPerItem > 0 ? '#D97706' : '#94A3B8'};">zł</span>
+                        </div>
+                        <div></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+              <button onclick="wzCustomVariantAddItem('${v.id}')"
+                style="padding:7px 14px;background:#fff;color:#0F3461;border:1px dashed #93C5FD;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+                <i class="ti ti-plus" style="font-size:12px;"></i> Pozycja własna
+              </button>
+              <div style="width:1px;background:#E2E8F0;"></div>
+              <button onclick="wzCustomVariantPickFromDb('${v.id}', 'split')" title="Dodaj klimatyzator Split z bazy"
+                style="padding:7px 12px;background:#F0F9FF;color:#0F3461;border:1px solid #93C5FD;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+                <i class="ti ti-snowflake" style="font-size:12px;"></i> Split z bazy
+              </button>
+              <button onclick="wzCustomVariantPickFromDb('${v.id}', 'multi_zew')" title="Dodaj agregat multisplit z bazy"
+                style="padding:7px 12px;background:#F0F9FF;color:#0F3461;border:1px solid #93C5FD;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+                <i class="ti ti-box" style="font-size:12px;"></i> Agregat multi
+              </button>
+              <button onclick="wzCustomVariantPickFromDb('${v.id}', 'multi_wew')" title="Dodaj jednostkę wewnętrzną multisplit z bazy"
+                style="padding:7px 12px;background:#F0F9FF;color:#0F3461;border:1px solid #93C5FD;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+                <i class="ti ti-wind" style="font-size:12px;"></i> Jedn. wew. multi
+              </button>
+              <button onclick="wzCustomVariantPickHpFromDb('${v.id}')" title="Dodaj pompę ciepła z bazy"
+                style="padding:7px 12px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+                <i class="ti ti-flame" style="font-size:12px;"></i> Pompa ciepła
+              </button>
+            </div>
+          </div>
+
+          <!-- Montaż + rabat na cały wariant + podsumowanie -->
+          <div style="background:#F8FBFD;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;">
+              <div>
+                <label class="wz-lbl">
+                  <i class="ti ti-tool" style="font-size:12px;color:#1B4F8C;vertical-align:-1px;margin-right:3px;"></i>
+                  Dodatkowy montaż netto (ogólny, poza montażem per pozycja)
+                </label>
+                <input class="wz-in" type="number" min="0" step="0.01" value="${v.installNet || 0}"
+                  ${v.excludeInstall ? 'disabled style="opacity:0.5;background:#F1F5F9;cursor:not-allowed;"' : ''}
+                  onblur="wzCustomVariantUpdateField('${v.id}', 'installNet', this.value); wzRenderStepContent();">
+                <div style="font-size:10px;color:#64748B;margin-top:3px;">
+                  ${itemsInstallNet > 0 ? `Montaż z pozycji: <strong>${fmtPl(itemsInstallNet)} zł</strong>. ` : ''}Pole jest dodatkiem do montażu per pozycja.
+                </div>
+              </div>
+              <div>
+                <label class="wz-lbl">
+                  <i class="ti ti-tag" style="font-size:12px;color:#16A34A;vertical-align:-1px;margin-right:3px;"></i>
+                  Rabat na cały wariant (%)
+                </label>
+                <input class="wz-in" type="number" min="0" max="100" step="0.1" value="${v.variantDiscount || ''}"
+                  onblur="wzCustomVariantUpdateField('${v.id}', 'variantDiscount', this.value); wzRenderStepContent();"
+                  placeholder="np. 5 (dla 5%)">
+                <div style="font-size:10px;color:#64748B;margin-top:3px;">
+                  ${variantDisc > 0 ? `Zaoszczędzisz: <strong style="color:#16A34A;">${fmtPl(variantDiscountSaving)} zł</strong>` : 'Zostaw puste jeśli nie dajesz dodatkowego rabatu'}
+                </div>
+              </div>
+            </div>
+
+            <!-- Podsumowanie finansowe -->
+            <div style="margin-top:12px;padding:10px 12px;background:#fff;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;color:#475569;">
+              <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                <span>Pozycje (cennik)</span>
+                <span>${fmtPl(itemsCatalogNet)} zł</span>
+              </div>
+              ${itemsDiscountSaving > 0 ? `
+                <div style="display:flex;justify-content:space-between;padding:2px 0;color:#16A34A;">
+                  <span>Rabaty per pozycja</span>
+                  <span>− ${fmtPl(itemsDiscountSaving)} zł</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:600;">
+                  <span>Pozycje po rabatach</span>
+                  <span>${fmtPl(itemsNet)} zł</span>
+                </div>
+              ` : ''}
+              ${installNet > 0 && !v.excludeInstall ? `
+                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                  <span>Montaż łącznie${itemsInstallNet > 0 && variantInstallNet > 0 ? ' (per pozycja + ogólny)' : ''}</span>
+                  <span>${fmtPl(installNet)} zł</span>
+                </div>
+              ` : ''}
+              ${variantDisc > 0 ? `
+                <div style="display:flex;justify-content:space-between;padding:2px 0;color:#16A34A;">
+                  <span>Rabat na wariant (${variantDisc.toString().replace('.', ',')}%)</span>
+                  <span>− ${fmtPl(variantDiscountSaving)} zł</span>
+                </div>
+              ` : ''}
+              <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px dashed #CBD5E1;margin-top:4px;font-weight:700;color:#0C447C;">
+                <span>${v.excludeInstall ? 'Cena urządzeń netto' : 'Razem netto'}</span>
+                <span>${fmtPl(totalNet)} zł</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:700;color:#0C447C;">
+                <span>${v.excludeInstall ? 'Cena urządzeń brutto' : 'Razem brutto'} (VAT ${vatRate}%)</span>
+                <span>${fmtPl(totalGross)} zł</span>
+              </div>
+            </div>
+
+            <label style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;background:${v.excludeInstall ? '#FEF3C7' : '#fff'};border:1px solid ${v.excludeInstall ? '#FCD34D' : '#E2E8F0'};border-radius:6px;cursor:pointer;">
+              <input type="checkbox" ${v.excludeInstall ? 'checked' : ''}
+                onchange="wzCustomVariantToggleInstall('${v.id}', this.checked)"
+                style="width:16px;height:16px;cursor:pointer;">
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:700;color:${v.excludeInstall ? '#92400E' : '#334155'};">
+                  <i class="ti ti-tool-off" style="font-size:13px;vertical-align:-2px;margin-right:4px;"></i>
+                  Wariant bez montażu — same urządzenia
+                </div>
+                <div style="font-size:10.5px;color:#64748B;margin-top:1px;">
+                  ${v.excludeInstall
+                    ? 'Montaż pominięty. Podsumowanie pokazuje tylko „cena urządzeń".'
+                    : 'Zaznacz, gdy klient chce samą dostawę pozycji z listy (bez montażu).'}
+                </div>
+              </div>
+            </label>
+
+            <!-- Checkbox: ukryj ceny jednostkowe w PDF -->
+            <label style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;background:${v.hideItemPrices ? '#EFF6FF' : '#fff'};border:1px solid ${v.hideItemPrices ? '#93C5FD' : '#E2E8F0'};border-radius:6px;cursor:pointer;">
+              <input type="checkbox" ${v.hideItemPrices ? 'checked' : ''}
+                onchange="wzCustomVariantToggleHidePrices('${v.id}', this.checked)"
+                style="width:16px;height:16px;cursor:pointer;">
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:700;color:${v.hideItemPrices ? '#0F3461' : '#334155'};">
+                  <i class="ti ti-eye-off" style="font-size:13px;vertical-align:-2px;margin-right:4px;"></i>
+                  Ukryj ceny jednostkowe w PDF — pokaż tylko podsumowanie
+                </div>
+                <div style="font-size:10.5px;color:#64748B;margin-top:1px;">
+                  ${v.hideItemPrices
+                    ? 'PDF pokaże listę pozycji BEZ cen jednostkowych — tylko suma końcowa wariantu będzie widoczna klientowi.'
+                    : 'Domyślnie PDF pokazuje cenę każdej pozycji osobno. Zaznacz, gdy chcesz pokazać tylko cenę całego pakietu.'}
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
 }
 
 /* ==================== POMPY CIEPŁA — WARIANTY ====================
@@ -27619,6 +28573,13 @@ function wzUpdateMultiIndoor(variantId, indoorIdx, field, value) {
   wzRender();
 }
 
+function wzUpdateMultiVariantName(variantId, value) {
+  const v = (wzState.variants || []).find(x => x.id === variantId);
+  if (!v) return;
+  v.displayName = String(value || '').trim();
+  wzSaveDraft();
+}
+
 function wzUpdateMultiOutdoor(variantId, field, value) {
   const v = wzState.variants.find(x => x.id === variantId);
   if (!v || !v.outdoor) return;
@@ -27675,6 +28636,14 @@ function wzRenderMultiVariantCard(v, idx) {
             <svg class="wzn-icon wzn-icon--sm"><use href="#wzn-i-trash"/></svg>
           </button>
         </div>
+      </div>
+
+      <!-- Ręczna zmiana nazwy wariantu multisplit -->
+      <div style="margin-bottom:12px;">
+        <label class="wzn-field__label">Nazwa wariantu (widoczna w PDF — zostaw puste dla auto-nazwy)</label>
+        <input class="wzn-field__input" type="text" value="${escapeHtml(v.displayName || '')}"
+          onblur="wzUpdateMultiVariantName('${v.id}', this.value); wzRenderStepContent();"
+          placeholder="np. ${escapeHtml(wzMultiDisplayName(v) || 'Zestaw multisplit ' + brand)}">
       </div>
 
       <div style="background:linear-gradient(135deg,#EFF6FF 0%,#DBEAFE 100%);padding:14px;border-radius:8px;margin-bottom:12px;border:1px solid #93C5FD;">
@@ -27937,13 +28906,34 @@ function wzRenderVariantBody(v) {
           </div>
           <div>
             <label class="wz-lbl">Montaż netto</label>
-            <input class="wz-in" type="number" min="0" step="0.01" data-wz-var-input="installNet" data-vid="${v.id}" value="${v.installNet || 0}">
+            <input class="wz-in" type="number" min="0" step="0.01" data-wz-var-input="installNet" data-vid="${v.id}" value="${v.installNet || 0}" ${v.excludeInstall ? 'disabled style="opacity:0.5;background:#F1F5F9;cursor:not-allowed;"' : ''}>
             <div style="font-size:10px;color:#64748B;margin-top:3px;">Dom. ${DEFAULT_INSTALL_SPLIT} zł</div>
           </div>
         </div>
 
+        <!-- Checkbox: wariant bez montażu -->
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:8px 12px;background:${v.excludeInstall ? '#FEF3C7' : '#F8FAFC'};border:1px solid ${v.excludeInstall ? '#FCD34D' : '#E2E8F0'};border-radius:6px;cursor:pointer;">
+          <input type="checkbox" ${v.excludeInstall ? 'checked' : ''}
+            onchange="wzToggleExcludeInstall('${v.id}', this.checked)"
+            style="width:16px;height:16px;cursor:pointer;">
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:700;color:${v.excludeInstall ? '#92400E' : '#334155'};">
+              <i class="ti ti-tool-off" style="font-size:13px;vertical-align:-2px;margin-right:4px;"></i>
+              Wariant bez montażu — same urządzenia
+            </div>
+            <div style="font-size:10.5px;color:#64748B;margin-top:1px;">
+              ${v.excludeInstall
+                ? 'Montaż pominięty w sumach wariantu i PDF. Podsumowanie pokazuje tylko „cena urządzeń".'
+                : 'Zaznacz, gdy klient chce samą dostawę sprzętu (bez montażu po stronie 4Climat).'}
+            </div>
+          </div>
+        </label>
+
         ${wzRenderVariantPriceBreakdown(v, vatRate)}
       </div>
+
+      <!-- Dodatkowe pozycje do wariantu (sterowanie, akcesoria, instalacja kanałowa, itp.) -->
+      ${wzRenderVariantExtraItems(v)}
 
       <div class="wz-two-col">
         <div class="wz-subcard">
@@ -28107,26 +29097,151 @@ async function wzAttachProductCards() {
 function wzRenderVariantPriceBreakdown(v, vatRate) {
   const totals = wzVariantTotals(v, vatRate);
   const fmtPl = (x) => x.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const extraCount = (v.extraItems || []).length;
+  const coreNet = totals.devicesCoreNet != null ? totals.devicesCoreNet : totals.devicesNet;
+  const noInstall = !!v.excludeInstall;
+  const sumLabel = noInstall ? 'Cena urządzeń (netto)' : 'Razem netto';
+  const sumLabelBr = noInstall ? 'Cena urządzeń (brutto)' : 'Razem brutto';
   return `
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #DCE9F5;font-size:12px;color:#475569;">
       <div style="display:flex;justify-content:space-between;padding:2px 0;">
         <span>Urządzenia (${v.qty || 1} szt. × ${fmtPl(totals.unitFinalNet)} zł)</span>
-        <span>${fmtPl(totals.devicesNet)} zł netto</span>
+        <span>${fmtPl(coreNet)} zł netto</span>
       </div>
+      ${extraCount > 0 ? `
+      <div style="display:flex;justify-content:space-between;padding:2px 0;">
+        <span>Dodatkowe pozycje (${extraCount})</span>
+        <span>${fmtPl(totals.extraItemsNet || 0)} zł netto</span>
+      </div>
+      ` : ''}
+      ${noInstall ? `
+      <div style="display:flex;justify-content:space-between;padding:2px 0;color:#92400E;font-style:italic;">
+        <span><i class="ti ti-tool-off" style="font-size:11px;vertical-align:-1px;"></i> Montaż wyłączony — same urządzenia</span>
+        <span>—</span>
+      </div>
+      ` : `
       <div style="display:flex;justify-content:space-between;padding:2px 0;">
         <span>Montaż (${v.qty || 1} × ${fmtPl(v.installNet || 0)} zł)</span>
         <span>${fmtPl(totals.installTotalNet)} zł netto</span>
       </div>
+      `}
       <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px dashed #CBD5E1;margin-top:4px;font-weight:600;color:#0F172A;">
-        <span>Razem netto</span>
+        <span>${sumLabel}</span>
         <span>${fmtPl(totals.totalNet)} zł</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:2px 0;font-weight:600;color:#0C447C;">
-        <span>Razem brutto (VAT ${vatRate}%)</span>
+        <span>${sumLabelBr} (VAT ${vatRate}%)</span>
         <span>${fmtPl(totals.totalGross)} zł</span>
       </div>
     </div>
   `;
+}
+
+/* ============================================================
+   DODATKOWE POZYCJE DO WARIANTU
+   Pozwala dołączyć do wariantu dodatkowe pozycje poza główną
+   jednostką: sterowanie, pilot, czerpnia, kanał, itp.
+   ============================================================ */
+function wzRenderVariantExtraItems(v) {
+  const items = v.extraItems || [];
+  const fmtPl = (x) => Number(x || 0).toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const sumNet = items.reduce((s, it) => s + (parseFloat(it.priceNet) || 0) * (parseInt(it.qty) || 1), 0);
+
+  return `
+    <div class="wz-card" style="background:#FEFEFE;margin:14px 0 0;padding:14px 16px;border:1px solid #E2E8F0;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="flex:1;font-size:11px;font-weight:600;color:#0F172A;text-transform:uppercase;letter-spacing:.05em;">
+          <i class="ti ti-package" style="font-size:14px;color:#1B4F8C;vertical-align:-2px;margin-right:4px;"></i>
+          Dodatkowe pozycje do wariantu
+          <span style="text-transform:none;font-weight:500;color:#64748B;margin-left:6px;">np. sterowanie, pilot, czerpnia, kanał</span>
+        </div>
+        ${items.length > 0 ? `<div style="font-size:11.5px;color:#166534;font-weight:700;">Suma: ${fmtPl(sumNet)} zł netto</div>` : ''}
+      </div>
+
+      ${items.length === 0 ? `
+        <div style="padding:14px;text-align:center;color:#94A3B8;font-size:11.5px;background:#F8FAFC;border-radius:6px;border:1px dashed #CBD5E1;">
+          Brak dodatkowych pozycji. Dodaj np. sterowanie przewodowe, pilot bezprzewodowy, kanał nawiewny, czerpnię.
+        </div>
+      ` : `
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${items.map((it, i) => `
+            <div style="display:grid;grid-template-columns:1fr 70px 110px 100px 32px;gap:6px;align-items:center;">
+              <input type="text" value="${escapeHtml(it.name || '')}"
+                oninput="wzUpdateExtraItem('${v.id}', ${i}, 'name', this.value)"
+                placeholder="Nazwa pozycji (np. Sterownik przewodowy BRC1E53B)"
+                style="padding:7px 10px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;">
+              <input type="number" min="1" step="1" value="${it.qty || 1}"
+                oninput="wzUpdateExtraItem('${v.id}', ${i}, 'qty', this.value)"
+                title="Ilość"
+                style="padding:7px 8px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;text-align:center;">
+              <div style="display:flex;align-items:center;gap:4px;">
+                <input type="number" min="0" step="0.01" value="${it.priceNet || 0}"
+                  oninput="wzUpdateExtraItem('${v.id}', ${i}, 'priceNet', this.value)"
+                  placeholder="Cena netto"
+                  style="width:100%;padding:7px 8px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;text-align:right;">
+                <span style="font-size:10.5px;color:#94A3B8;">zł</span>
+              </div>
+              <div style="text-align:right;font-size:11.5px;font-weight:700;color:#1B4F8C;white-space:nowrap;">
+                ${fmtPl((parseFloat(it.priceNet) || 0) * (parseInt(it.qty) || 1))} zł
+              </div>
+              <button onclick="wzRemoveExtraItem('${v.id}', ${i})" title="Usuń pozycję"
+                style="padding:6px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:5px;font-size:11px;cursor:pointer;">
+                <i class="ti ti-x" style="font-size:12px;"></i>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      `}
+
+      <button onclick="wzAddExtraItem('${v.id}')"
+        style="margin-top:10px;padding:7px 14px;background:#fff;color:#0F3461;border:1px dashed #93C5FD;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer;">
+        <i class="ti ti-plus" style="font-size:12px;"></i> Dodaj pozycję
+      </button>
+    </div>
+  `;
+}
+
+function wzAddExtraItem(vid) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v) return;
+  if (!Array.isArray(v.extraItems)) v.extraItems = [];
+  v.extraItems.push({ name: '', qty: 1, priceNet: 0 });
+  wzSaveDraft();
+  wzRender();
+}
+
+function wzRemoveExtraItem(vid, idx) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || !Array.isArray(v.extraItems)) return;
+  v.extraItems.splice(idx, 1);
+  wzSaveDraft();
+  wzRender();
+}
+
+function wzUpdateExtraItem(vid, idx, field, value) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v || !Array.isArray(v.extraItems) || !v.extraItems[idx]) return;
+  if (field === 'qty') v.extraItems[idx].qty = Math.max(1, parseInt(value) || 1);
+  else if (field === 'priceNet') v.extraItems[idx].priceNet = parseFloat(String(value).replace(',', '.')) || 0;
+  else v.extraItems[idx][field] = value;
+  wzSaveDraft();
+  // Odśwież tylko breakdown i summary — nie cały wariant (bo tracimy focus z inputa)
+  wzUpdateVariantTotalsLive(vid);
+}
+
+/* Aktualizuje suma + breakdown dla wariantu live bez pełnego rerender */
+function wzToggleExcludeInstall(vid, checked) {
+  const v = (wzState.variants || []).find(x => x.id === vid);
+  if (!v) return;
+  v.excludeInstall = !!checked;
+  wzSaveDraft();
+  wzRender();
+}
+
+function wzUpdateVariantTotalsLive(vid) {
+  // Prosty refresh — pełny render zachowuje focus na onblur, przy oninput po prostu nie przeliczamy UI (user zobaczy po blur)
+  // Zamiast tego aktualizujemy tylko wyświetlane sumy per wiersz, co już oninput robi przez value.
+  // Breakdown i summary odświeżają się po pełnym rerender (przy dodaniu/usunięciu pozycji).
 }
 
 function wzRenderPhotoSlot(v, slot) {
@@ -28202,27 +29317,38 @@ function wzRenderVariantsSummary() {
   const variants = wzState.variants || [];
   const vatRate = wzState.basics.vatRate || 8;
   const fmtPl = (x) => x.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const isCustom = wzState.basics.scope === 'custom';
+
+  // Dla oferty dowolnej montaż i rabaty są już w wariancie — podsumowanie pokazuje pełną cenę.
+  // Dla split/multi montaż doliczasz w kolejnym kroku — pokazujemy sam sprzęt.
+  const headerSubtitle = isCustom
+    ? '(pełna cena wariantu z montażem i rabatami)'
+    : '(sam sprzęt — montaż doliczysz w kolejnym kroku)';
+
   return `
     <div class="wz-summary">
-      <div class="wz-summary__h"><i class="ti ti-report-money" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>Podsumowanie cen wariantów <span style="font-size:10.5px;font-weight:500;color:#64748B;margin-left:4px;">(sam sprzęt — montaż doliczysz w kolejnym kroku)</span></div>
+      <div class="wz-summary__h"><i class="ti ti-report-money" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>Podsumowanie cen wariantów <span style="font-size:10.5px;font-weight:500;color:#64748B;margin-left:4px;">${headerSubtitle}</span></div>
       ${variants.map((v, idx) => {
         const t = wzVariantTotals(v, vatRate);
-        // Tylko cena sprzętu — bez montażu, bez prac dodatkowych.
-        // Montaż i prace dodatkowe są dodawane w kroku "Montaż" i "Dodatki".
-        const deviceNet = t.devicesNet;
-        const deviceGross = deviceNet * (1 + vatRate / 100);
+        // Dla custom: pełna cena (devicesNet + installTotalNet + rabat na wariant już uwzględniony w totalNet)
+        // Dla split/multi: tylko sam sprzęt (bez montażu — doliczony w kroku Montaż)
+        const sumNet = isCustom ? t.totalNet : t.devicesNet;
+        const sumGross = sumNet * (1 + vatRate / 100);
         const displayLabel = v.displayName || v.name || (v.type === 'multi' ? wzMultiDisplayName(v) : '') || '—';
+        const extraInfo = isCustom
+          ? `Pozycje po rabatach: ${fmtPl(t.devicesNet)} zł netto${t.installTotalNet > 0 ? ' · Montaż: ' + fmtPl(t.installTotalNet) + ' zł netto' : ''}`
+          : `Zestaw urządzeń: ${fmtPl(t.devicesNet)} zł netto`;
         return `
           <div class="wz-summary__row">
             <div>
               <div class="wz-summary__row-label">Wariant ${idx+1}: ${escapeHtml(displayLabel)}</div>
               <div class="wz-summary__extra-info" style="color:#64748B;">
-                Zestaw urządzeń: ${fmtPl(deviceNet)} zł netto
+                ${extraInfo}
               </div>
             </div>
             <div style="text-align:right;">
-              <div class="wz-summary__row-val" style="color:#0C447C;">${fmtPl(deviceGross)} zł brutto</div>
-              <div style="font-size:10px;color:#64748B;">${fmtPl(deviceNet)} zł netto + VAT ${vatRate}%</div>
+              <div class="wz-summary__row-val" style="color:#0C447C;">${fmtPl(sumGross)} zł brutto</div>
+              <div style="font-size:10px;color:#64748B;">${fmtPl(sumNet)} zł netto + VAT ${vatRate}%</div>
             </div>
           </div>
         `;
@@ -28261,8 +29387,50 @@ function wzMultiDisplayName(v) {
 
 function wzVariantTotals(v, vatRate) {
   const vat = (vatRate || 8) / 100;
+
+  // CUSTOM: wariant oferty dowolnej — suma pozycji po rabatach + montaż per pozycja + ogólny + rabat na wariant
+  if (v && v.type === 'custom') {
+    const items = v.items || [];
+    const itemsCatalogNet = items.reduce((s, it) => s + (parseFloat(it.priceNet) || 0) * (parseInt(it.qty) || 1), 0);
+    const itemsNet = items.reduce((s, it) => {
+      const p = parseFloat(it.priceNet) || 0;
+      const d = parseFloat(it.discount) || 0;
+      const q = parseInt(it.qty) || 1;
+      return s + p * (1 - d / 100) * q;
+    }, 0);
+    const itemsInstallNet = v.excludeInstall ? 0 : items.reduce((s, it) =>
+      s + (parseFloat(it.installPrice) || 0) * (parseInt(it.qty) || 1), 0);
+    const variantInstallNet = v.excludeInstall ? 0 : (parseFloat(v.installNet) || 0);
+    const installTotal = itemsInstallNet + variantInstallNet;
+    const beforeVariantDiscount = itemsNet + installTotal;
+    const variantDisc = parseFloat(v.variantDiscount) || 0;
+    const variantDiscountSaving = beforeVariantDiscount * (variantDisc / 100);
+    const totalNet = beforeVariantDiscount - variantDiscountSaving;
+    const totalGross = totalNet * (1 + vat);
+    return {
+      unitFinalNet: Math.round(itemsNet * 100) / 100,
+      devicesNet: Math.round(itemsNet * 100) / 100,
+      devicesCoreNet: Math.round(itemsNet * 100) / 100,
+      extraItemsNet: 0,
+      installTotalNet: Math.round(installTotal * 100) / 100,
+      totalNet: Math.round(totalNet * 100) / 100,
+      totalGross: Math.round(totalGross * 100) / 100
+    };
+  }
+
   const installFromWz = (wzState.install && wzState.install.installNet != null) ? parseFloat(wzState.install.installNet) || 0 : 0;
-  const installNetRaw = (v.installNet != null) ? (parseFloat(v.installNet) || 0) : installFromWz;
+  // Jeśli wariant ma wyłączony montaż (same urządzenia) — zeruj go niezależnie od wartości
+  const installNetRaw = v.excludeInstall
+    ? 0
+    : ((v.installNet != null) ? (parseFloat(v.installNet) || 0) : installFromWz);
+
+  // Dodatkowe pozycje własne (sterowanie, akcesoria, itp.) — doliczane do urządzeń
+  const extraItemsNet = (v.extraItems || []).reduce((sum, it) => {
+    if (!it) return sum;
+    const price = parseFloat(it.priceNet) || 0;
+    const q = parseInt(it.qty) || 1;
+    return sum + price * q;
+  }, 0);
 
   // MULTI: cena = agregat + jednostki wewnętrzne (rabaty od katalogowej) + montaż raz
   if (v.type === 'multi') {
@@ -28287,11 +29455,14 @@ function wzVariantTotals(v, vatRate) {
       });
     }
     const installTotalNet = installNetRaw; // montaż raz do zestawu
-    const totalNet = devicesNet + installTotalNet;
+    const devicesWithExtras = devicesNet + extraItemsNet;
+    const totalNet = devicesWithExtras + installTotalNet;
     const totalGross = totalNet * (1 + vat);
     return {
       unitFinalNet: Math.round(devicesNet * 100) / 100,
-      devicesNet: Math.round(devicesNet * 100) / 100,
+      devicesNet: Math.round(devicesWithExtras * 100) / 100,
+      devicesCoreNet: Math.round(devicesNet * 100) / 100,
+      extraItemsNet: Math.round(extraItemsNet * 100) / 100,
       installTotalNet: Math.round(installTotalNet * 100) / 100,
       totalNet: Math.round(totalNet * 100) / 100,
       totalGross: Math.round(totalGross * 100) / 100
@@ -28301,13 +29472,16 @@ function wzVariantTotals(v, vatRate) {
   // SPLIT (default)
   const qty = parseInt(v.qty) || 1;
   const priceNet = parseFloat(v.priceNet) || 0;  // to jest już cena po rabacie
-  const devicesNet = priceNet * qty;
+  const devicesCoreNet = priceNet * qty;
+  const devicesNet = devicesCoreNet + extraItemsNet;
   const installTotalNet = installNetRaw * qty;
   const totalNet = devicesNet + installTotalNet;
   const totalGross = totalNet * (1 + vat);
   return {
     unitFinalNet: Math.round(priceNet * 100) / 100,
     devicesNet: Math.round(devicesNet * 100) / 100,
+    devicesCoreNet: Math.round(devicesCoreNet * 100) / 100,
+    extraItemsNet: Math.round(extraItemsNet * 100) / 100,
     installTotalNet: Math.round(installTotalNet * 100) / 100,
     totalNet: Math.round(totalNet * 100) / 100,
     totalGross: Math.round(totalGross * 100) / 100
@@ -29083,20 +30257,28 @@ async function wzGeneratePdf() {
           ? (parseFloat(wzState.install.installNet) || 0)
           : 2100;
         const includeInstall = wzState.install ? (wzState.install.installIncluded !== false) : true;
+        // Jeżeli wariant wyłącza montaż — przekaż includeInstall:false i excludeInstall:true
+        const variantIncludesInstall = v.excludeInstall ? false : includeInstall;
         return {
           id: idx + 1,
           name: v.displayName || v.name || 'Wariant ' + (idx + 1),
           type: 'split',
+          excludeInstall: !!v.excludeInstall,
           units: [{
             productIdx: v.productIdx,
             qty: parseInt(v.qty) || 1,
             installPrice: commonInstall,
-            includeInstall: includeInstall,
+            includeInstall: variantIncludesInstall,
             priceOverride: parseFloat(v.priceNet) || 0,
             color: v.color || '',
             label: '',
             images: photos
           }],
+          extraItems: Array.isArray(v.extraItems) ? v.extraItems.filter(it => it && (it.name || '').trim()).map(it => ({
+            name: it.name,
+            qty: parseInt(it.qty) || 1,
+            priceNet: parseFloat(it.priceNet) || 0
+          })) : [],
           description: '',
           images: photos
         };
@@ -29141,7 +30323,13 @@ async function wzGeneratePdf() {
           outdoorPriceOverride: outdoorSalesNet,   // niektóre miejsca w klasyku szukają tego pola
           indoor: indoorMapped,
           installPrice: commonInstall,
-          includeInstall: includeInstall,
+          includeInstall: v.excludeInstall ? false : includeInstall,
+          excludeInstall: !!v.excludeInstall,
+          extraItems: Array.isArray(v.extraItems) ? v.extraItems.filter(it => it && (it.name || '').trim()).map(it => ({
+            name: it.name,
+            qty: parseInt(it.qty) || 1,
+            priceNet: parseFloat(it.priceNet) || 0
+          })) : [],
           description: '',
           images: []
         };
@@ -29150,6 +30338,48 @@ async function wzGeneratePdf() {
         if (typeof showToast === 'function') showToast('Brak wariantów multisplit z jednostkami wewnętrznymi');
         return;
       }
+    } else if (wzState.basics.scope === 'custom') {
+      // Oferta dowolna: mapowanie wariantów custom na klasyczny state
+      // Używamy type='custom_kit' który generator PDF rozpozna
+      state.variants = (wzState.variants || [])
+        .filter(v => v && v.type === 'custom')
+        .map((v, idx) => {
+          const items = (v.items || []).filter(it => it && (it.name || '').trim());
+          const itemsNet = items.reduce((s, it) => s + _customItemNet(it), 0);
+          const itemsInstallNet = v.excludeInstall ? 0 : _customItemsInstallTotal(items);
+          const variantInstallNet = v.excludeInstall ? 0 : (parseFloat(v.installNet) || 0);
+          const installNet = itemsInstallNet + variantInstallNet;
+          return {
+            id: idx + 1,
+            name: v.name || `Wariant dowolny ${idx + 1}`,
+            type: 'custom_kit',
+            description: v.description || '',
+            customItems: items.map(it => ({
+              name: it.name,
+              qty: parseInt(it.qty) || 1,
+              unit: it.unit || 'szt',
+              priceNet: parseFloat(it.priceNet) || 0,     // cena katalogowa jednostkowa
+              discount: parseFloat(it.discount) || 0,     // rabat na pozycję w %
+              installPrice: parseFloat(it.installPrice) || 0,  // montaż per pozycja
+              link: (it.link || '').trim() || null,
+              color: (it.color || '').trim() || null
+            })),
+            priceNet: itemsNet,              // suma pozycji po rabacie (klasyk patrzy na priceNet)
+            qty: 1,
+            installPrice: installNet,        // suma montaży (per pozycja + ogólny)
+            variantInstallExtra: variantInstallNet,  // ogólny montaż osobno (do PDF)
+            includeInstall: !v.excludeInstall,
+            excludeInstall: !!v.excludeInstall,
+            hideItemPrices: !!v.hideItemPrices,
+            variantDiscount: parseFloat(v.variantDiscount) || 0,
+            images: []
+          };
+        });
+      if (state.variants.length === 0) {
+        if (typeof showToast === 'function') showToast('Dodaj co najmniej jeden wariant z pozycjami');
+        return;
+      }
+      // Oferta dowolna — scope zostaje 'custom' żeby PDF generator pominął OWS klimatyzacji
     } else if (wzState.basics.scope === 'hp') {
       // Pompa ciepła: mapowanie z hpVariants (items[] + installNet) do klasycznego state.variants
       // z type='hp_kit' — priceNet trzyma sumę pozycji, installPrice montaż;
@@ -29500,6 +30730,15 @@ function wzCanGoNext() {
               (v.manualModel && v.manualModel.trim().length > 1)
             ));
         return hasName && (parseFloat(v.priceNet) || 0) > 0;
+      });
+    }
+    if (wzState.basics.scope === 'custom') {
+      const vs = wzState.variants || [];
+      if (vs.length === 0) return false;
+      return vs.every(v => {
+        const hasName = v.name && v.name.trim().length > 1;
+        const items = (v.items || []).filter(it => it && (it.name || '').trim() && (parseFloat(it.priceNet) || 0) > 0);
+        return hasName && items.length > 0;
       });
     }
     return true;
