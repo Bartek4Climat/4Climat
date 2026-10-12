@@ -9,11 +9,109 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="1779533074">
+<meta name="app-version" content="1791794722">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="4Climat Oferty">
+<script>
+  // === Auto-aktualizacja: unregister starych SW + cache, wykrywanie nowej wersji ===
+  (function(){
+    // 1. Przy starcie: wyczyść service workery i cache storage (jeśli były)
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          regs.forEach(function(r){ r.unregister(); });
+        }).catch(function(){});
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(keys){
+          keys.forEach(function(k){ caches.delete(k); });
+        }).catch(function(){});
+      }
+    } catch(e) {}
+
+    // 2. Pobierz aktualną wersję z meta
+    var currentVersion = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
+
+    // 3. Flaga anty-pętli: jeśli strona już została zreloadowana w tej sesji z powodu
+    //    nieaktualnej wersji, a serwer wciąż oddaje stary HTML — nie reloaduj w nieskończoność
+    var reloadFlag = 'app_reload_v_' + currentVersion;
+
+    // 4. Funkcja: sprawdź czy na serwerze jest nowsza wersja
+    async function checkForUpdate(forceReload) {
+      try {
+        var url = window.location.pathname + '?_cb=' + Date.now();
+        var res = await fetch(url, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: {'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache'}
+        });
+        if (!res.ok) return;
+        var txt = await res.text();
+        var m = txt.match(/<meta name="app-version" content="(\d+)"/);
+        if (!m) return;
+        var serverVersion = m[1];
+        if (serverVersion !== currentVersion && parseInt(serverVersion,10) > parseInt(currentVersion,10)) {
+          if (forceReload) {
+            // Przy starcie wymuś reload tylko raz na wersję (anty-pętla)
+            if (sessionStorage.getItem(reloadFlag) !== '1') {
+              sessionStorage.setItem(reloadFlag, '1');
+              window.location.reload();
+            } else {
+              showUpdateBanner(serverVersion);
+            }
+          } else {
+            showUpdateBanner(serverVersion);
+          }
+        } else {
+          // Jesteśmy aktualni — wyczyść flagę żeby kolejny deploy znów działał
+          sessionStorage.removeItem(reloadFlag);
+        }
+      } catch(e) {}
+    }
+
+    // 5. Banner "Dostępna nowa wersja"
+    function showUpdateBanner(newVer) {
+      if (document.getElementById('appUpdateBanner')) return;
+      var b = document.createElement('div');
+      b.id = 'appUpdateBanner';
+      b.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;background:#1B4F8C;color:#fff;padding:12px 16px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-family:Inter,system-ui,sans-serif;font-size:14px;display:flex;align-items:center;gap:12px;max-width:360px';
+      b.innerHTML = '<span>Dostępna nowa wersja programu.</span>' +
+        '<button id="appUpdateReload" style="background:#fff;color:#1B4F8C;border:none;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer;font-size:13px">Odśwież</button>' +
+        '<button id="appUpdateClose" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px">Później</button>';
+      document.body.appendChild(b);
+      document.getElementById('appUpdateReload').onclick = function(){
+        // Twardy reload z pominięciem cache
+        try { sessionStorage.removeItem(reloadFlag); } catch(e) {}
+        window.location.href = window.location.pathname + '?_v=' + Date.now();
+      };
+      document.getElementById('appUpdateClose').onclick = function(){
+        b.remove();
+      };
+    }
+
+    // 6. Udostępnij w window żeby user mógł wywołać ręcznie
+    window.forceAppReload = function(){
+      try { sessionStorage.clear(); localStorage.removeItem('_app_version_cache'); } catch(e){}
+      window.location.href = window.location.pathname + '?_v=' + Date.now();
+    };
+
+    // 7. Pierwsze sprawdzenie przy starcie (z force reload)
+    window.addEventListener('load', function(){
+      setTimeout(function(){ checkForUpdate(true); }, 1500);
+    });
+
+    // 8. Sprawdzaj co 60 sekund
+    setInterval(function(){ checkForUpdate(false); }, 60000);
+
+    // 9. Sprawdzaj przy powrocie fokusu na okno
+    window.addEventListener('focus', function(){ checkForUpdate(false); });
+    document.addEventListener('visibilitychange', function(){
+      if (!document.hidden) checkForUpdate(false);
+    });
+  })();
+</script>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
@@ -9344,7 +9442,8 @@ function setOws(key) {
   state.owsKey = key;
   const el = document.getElementById('owsText');
   if (!el) return;
-  if (key === 'custom') return; // zostaw obecny tekst
+  if (key === 'none') { el.value = ''; return; }  // brak OWS — pusty textarea
+  if (key === 'custom') return; // zostaw obecny tekst (user wpisuje własny)
   el.value = OWS_TEMPLATES[key] || '';
 }
 function initOws() {
@@ -17574,10 +17673,21 @@ async function loadOwsTemplatesFromSupabase() {
     if (Array.isArray(data) && data.length && data[0].data) {
       const overrides = data[0].data;
       Object.keys(overrides).forEach(k => {
-        if (typeof overrides[k] === 'string' && overrides[k].trim()) {
-          OWS_TEMPLATES[k] = overrides[k];
+        const val = overrides[k];
+        // Nowy format: {k: {label, text}} — odtwarza label (dla custom_XXX szablonów)
+        if (val && typeof val === 'object' && typeof val.text === 'string') {
+          if (val.text.trim() || k.startsWith('custom_')) {
+            OWS_TEMPLATES[k] = val.text;
+            if (val.label && !OWS_LABELS[k]) OWS_LABELS[k] = val.label;
+          }
+        }
+        // Stary format: {k: "text"} — backward-compat
+        else if (typeof val === 'string' && val.trim()) {
+          OWS_TEMPLATES[k] = val;
         }
       });
+      // Odśwież selektory (dla custom_XXX żeby pojawiły się w dropdownach)
+      if (typeof refreshOwsSelectors === 'function') refreshOwsSelectors();
       // Odśwież pole tekstowe jeśli aktualnie wybrany szablon się zmienił
       const owsEl = document.getElementById('owsText');
       const owsSel = document.getElementById('owsSelect');
@@ -17626,7 +17736,19 @@ async function loadOwsTemplatesLocalFallback() {
     const raw = localStorage.getItem('4climat_ows_templates_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
-      Object.keys(parsed).forEach(k => { if (OWS_TEMPLATES.hasOwnProperty(k) || OWS_LABELS[k]) OWS_TEMPLATES[k] = parsed[k]; });
+      Object.keys(parsed).forEach(k => {
+        const val = parsed[k];
+        // Nowy format: {k: {label, text}}
+        if (val && typeof val === 'object' && typeof val.text === 'string') {
+          OWS_TEMPLATES[k] = val.text;
+          if (val.label && !OWS_LABELS[k]) OWS_LABELS[k] = val.label;
+        }
+        // Stary format: {k: "text"}
+        else if (typeof val === 'string') {
+          if (OWS_TEMPLATES.hasOwnProperty(k) || OWS_LABELS[k]) OWS_TEMPLATES[k] = val;
+        }
+      });
+      if (typeof refreshOwsSelectors === 'function') refreshOwsSelectors();
       return true;
     }
   } catch(e) { console.warn('OWS localStorage load error:', e); }
@@ -17793,9 +17915,12 @@ async function saveCurrentOwsTemplate() {
   btn.disabled = true; btn.textContent = 'Zapisuję…';
   // Zaktualizuj lokalnie
   OWS_TEMPLATES[_owsEditorCurrentKey] = val;
-  // Zbuduj obiekt do zapisu (wszystkie szablony)
+  // Zbuduj obiekt do zapisu — pełny format {k: {label, text}} żeby zachować nazwy
+  // custom_XXX szablonów przy ponownym ładowaniu z Supabase
   const toSave = {};
-  Object.keys(OWS_LABELS).forEach(k => { toSave[k] = OWS_TEMPLATES[k] || ''; });
+  Object.keys(OWS_LABELS).forEach(k => {
+    toSave[k] = { label: OWS_LABELS[k], text: OWS_TEMPLATES[k] || '' };
+  });
   const result = await saveOwsTemplatesToSupabase(toSave);
   btn.disabled = false; btn.innerHTML = '<i class="ti ti-device-floppy"></i> Zapisz szablon';
   if (result.ok) {
@@ -29905,17 +30030,43 @@ function wzRenderStepFinalize() {
   const owsKey = f.owsKey || 'split_multi';
   const scope = wzState.basics.scope || 'ac';
   const offerType = wzState.basics.offerType || 'variants';
-  const owsOptions = scope === 'hp'
+  // Zbuduj listę opcji OWS zależnie od zakresu + dołącz wszystkie custom_* szablony z OWS_LABELS
+  const customOwsKeys = (typeof OWS_LABELS !== 'undefined')
+    ? Object.keys(OWS_LABELS).filter(k => k.startsWith('custom_'))
+    : [];
+  const customOwsOptions = customOwsKeys.map(k => ({ v: k, label: '★ ' + (OWS_LABELS[k] || k) }));
+
+  const baseOptions = scope === 'hp'
     ? [
         {v: 'pompa_ciepla', label: 'Pompa ciepła — wstępna'},
         {v: 'pompa_ciepla_koncowa', label: 'Pompa ciepła — końcowa (po wizji lokalnej)'},
-        {v: 'hp_cena_koncowa', label: 'Pompa ciepła — cena końcowa (skrót)'}
+        {v: 'hp_cena_koncowa', label: 'Pompa ciepła — cena końcowa (skrót)'},
+        {v: 'serwis_hp', label: 'Serwis pompy ciepła'}
       ]
-    : [
-        {v: 'split_multi', label: 'Split/Multi — wstępna'},
-        {v: 'split_multi_koncowa', label: 'Split/Multi — końcowa (po wizji lokalnej)'},
-        {v: 'split_cena_koncowa', label: 'Split/Multi — cena końcowa (skrót)'}
-      ];
+    : scope === 'custom'
+      ? [
+          {v: 'split_multi', label: 'Klimatyzacja Split/Multi — wstępna'},
+          {v: 'split_multi_koncowa', label: 'Klimatyzacja Split/Multi — końcowa'},
+          {v: 'split_cena_koncowa', label: 'Klimatyzacja — cena końcowa (skrót)'},
+          {v: 'pompa_ciepla', label: 'Pompa ciepła — wstępna'},
+          {v: 'pompa_ciepla_koncowa', label: 'Pompa ciepła — końcowa'},
+          {v: 'hp_cena_koncowa', label: 'Pompa ciepła — cena końcowa (skrót)'},
+          {v: 'serwis_klima', label: 'Serwis klimatyzacji'},
+          {v: 'serwis_hp', label: 'Serwis pompy ciepła'}
+        ]
+      : [
+          {v: 'split_multi', label: 'Split/Multi — wstępna'},
+          {v: 'split_multi_koncowa', label: 'Split/Multi — końcowa (po wizji lokalnej)'},
+          {v: 'split_cena_koncowa', label: 'Split/Multi — cena końcowa (skrót)'},
+          {v: 'serwis_klima', label: 'Serwis klimatyzacji'}
+        ];
+
+  const owsOptions = [
+    ...baseOptions,
+    ...customOwsOptions,
+    {v: 'none', label: '— Brak OWS (bez załącznika) —'},
+    {v: 'custom', label: '✎ Własna treść (edytuj poniżej)'}
+  ];
 
   const attachments = f.attachments || [];
   const vatRate = wzState.basics.vatRate || 8;
@@ -29955,11 +30106,27 @@ function wzRenderStepFinalize() {
     <div class="wzn-card">
       <div class="wzn-field">
         <label class="wzn-field__label">Szablon warunków</label>
-        <select class="wzn-field__select" id="wzOwsSelect" onchange="wzSetFinalize('owsKey', this.value)">
+        <select class="wzn-field__select" id="wzOwsSelect" onchange="wzSetFinalize('owsKey', this.value); wzRenderStepContent();">
           ${owsOptions.map(o => `<option value="${o.v}" ${owsKey === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}
         </select>
       </div>
-      <div style="font-size:11px;color:#64748B;margin-top:6px;">Pełna treść z OWS zostanie dodana na końcu PDF. Edycja szablonów: sekcja „OWS" w menu bocznym.</div>
+      ${owsKey === 'custom' ? `
+        <div style="margin-top:12px;">
+          <label class="wzn-field__label">Własna treść OWS (pojawi się na końcu PDF)</label>
+          <textarea class="wzn-field__input" rows="12"
+            oninput="wzSetFinalize('owsCustomText', this.value)"
+            placeholder="Wpisz tutaj własną treść warunków handlowych, które dołączysz do oferty..."
+            style="font-family:'Inter',sans-serif;line-height:1.5;font-size:12px;">${escapeHtml(f.owsCustomText || '')}</textarea>
+          <div style="font-size:11px;color:#64748B;margin-top:4px;">Treść zapisywana per oferta — nie trafia do globalnej biblioteki szablonów.</div>
+        </div>
+      ` : owsKey === 'none' ? `
+        <div style="margin-top:10px;padding:10px 12px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;font-size:11.5px;color:#92400E;">
+          <i class="ti ti-alert-triangle" style="font-size:13px;vertical-align:-1px;margin-right:3px;"></i>
+          Oferta zostanie wygenerowana <strong>bez sekcji warunków</strong>. Użyj tylko gdy warunki klient dostaje w inny sposób (np. w umowie).
+        </div>
+      ` : `
+        <div style="font-size:11px;color:#64748B;margin-top:6px;">Pełna treść z OWS zostanie dodana na końcu PDF. Edycja szablonów: sekcja „OWS" w menu bocznym.</div>
+      `}
     </div>
 
     <div class="wzn-section-h">
@@ -30443,6 +30610,11 @@ async function wzGeneratePdf() {
 
     // 5) Ustaw OWS w textarea
     if (typeof setOws === 'function') setOws(state.owsKey);
+    // Jeżeli wybrano "custom" (własna treść) — wrzuć treść z wzState.finalize.owsCustomText do textarea
+    if (state.owsKey === 'custom') {
+      const owsEl = document.getElementById('owsText');
+      if (owsEl) owsEl.value = (wzState.finalize?.owsCustomText || '').trim();
+    }
 
     // 5b) Dołącz karty produktów (pobierz zdjęcia jako base64) — dla wariantów z includeProductCard
     if (typeof wzAttachProductCards === 'function') {
