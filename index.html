@@ -9,7 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="1791794722">
+<meta name="app-version" content="1792063452">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5155,7 +5155,8 @@ function onLoginSuccess() {
   Promise.all([
     loadProductsFromSupabase(),
     loadBrandMarginsFromSupabase(),
-    loadExtrasCatalogFromSupabase()
+    loadExtrasCatalogFromSupabase(),
+    loadMiniCardsFromSupabase()
   ]).then(async () => {
     // Załaduj też własne produkty z Supabase (legacy fallback)
     const customDb = await loadCustomDbFromSupabase();
@@ -9864,6 +9865,80 @@ async function deleteProductPhoto(publicUrl) {
 }
 
 /* ============================================================
+   PRODUCT_MINI_CARDS — mini-karty produktu (zdjęcie + specyfikacja)
+   drukowane w PDF pod każdym wariantem.
+   Zapis w tabeli drafts (user_id='mini_cards_shared') — wzorzec analogiczny do OWS templates.
+   Struktura: { [productSbid]: {
+     photo_indoor: url, photo_outdoor: url, photo_set: url,
+     specs: {
+       dim_in: 'szer × wys × gł mm', dim_out: 'szer × wys × gł mm',
+       class_cool: 'A+++', class_heat: 'A++',
+       noise_in: '19-45 dB(A)', noise_out: '48 dB(A)',
+       seer: '8.65', scop: '5.10',
+       refrigerant: 'R-32', power_range: '2,5 kW'
+     }
+   }}
+   ============================================================ */
+let PRODUCT_MINI_CARDS = {};
+
+async function loadMiniCardsFromSupabase() {
+  try {
+    const r = await sbFetch("/rest/v1/drafts?user_id=eq.mini_cards_shared&select=payload&limit=1");
+    if (r && r[0] && r[0].payload && typeof r[0].payload === 'object') {
+      PRODUCT_MINI_CARDS = r[0].payload;
+      console.log('✓ Mini-karty produktu załadowane:', Object.keys(PRODUCT_MINI_CARDS).length);
+    } else {
+      PRODUCT_MINI_CARDS = {};
+    }
+    return true;
+  } catch(e) {
+    console.warn('loadMiniCards error:', e);
+    PRODUCT_MINI_CARDS = {};
+    return false;
+  }
+}
+
+async function saveMiniCardsToSupabase() {
+  if (!currentUser) { showToast('Zaloguj się ponownie'); return false; }
+  try {
+    const existing = await sbFetch("/rest/v1/drafts?user_id=eq.mini_cards_shared&select=id");
+    const nowIso = new Date().toISOString();
+    if (existing && existing[0]) {
+      await sbFetch("/rest/v1/drafts?id=eq." + existing[0].id, 'PATCH', {
+        payload: PRODUCT_MINI_CARDS,
+        updated_at: nowIso,
+        updated_by: currentUser.email
+      });
+    } else {
+      await sbFetch("/rest/v1/drafts", 'POST', {
+        user_id: 'mini_cards_shared',
+        payload: PRODUCT_MINI_CARDS,
+        updated_at: nowIso,
+        updated_by: currentUser.email
+      });
+    }
+    return true;
+  } catch(e) {
+    console.warn('saveMiniCards error:', e);
+    showToast('Błąd zapisu mini-karty: ' + (e.message || e).toString().slice(0,80));
+    return false;
+  }
+}
+
+function getMiniCard(sbid) {
+  if (!sbid) return null;
+  return PRODUCT_MINI_CARDS[sbid] || null;
+}
+
+function miniCardIsEmpty(mc) {
+  if (!mc) return true;
+  const hasPhoto = mc.photo_indoor || mc.photo_outdoor || mc.photo_set;
+  const specs = mc.specs || {};
+  const hasSpec = Object.keys(specs).some(k => (specs[k] || '').toString().trim());
+  return !hasPhoto && !hasSpec;
+}
+
+/* ============================================================
    EXTRAS_CATALOG — katalog prac dodatkowych (AC + HP)
    ============================================================ */
 async function loadExtrasCatalogFromSupabase() {
@@ -10365,9 +10440,13 @@ function renderAcProductsList() {
                       </td>
                       <td style="padding:6px 12px;text-align:center;white-space:nowrap;">
                         ${hasSbid ? `
-                          <button onclick="openProductCardEditor(${p._sbid}, '${escapeHtml(p.marka || '').replace(/'/g, '&#39;')}', '${escapeHtml(modelClean).replace(/'/g, '&#39;')}')" title="Edytuj kartę produktu (zdjęcia i parametry)"
+                          <button onclick="openProductCardEditor(${p._sbid}, '${escapeHtml(p.marka || '').replace(/'/g, '&#39;')}', '${escapeHtml(modelClean).replace(/'/g, '&#39;')}')" title="Edytuj kartę katalogową (załącznik PDF)"
                             style="padding:4px 8px;background:${(p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0) ? '#F0FDF4' : 'transparent'};color:${(p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0) ? '#166534' : '#0F3461'};border:1px solid ${(p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0) ? '#BBF7D0' : '#E2E8F0'};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
                             <i class="ti ti-id" style="font-size:12px;"></i>
+                          </button>
+                          <button onclick="openMiniCardEditor(${p._sbid}, '${escapeHtml(p.marka || '').replace(/'/g, '&#39;')}', '${escapeHtml(modelClean).replace(/'/g, '&#39;')}', '${rowKey.split('|')[0]}')" title="Mini-karta pod wariantem w PDF (zdjęcie + specyfikacja)"
+                            style="padding:4px 8px;background:${(function(){var mc=PRODUCT_MINI_CARDS[p._sbid]; return mc && !miniCardIsEmpty(mc) ? '#EFF6FF' : 'transparent';})()};color:${(function(){var mc=PRODUCT_MINI_CARDS[p._sbid]; return mc && !miniCardIsEmpty(mc) ? '#1E40AF' : '#0F3461';})()};border:1px solid ${(function(){var mc=PRODUCT_MINI_CARDS[p._sbid]; return mc && !miniCardIsEmpty(mc) ? '#BFDBFE' : '#E2E8F0';})()};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
+                            <i class="ti ti-photo" style="font-size:12px;"></i>
                           </button>
                           <button onclick="_acDeleteProduct(${p._sbid}, '${escapeHtml(modelClean).replace(/'/g, '&#39;')}')" title="Usuń pozycję" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;">
                             <i class="ti ti-trash" style="font-size:12px;"></i>
@@ -10777,6 +10856,251 @@ async function _cardSave() {
   }
   showToast('Karta zapisana');
   closeProductCardEditor();
+  renderAcProductsList();
+}
+
+/* ============================================================
+   MINI-KARTA PRODUKTU — modal edycji
+   Zapis w PRODUCT_MINI_CARDS, które leci do Supabase (drafts).
+   Drukuje się pod każdym wariantem w PDF jako: zdjęcie + tabelka specyfikacji.
+   ============================================================ */
+let _miniCardEditing = null;
+
+async function openMiniCardEditor(sbid, marka, model, category) {
+  if (!sbid) return;
+  const existing = PRODUCT_MINI_CARDS[sbid] || {};
+  _miniCardEditing = {
+    sbid,
+    marka: marka || '',
+    model: model || '',
+    category: category || 'split', // 'split' | 'multi_zew' | 'multi_wew' | 'hp'
+    photo_indoor: existing.photo_indoor || '',
+    photo_outdoor: existing.photo_outdoor || '',
+    photo_set: existing.photo_set || '',
+    specs: Object.assign({
+      dim_in: '', dim_out: '',
+      class_cool: '', class_heat: '',
+      noise_in: '', noise_out: '',
+      seer: '', scop: '',
+      refrigerant: '', power_range: ''
+    }, existing.specs || {})
+  };
+  let mod = document.getElementById('miniCardModal');
+  if (mod) mod.remove();
+  mod = document.createElement('div');
+  mod.id = 'miniCardModal';
+  mod.className = 'modal-backdrop';
+  mod.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  mod.onclick = (e) => { if (e.target === mod) closeMiniCardEditor(); };
+  document.body.appendChild(mod);
+  renderMiniCardEditor();
+}
+
+function closeMiniCardEditor() {
+  const mod = document.getElementById('miniCardModal');
+  if (mod) mod.remove();
+  _miniCardEditing = null;
+}
+
+function renderMiniCardEditor() {
+  const mod = document.getElementById('miniCardModal');
+  if (!mod || !_miniCardEditing) return;
+  const c = _miniCardEditing;
+  // Które zdjęcia pokazać zależy od kategorii
+  const showIndoor = c.category === 'split' || c.category === 'multi_wew';
+  const showOutdoor = c.category === 'split' || c.category === 'multi_zew';
+  const showSet = c.category === 'split' || c.category === 'hp';
+  // Które pola specyfikacji
+  const showIndoorSpecs = showIndoor;
+  const showOutdoorSpecs = showOutdoor;
+
+  const photoSlot = (role, label, url) => `
+    <div style="border:1px dashed #CBD5E1;border-radius:8px;padding:10px;background:#F8FAFC;">
+      <div style="font-size:10.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">${escapeHtml(label)}</div>
+      ${url ? `
+        <div style="position:relative;aspect-ratio:1;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;background:#fff;margin-bottom:8px;">
+          <img src="${escapeHtml(url)}" style="width:100%;height:100%;object-fit:contain;">
+          <button onclick="_miniCardRemovePhoto('${role}')" title="Usuń zdjęcie"
+            style="position:absolute;top:4px;right:4px;background:rgba(220,38,38,0.9);color:#fff;border:none;border-radius:4px;width:24px;height:24px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+            <i class="ti ti-x" style="font-size:14px;"></i>
+          </button>
+        </div>
+      ` : `
+        <div style="aspect-ratio:1;background:#fff;border:1px dashed #E2E8F0;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:11px;margin-bottom:8px;">
+          Brak zdjęcia
+        </div>
+      `}
+      <label style="display:block;padding:5px 8px;background:#0F3461;color:#fff;border-radius:5px;font-size:10.5px;font-weight:600;cursor:pointer;text-align:center;">
+        <i class="ti ti-upload" style="font-size:11px;"></i> ${url ? 'Zmień' : 'Dodaj zdjęcie'}
+        <input type="file" accept="image/jpeg,image/png,image/webp" onchange="_miniCardUploadPhoto('${role}', this)" style="display:none;">
+      </label>
+    </div>
+  `;
+
+  const specRow = (key, label, placeholder) => `
+    <div>
+      <label style="font-size:10.5px;color:#64748B;font-weight:600;display:block;margin-bottom:3px;">${escapeHtml(label)}</label>
+      <input type="text" value="${escapeHtml(c.specs[key] || '')}"
+        oninput="_miniCardEditing.specs['${key}']=this.value"
+        placeholder="${escapeHtml(placeholder)}"
+        style="width:100%;padding:7px 9px;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;background:#fff;">
+    </div>
+  `;
+
+  const photoCols = [];
+  if (showIndoor) photoCols.push(photoSlot('photo_indoor', 'Jednostka wewnętrzna', c.photo_indoor));
+  if (showOutdoor) photoCols.push(photoSlot('photo_outdoor', 'Jednostka zewnętrzna', c.photo_outdoor));
+  if (showSet) photoCols.push(photoSlot('photo_set', c.category === 'hp' ? 'Pompa ciepła' : 'Zestaw / render', c.photo_set));
+
+  mod.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:900px;width:100%;max-height:92vh;overflow:auto;">
+      <div style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;background:#EFF6FF;color:#0F3461;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+          <i class="ti ti-photo" style="font-size:18px;"></i>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:14.5px;font-weight:700;color:#0A2647;">Mini-karta w PDF — ${escapeHtml(c.marka)} ${escapeHtml(c.model)}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:1px;">Zdjęcie + specyfikacja pokazywana pod każdym wariantem, w którym występuje ten produkt</div>
+        </div>
+        <button onclick="closeMiniCardEditor()" style="padding:6px 10px;background:transparent;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;cursor:pointer;color:#64748B;">✕</button>
+      </div>
+
+      <div style="padding:16px 18px;">
+
+        <!-- ZDJĘCIA -->
+        <div style="margin-bottom:18px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Zdjęcia (JPG/PNG/WEBP, max 5 MB)</label>
+          <div style="display:grid;grid-template-columns:repeat(${photoCols.length}, 1fr);gap:10px;">
+            ${photoCols.join('')}
+          </div>
+          <div style="margin-top:6px;font-size:10.5px;color:#64748B;">
+            Zalecane zdjęcia o rozdzielczości min. 600×600 px, tło białe / neutralne.
+          </div>
+        </div>
+
+        <!-- WYMIARY -->
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Wymiary (szer × wys × gł mm)</label>
+          <div style="display:grid;grid-template-columns:${(showIndoorSpecs && showOutdoorSpecs) ? '1fr 1fr' : '1fr'};gap:10px;">
+            ${showIndoorSpecs ? specRow('dim_in', 'Jedn. wewnętrzna', 'np. 798 × 295 × 189') : ''}
+            ${showOutdoorSpecs ? specRow('dim_out', 'Jedn. zewnętrzna', 'np. 770 × 548 × 285') : ''}
+          </div>
+        </div>
+
+        <!-- KLASY ENERGETYCZNE + SCOP/SEER -->
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Efektywność energetyczna</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+            ${specRow('class_cool', 'Klasa (chłodzenie)', 'np. A+++')}
+            ${specRow('class_heat', 'Klasa (grzanie)', 'np. A++')}
+            ${specRow('seer', 'SEER', 'np. 8,65')}
+            ${specRow('scop', 'SCOP', 'np. 5,10')}
+          </div>
+        </div>
+
+        <!-- POZIOM HAŁASU -->
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Poziom hałasu dB(A)</label>
+          <div style="display:grid;grid-template-columns:${(showIndoorSpecs && showOutdoorSpecs) ? '1fr 1fr' : '1fr'};gap:10px;">
+            ${showIndoorSpecs ? specRow('noise_in', 'Jedn. wewnętrzna', 'np. 19–45') : ''}
+            ${showOutdoorSpecs ? specRow('noise_out', 'Jedn. zewnętrzna', 'np. 48') : ''}
+          </div>
+        </div>
+
+        <!-- POZOSTAŁE -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Dodatkowe (opcjonalnie)</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${specRow('refrigerant', 'Czynnik chłodniczy', 'np. R-32')}
+            ${specRow('power_range', 'Zakres mocy', 'np. 2,5 kW · 3,5 kW · 5,0 kW')}
+          </div>
+        </div>
+
+        <div style="padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;font-size:11.5px;color:#1E40AF;margin-bottom:14px;">
+          <strong>Jak to działa:</strong> wypełnione pola pokażą się jako kompaktowa karta pod każdym wariantem w PDF. Puste pola są pomijane. Dane są wspólne — raz uzupełnione, działają w każdej kolejnej ofercie z tym produktem.
+        </div>
+
+        <!-- AKCJE -->
+        <div style="display:flex;gap:8px;justify-content:space-between;padding-top:14px;border-top:1px solid #E2E8F0;">
+          <button onclick="_miniCardReset()" style="padding:9px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+            <i class="ti ti-trash" style="font-size:13px;"></i> Usuń całą mini-kartę
+          </button>
+          <div style="display:flex;gap:8px;">
+            <button onclick="closeMiniCardEditor()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
+            <button onclick="_miniCardSave()" style="padding:9px 22px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <i class="ti ti-check" style="font-size:14px;"></i> Zapisz mini-kartę
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function _miniCardUploadPhoto(role, input) {
+  if (!input.files || !input.files[0] || !_miniCardEditing) return;
+  const file = input.files[0];
+  showToast('Wysyłam zdjęcie...');
+  const url = await uploadProductPhoto(file, _miniCardEditing.sbid + '-' + role);
+  if (url) {
+    _miniCardEditing[role] = url;
+    renderMiniCardEditor();
+    showToast('Zdjęcie dodane');
+  }
+  input.value = '';
+}
+
+async function _miniCardRemovePhoto(role) {
+  if (!_miniCardEditing) return;
+  const url = _miniCardEditing[role];
+  if (!url) return;
+  if (!confirm('Usunąć to zdjęcie?')) return;
+  await deleteProductPhoto(url);
+  _miniCardEditing[role] = '';
+  renderMiniCardEditor();
+}
+
+async function _miniCardSave() {
+  if (!_miniCardEditing) return;
+  const sbid = _miniCardEditing.sbid;
+  // Przytnij puste wartości ze specs
+  const cleanSpecs = {};
+  Object.keys(_miniCardEditing.specs).forEach(k => {
+    const v = (_miniCardEditing.specs[k] || '').toString().trim();
+    if (v) cleanSpecs[k] = v;
+  });
+  const hasAny = _miniCardEditing.photo_indoor || _miniCardEditing.photo_outdoor || _miniCardEditing.photo_set || Object.keys(cleanSpecs).length > 0;
+  if (hasAny) {
+    PRODUCT_MINI_CARDS[sbid] = {
+      photo_indoor: _miniCardEditing.photo_indoor || '',
+      photo_outdoor: _miniCardEditing.photo_outdoor || '',
+      photo_set: _miniCardEditing.photo_set || '',
+      specs: cleanSpecs
+    };
+  } else {
+    delete PRODUCT_MINI_CARDS[sbid];
+  }
+  const ok = await saveMiniCardsToSupabase();
+  if (!ok) return;
+  showToast('Mini-karta zapisana');
+  closeMiniCardEditor();
+  renderAcProductsList();
+}
+
+async function _miniCardReset() {
+  if (!_miniCardEditing) return;
+  if (!confirm('Usunąć całą mini-kartę dla tego produktu? (zdjęcia zostaną usunięte z serwera)')) return;
+  const sbid = _miniCardEditing.sbid;
+  const prev = PRODUCT_MINI_CARDS[sbid];
+  if (prev) {
+    if (prev.photo_indoor) await deleteProductPhoto(prev.photo_indoor);
+    if (prev.photo_outdoor) await deleteProductPhoto(prev.photo_outdoor);
+    if (prev.photo_set) await deleteProductPhoto(prev.photo_set);
+  }
+  delete PRODUCT_MINI_CARDS[sbid];
+  await saveMiniCardsToSupabase();
+  showToast('Mini-karta usunięta');
+  closeMiniCardEditor();
   renderAcProductsList();
 }
 
@@ -15031,6 +15355,146 @@ function generatePdf() {
     };
   }
 
+  /* === MINI-KARTA PRODUKTU — zdjęcia + specyfikacja drukowana pod wariantem === */
+  function getVariantProductSbids(v) {
+    const sbids = [];
+    const seen = new Set();
+    const add = (s) => { if (s && !seen.has(s)) { seen.add(s); sbids.push(s); } };
+    if (!v) return sbids;
+    const t = v.type;
+    if ((t === 'split' || t === 'custom_kit') && Array.isArray(v.units)) {
+      v.units.forEach(u => {
+        const p = (typeof getProductFromPool === 'function' ? getProductFromPool('split', u.productIdx) : null)
+                || (DB.split && DB.split[u.productIdx]);
+        if (p && p._sbid) add(p._sbid);
+      });
+    } else if (t === 'multi') {
+      if (v.outdoor) {
+        const po = (typeof getProductFromPool === 'function' ? getProductFromPool('multi_zew', v.outdoor.productIdx) : null)
+                 || (DB.multi_zew && DB.multi_zew[v.outdoor.productIdx]);
+        if (po && po._sbid) add(po._sbid);
+      }
+      if (Array.isArray(v.indoor)) {
+        v.indoor.forEach(u => {
+          const p = (typeof getProductFromPool === 'function' ? getProductFromPool('multi_wew', u.productIdx) : null)
+                  || (DB.multi_wew && DB.multi_wew[u.productIdx]);
+          if (p && p._sbid) add(p._sbid);
+        });
+      }
+    } else if (t === 'hp_kit' && Array.isArray(v.hpItems)) {
+      v.hpItems.forEach(it => { if (it && (it._sbid || it.sbid)) add(it._sbid || it.sbid); });
+    } else if (t === 'custom' && Array.isArray(v.customItems)) {
+      v.customItems.forEach(it => { if (it && (it._sbid || it.sbid)) add(it._sbid || it.sbid); });
+    }
+    return sbids;
+  }
+
+  function _miniCardSpecRows(specs) {
+    const rows = [];
+    const push = (lbl, val) => {
+      if (!val) return;
+      rows.push([
+        { text: lbl, fontSize: 8, color: '#64748B', margin: [0, 2, 0, 2] },
+        { text: String(val), fontSize: 8.5, bold: true, color: '#1A2332', alignment: 'right', margin: [0, 2, 0, 2] }
+      ]);
+    };
+    push('Wymiary wew. (mm)', specs.dim_in);
+    push('Wymiary zew. (mm)', specs.dim_out);
+    push('Klasa en. (chłodzenie)', specs.class_cool);
+    push('Klasa en. (grzanie)', specs.class_heat);
+    push('SEER', specs.seer);
+    push('SCOP', specs.scop);
+    push('Hałas jedn. wew.', specs.noise_in ? specs.noise_in + (/dB/i.test(specs.noise_in)?'':' dB(A)') : '');
+    push('Hałas jedn. zew.', specs.noise_out ? specs.noise_out + (/dB/i.test(specs.noise_out)?'':' dB(A)') : '');
+    push('Czynnik chłodniczy', specs.refrigerant);
+    push('Zakres mocy', specs.power_range);
+    return rows;
+  }
+
+  function buildSingleMiniCardPdfBlock(mc, productMeta) {
+    if (!mc) return null;
+    const specs = mc.specs || {};
+    const specRows = _miniCardSpecRows(specs);
+    const imgs = [];
+    if (mc._base64_indoor)  imgs.push({ image: mc._base64_indoor,  fit: [95, 95], alignment: 'center' });
+    if (mc._base64_outdoor) imgs.push({ image: mc._base64_outdoor, fit: [95, 95], alignment: 'center' });
+    if (imgs.length === 0 && mc._base64_set) imgs.push({ image: mc._base64_set, fit: [100, 100], alignment: 'center' });
+    if (specRows.length === 0 && imgs.length === 0) return null;
+
+    const headerText = ((productMeta.marka || '') + ' ' + (productMeta.model || '')).trim();
+    const rightStack = [];
+    if (headerText) {
+      rightStack.push({ text: headerText, fontSize: 9, bold: true, color: '#1B4F8C', margin: [0, 0, 0, 5] });
+    }
+    if (specRows.length > 0) {
+      rightStack.push({
+        table: { widths: ['*', 'auto'], body: specRows },
+        layout: {
+          hLineColor: () => '#DCE9F5',
+          hLineWidth: (i) => i === 0 ? 0 : 0.4,
+          vLineColor: () => '#DCE9F5',
+          vLineWidth: () => 0,
+          paddingLeft: () => 4, paddingRight: () => 4, paddingTop: () => 1, paddingBottom: () => 1
+        }
+      });
+    }
+
+    const hasImgs = imgs.length > 0;
+    let inner;
+    if (hasImgs) {
+      // Zdjęcia poziomo
+      const imgCols = imgs.map(i => ({ width: 100, stack: [i] }));
+      const leftWidth = Math.min(220, 10 + 100 * imgs.length);
+      const leftStack = { columns: imgCols, columnGap: 6, alignment: 'center' };
+      inner = { columns: [{ width: leftWidth, stack: [leftStack] }, { width: '*', stack: rightStack }], columnGap: 14 };
+    } else {
+      inner = { stack: rightStack };
+    }
+
+    return {
+      unbreakable: true,
+      margin: [0, 6, 0, 0],
+      table: { widths: ['*'], body: [[{
+        stack: [inner],
+        fillColor: '#F8FBFD',
+        border: [false, false, false, false],
+        margin: [10, 10, 10, 10]
+      }]]}
+    };
+  }
+
+  function buildVariantMiniCardsBlock(v) {
+    if (!v || v.type === 'install') return null;
+    // Globalny switch — można wyłączyć z finalize
+    if (state && state.includeMiniCards === false) return null;
+    const sbids = getVariantProductSbids(v);
+    if (sbids.length === 0) return null;
+    // Mapa sbid → {marka, model}
+    const meta = {};
+    ['split','multi_zew','multi_wew'].forEach(cat => {
+      (DB[cat] || []).forEach(p => { if (p._sbid) meta[p._sbid] = { marka: p.marka, model: p.model }; });
+    });
+    // Max 3 mini-karty per wariant (żeby mieściło się na stronie A4)
+    const blocks = [];
+    for (let i = 0; i < sbids.length && blocks.length < 3; i++) {
+      const sbid = sbids[i];
+      const mc = PRODUCT_MINI_CARDS[sbid];
+      if (!mc || miniCardIsEmpty(mc)) continue;
+      const pm = meta[sbid] || { marka: '', model: '' };
+      const blk = buildSingleMiniCardPdfBlock(mc, pm);
+      if (blk) blocks.push(blk);
+    }
+    if (blocks.length === 0) return null;
+    return {
+      margin: [0, 10, 0, 0],
+      stack: [
+        { text: 'KARTA PRODUKTU', fontSize: 8.5, color: '#64748B', bold: true, characterSpacing: 1.6, margin: [0, 0, 0, 2] },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.4, lineColor: '#DCE9F5' }] },
+        ...blocks
+      ]
+    };
+  }
+
   function buildAcVariant(v, vIdx) {
     const variantNet = variantNetTotal(v);
     const variantBr  = variantBrTotal(v);
@@ -15127,7 +15591,9 @@ function generatePdf() {
           // Cena końcowa wariantu — pomiń jeśli są shared extras (linia z extras będzie po tabeli extras)
           (state.extras && state.extras.length > 0 && state.offerType !== 'final')
             ? null
-            : buildPriceLineBlock(variantNet, variantBr, variantHeaderText)
+            : buildPriceLineBlock(variantNet, variantBr, variantHeaderText),
+          // Mini-karta produktu (zdjęcia + specyfikacja)
+          buildVariantMiniCardsBlock(v)
         ].filter(Boolean)
       };
     }
@@ -15442,9 +15908,13 @@ function generatePdf() {
     if (priceBlock) variantStack.push(priceBlock);
     if (productCard) variantStack.push(productCard);
 
+    const miniCardsBlock = buildVariantMiniCardsBlock(v);
+    const outerStack = [{ unbreakable: true, stack: variantStack }];
+    if (miniCardsBlock) outerStack.push(miniCardsBlock);
+
     return {
       margin: [0, vIdx > 0 ? 18 : 0, 0, 0],
-      stack: [{ unbreakable: true, stack: variantStack }]
+      stack: outerStack
     };
   }
   /* ---- Blok ceny „Koszt urządzeń wraz z materiałami i montażem" ---- */
@@ -16945,6 +17415,11 @@ async function handleGeneratePdf(btn) {
   // Wygeneruj QR code jeśli jeszcze nie ma
   if (!window._generatedQRCode) {
     window._generatedQRCode = await generateQRCodeBase64(state.realizationsUrl);
+  }
+  // Prefetch zdjęć mini-kart produktów (do base64, wymagane przez pdfMake)
+  // W klasycznym flow (bez wizarda) nie wołane jest wzAttachMiniCardImages.
+  if (typeof wzAttachMiniCardImages === 'function') {
+    try { await wzAttachMiniCardImages(); } catch(e) { console.warn('mini-card prefetch:', e); }
   }
   await openPdfPreview();
 }
@@ -29186,6 +29661,34 @@ async function _wzFetchImageAsBase64(url) {
   }
 }
 
+/* Prefetchuje zdjęcia mini-kart produktów (dla wszystkich produktów użytych w wariantach)
+   do base64 i zapisuje w PRODUCT_MINI_CARDS[sbid]._base64_*. Wywołane raz przed PDF. */
+async function wzAttachMiniCardImages() {
+  try {
+    const sbids = new Set();
+    const variants = (state && Array.isArray(state.variants)) ? state.variants : [];
+    variants.forEach(v => {
+      try {
+        const list = (typeof getVariantProductSbids === 'function') ? getVariantProductSbids(v) : [];
+        list.forEach(s => sbids.add(s));
+      } catch(e) {}
+    });
+    const tasks = [];
+    sbids.forEach(sbid => {
+      const mc = PRODUCT_MINI_CARDS[sbid];
+      if (!mc) return;
+      // wyczyść poprzedni cache
+      mc._base64_indoor = null; mc._base64_outdoor = null; mc._base64_set = null;
+      if (mc.photo_indoor)  tasks.push(_wzFetchImageAsBase64(mc.photo_indoor).then(b => mc._base64_indoor = b));
+      if (mc.photo_outdoor) tasks.push(_wzFetchImageAsBase64(mc.photo_outdoor).then(b => mc._base64_outdoor = b));
+      if (mc.photo_set)     tasks.push(_wzFetchImageAsBase64(mc.photo_set).then(b => mc._base64_set = b));
+    });
+    await Promise.all(tasks);
+  } catch(e) {
+    console.warn('wzAttachMiniCardImages error:', e);
+  }
+}
+
 /* Dołącz karty produktów do state.variants (dla generatePdf) — pobiera zdjęcia
    jako base64 i zapisuje w v._productCard. Wywoływane z wzGeneratePdf przed
    handleGeneratePdf. */
@@ -30170,6 +30673,10 @@ function wzRenderStepFinalize() {
         <input type="checkbox" ${includeQr ? 'checked' : ''} onchange="wzSetFinalize('includeQr', this.checked)">
         <span>Dołącz kody QR (Facebook 4Climat + galeria realizacji)</span>
       </label>
+      <label class="wzn-check">
+        <input type="checkbox" ${(f.includeMiniCards !== false) ? 'checked' : ''} onchange="wzSetFinalize('includeMiniCards', this.checked)">
+        <span>Dołącz mini-kartę produktu pod każdym wariantem (zdjęcie + specyfikacja)</span>
+      </label>
     </div>
 
     <div class="wzn-section-h">
@@ -30415,6 +30922,8 @@ async function wzGeneratePdf() {
     state.owsKey = wzState.finalize?.owsKey || (wzState.basics.scope === 'hp' ? 'pompa_ciepla' : 'split_multi');
     state.attachments = (wzState.finalize?.attachments || []).map(a => ({...a}));
     state.linkedClientId = wzState.client.linkedId || null;
+    // Flaga mini-kart produktu — pod każdym wariantem w PDF
+    state.includeMiniCards = wzState.finalize?.includeMiniCards !== false;
 
     // 3) Zmapuj warianty (split lub multi)
     if (wzState.basics.scope === 'ac' && wzState.basics.mode === 'split') {
@@ -30619,6 +31128,11 @@ async function wzGeneratePdf() {
     // 5b) Dołącz karty produktów (pobierz zdjęcia jako base64) — dla wariantów z includeProductCard
     if (typeof wzAttachProductCards === 'function') {
       await wzAttachProductCards();
+    }
+
+    // 5c) Dołącz zdjęcia mini-kart produktów (zdjęcia + specyfikacja drukowane pod każdym wariantem)
+    if (typeof wzAttachMiniCardImages === 'function') {
+      await wzAttachMiniCardImages();
     }
 
     // 6) Otwórz PODGLĄD PDF (modal) zamiast bezpośredniego pobrania.
