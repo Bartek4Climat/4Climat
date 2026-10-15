@@ -9,7 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="1792063452">
+<meta name="app-version" content="1792064149">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -10439,19 +10439,32 @@ function renderAcProductsList() {
                         ${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Otwórz" style="padding:4px 6px;color:#0F3461;display:inline-block;"><i class="ti ti-external-link" style="font-size:12px;"></i></a>` : ''}
                       </td>
                       <td style="padding:6px 12px;text-align:center;white-space:nowrap;">
-                        ${hasSbid ? `
-                          <button onclick="openProductCardEditor(${p._sbid}, '${escapeHtml(p.marka || '').replace(/'/g, '&#39;')}', '${escapeHtml(modelClean).replace(/'/g, '&#39;')}')" title="Edytuj kartę katalogową (załącznik PDF)"
-                            style="padding:4px 8px;background:${(p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0) ? '#F0FDF4' : 'transparent'};color:${(p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0) ? '#166534' : '#0F3461'};border:1px solid ${(p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0) ? '#BBF7D0' : '#E2E8F0'};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
+                        ${hasSbid ? (function(){
+                          const hasCatalogCard = (p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0);
+                          const mc = (typeof PRODUCT_MINI_CARDS !== 'undefined') ? PRODUCT_MINI_CARDS[p._sbid] : null;
+                          const hasMini = mc && (typeof miniCardIsEmpty === 'function' ? !miniCardIsEmpty(mc) : true);
+                          const miniBg = hasMini ? '#EFF6FF' : 'transparent';
+                          const miniFg = hasMini ? '#1E40AF' : '#0F3461';
+                          const miniBd = hasMini ? '#BFDBFE' : '#E2E8F0';
+                          const catBg = hasCatalogCard ? '#F0FDF4' : 'transparent';
+                          const catFg = hasCatalogCard ? '#166534' : '#0F3461';
+                          const catBd = hasCatalogCard ? '#BBF7D0' : '#E2E8F0';
+                          const safeMarka = escapeHtml(p.marka || '').replace(/'/g, '&#39;');
+                          const safeModel = escapeHtml(modelClean).replace(/'/g, '&#39;');
+                          const cat = p._type || 'split';
+                          return `
+                          <button onclick="openProductCardEditor(${p._sbid}, '${safeMarka}', '${safeModel}')" title="Edytuj kartę katalogową (załącznik PDF)"
+                            style="padding:4px 8px;background:${catBg};color:${catFg};border:1px solid ${catBd};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
                             <i class="ti ti-id" style="font-size:12px;"></i>
                           </button>
-                          <button onclick="openMiniCardEditor(${p._sbid}, '${escapeHtml(p.marka || '').replace(/'/g, '&#39;')}', '${escapeHtml(modelClean).replace(/'/g, '&#39;')}', '${rowKey.split('|')[0]}')" title="Mini-karta pod wariantem w PDF (zdjęcie + specyfikacja)"
-                            style="padding:4px 8px;background:${(function(){var mc=PRODUCT_MINI_CARDS[p._sbid]; return mc && !miniCardIsEmpty(mc) ? '#EFF6FF' : 'transparent';})()};color:${(function(){var mc=PRODUCT_MINI_CARDS[p._sbid]; return mc && !miniCardIsEmpty(mc) ? '#1E40AF' : '#0F3461';})()};border:1px solid ${(function(){var mc=PRODUCT_MINI_CARDS[p._sbid]; return mc && !miniCardIsEmpty(mc) ? '#BFDBFE' : '#E2E8F0';})()};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
+                          <button onclick="openMiniCardEditor(${p._sbid}, '${safeMarka}', '${safeModel}', '${cat}')" title="Mini-karta pod wariantem w PDF (zdjęcie + specyfikacja)"
+                            style="padding:4px 8px;background:${miniBg};color:${miniFg};border:1px solid ${miniBd};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
                             <i class="ti ti-photo" style="font-size:12px;"></i>
                           </button>
-                          <button onclick="_acDeleteProduct(${p._sbid}, '${escapeHtml(modelClean).replace(/'/g, '&#39;')}')" title="Usuń pozycję" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;">
+                          <button onclick="_acDeleteProduct(${p._sbid}, '${safeModel}')" title="Usuń pozycję" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;">
                             <i class="ti ti-trash" style="font-size:12px;"></i>
-                          </button>
-                        ` : ''}
+                          </button>`;
+                        })() : ''}
                       </td>
                     </tr>
                   `;
