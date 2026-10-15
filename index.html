@@ -9,7 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="1792064149">
+<meta name="app-version" content="1792064653">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -10449,20 +10449,24 @@ function renderAcProductsList() {
                           const catBg = hasCatalogCard ? '#F0FDF4' : 'transparent';
                           const catFg = hasCatalogCard ? '#166534' : '#0F3461';
                           const catBd = hasCatalogCard ? '#BBF7D0' : '#E2E8F0';
-                          const safeMarka = escapeHtml(p.marka || '').replace(/'/g, '&#39;');
-                          const safeModel = escapeHtml(modelClean).replace(/'/g, '&#39;');
+                          const dMarka = encodeURIComponent(p.marka || '');
+                          const dModel = encodeURIComponent(modelClean || '');
                           const cat = p._type || 'split';
                           return `
-                          <button onclick="openProductCardEditor(${p._sbid}, '${safeMarka}', '${safeModel}')" title="Edytuj kartę katalogową (załącznik PDF)"
+                          <button type="button" data-ac-btn="catalog" data-sbid="${p._sbid}" data-marka="${dMarka}" data-model="${dModel}"
+                            title="Edytuj kartę katalogową (załącznik PDF)"
                             style="padding:4px 8px;background:${catBg};color:${catFg};border:1px solid ${catBd};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
-                            <i class="ti ti-id" style="font-size:12px;"></i>
+                            <i class="ti ti-id" style="font-size:12px;pointer-events:none;"></i>
                           </button>
-                          <button onclick="openMiniCardEditor(${p._sbid}, '${safeMarka}', '${safeModel}', '${cat}')" title="Mini-karta pod wariantem w PDF (zdjęcie + specyfikacja)"
+                          <button type="button" data-ac-btn="minicard" data-sbid="${p._sbid}" data-marka="${dMarka}" data-model="${dModel}" data-cat="${cat}"
+                            title="Mini-karta pod wariantem w PDF (zdjęcie + specyfikacja)"
                             style="padding:4px 8px;background:${miniBg};color:${miniFg};border:1px solid ${miniBd};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
-                            <i class="ti ti-photo" style="font-size:12px;"></i>
+                            <i class="ti ti-photo" style="font-size:12px;pointer-events:none;"></i>
                           </button>
-                          <button onclick="_acDeleteProduct(${p._sbid}, '${safeModel}')" title="Usuń pozycję" style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;">
-                            <i class="ti ti-trash" style="font-size:12px;"></i>
+                          <button type="button" data-ac-btn="delete" data-sbid="${p._sbid}" data-model="${dModel}"
+                            title="Usuń pozycję"
+                            style="padding:4px 8px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:4px;font-size:11px;cursor:pointer;">
+                            <i class="ti ti-trash" style="font-size:12px;pointer-events:none;"></i>
                           </button>`;
                         })() : ''}
                       </td>
@@ -10798,11 +10802,16 @@ function renderProductCardEditor() {
         </div>
 
         <!-- AKCJE -->
-        <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid #E2E8F0;">
-          <button onclick="closeProductCardEditor()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
-          <button onclick="_cardSave()" style="padding:9px 22px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-            <i class="ti ti-check" style="font-size:14px;"></i> Zapisz kartę
+        <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #E2E8F0;flex-wrap:wrap;">
+          <button type="button" onclick="openCatalogCardCopyDialog()" style="padding:9px 14px;background:#F0F9FF;color:#0369A1;border:1px solid #BAE6FD;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+            <i class="ti ti-copy" style="font-size:13px;"></i> Zastosuj do innych pozycji…
           </button>
+          <div style="display:flex;gap:8px;">
+            <button type="button" onclick="closeProductCardEditor()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
+            <button type="button" onclick="_cardSave()" style="padding:9px 22px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <i class="ti ti-check" style="font-size:14px;"></i> Zapisz kartę
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -10878,6 +10887,38 @@ async function _cardSave() {
    Drukuje się pod każdym wariantem w PDF jako: zdjęcie + tabelka specyfikacji.
    ============================================================ */
 let _miniCardEditing = null;
+
+// Delegowany listener na przyciski akcji w liście AC (karta / mini-karta / usuń).
+// Rejestrujemy raz, działa dla każdego render'u listy — niezależny od escape issues inline onclick.
+(function _registerAcActionsDelegate(){
+  if (window._acActionsDelegateRegistered) return;
+  window._acActionsDelegateRegistered = true;
+  document.addEventListener('click', function(e){
+    const btn = e.target.closest('button[data-ac-btn]');
+    if (!btn) return;
+    const kind = btn.getAttribute('data-ac-btn');
+    const sbidRaw = btn.getAttribute('data-sbid');
+    const sbid = sbidRaw ? (isNaN(sbidRaw) ? sbidRaw : parseInt(sbidRaw, 10)) : null;
+    const marka = decodeURIComponent(btn.getAttribute('data-marka') || '');
+    const model = decodeURIComponent(btn.getAttribute('data-model') || '');
+    const cat = btn.getAttribute('data-cat') || 'split';
+    if (!sbid) { console.warn('[ac-btn] brak sbid'); return; }
+    try {
+      if (kind === 'catalog' && typeof openProductCardEditor === 'function') {
+        openProductCardEditor(sbid, marka, model);
+      } else if (kind === 'minicard' && typeof openMiniCardEditor === 'function') {
+        openMiniCardEditor(sbid, marka, model, cat);
+      } else if (kind === 'delete' && typeof _acDeleteProduct === 'function') {
+        _acDeleteProduct(sbid, model);
+      } else {
+        console.warn('[ac-btn] nieobsługiwana akcja:', kind);
+      }
+    } catch(err) {
+      console.error('[ac-btn] błąd przy akcji ' + kind, err);
+      if (typeof showToast === 'function') showToast('Błąd: ' + (err.message || err));
+    }
+  }, true);
+})();
 
 async function openMiniCardEditor(sbid, marka, model, category) {
   if (!sbid) return;
@@ -11034,13 +11075,18 @@ function renderMiniCardEditor() {
         </div>
 
         <!-- AKCJE -->
-        <div style="display:flex;gap:8px;justify-content:space-between;padding-top:14px;border-top:1px solid #E2E8F0;">
-          <button onclick="_miniCardReset()" style="padding:9px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
-            <i class="ti ti-trash" style="font-size:13px;"></i> Usuń całą mini-kartę
-          </button>
+        <div style="display:flex;gap:8px;justify-content:space-between;padding-top:14px;border-top:1px solid #E2E8F0;flex-wrap:wrap;">
           <div style="display:flex;gap:8px;">
-            <button onclick="closeMiniCardEditor()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
-            <button onclick="_miniCardSave()" style="padding:9px 22px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+            <button type="button" onclick="_miniCardReset()" style="padding:9px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="ti ti-trash" style="font-size:13px;"></i> Usuń mini-kartę
+            </button>
+            <button type="button" onclick="openMiniCardCopyDialog()" style="padding:9px 14px;background:#F0F9FF;color:#0369A1;border:1px solid #BAE6FD;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="ti ti-copy" style="font-size:13px;"></i> Zastosuj do innych pozycji…
+            </button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" onclick="closeMiniCardEditor()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
+            <button type="button" onclick="_miniCardSave()" style="padding:9px 22px;background:#0F3461;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
               <i class="ti ti-check" style="font-size:14px;"></i> Zapisz mini-kartę
             </button>
           </div>
@@ -11048,6 +11094,202 @@ function renderMiniCardEditor() {
       </div>
     </div>
   `;
+}
+
+/* ============================================================
+   KOPIOWANIE DANYCH DO INNYCH POZYCJI
+   Działa dla mini-karty i karty katalogowej.
+   Mode: 'mini' | 'catalog'
+   ============================================================ */
+function openMiniCardCopyDialog() { openCopyProductDataDialog('mini'); }
+function openCatalogCardCopyDialog() { openCopyProductDataDialog('catalog'); }
+
+async function openCopyProductDataDialog(mode) {
+  const src = (mode === 'mini') ? _miniCardEditing : _cardEditing;
+  if (!src || !src.sbid) { showToast('Brak źródłowej karty'); return; }
+  // Zbierz wszystkie produkty z DB oprócz źródłowego, pogrupowane po marce
+  const allProds = [];
+  ['split','multi_zew','multi_wew'].forEach(cat => {
+    (DB[cat] || []).forEach(p => {
+      if (!p._sbid || p._sbid === src.sbid) return;
+      allProds.push({ sbid: p._sbid, marka: p.marka || '—', model: p.model || '—', cat });
+    });
+  });
+  // Grupy po marce
+  const byBrand = {};
+  allProds.forEach(p => {
+    const b = p.marka.toUpperCase();
+    if (!byBrand[b]) byBrand[b] = [];
+    byBrand[b].push(p);
+  });
+  // Sortowanie: najpierw ta sama marka co źródło, potem reszta alfabetycznie
+  const srcBrand = (src.marka || '').toUpperCase();
+  const brandNames = Object.keys(byBrand).sort((a,b) => {
+    if (a === srcBrand) return -1;
+    if (b === srcBrand) return 1;
+    return a.localeCompare(b, 'pl');
+  });
+
+  // Modal
+  let mod = document.getElementById('copyDataModal');
+  if (mod) mod.remove();
+  mod = document.createElement('div');
+  mod.id = 'copyDataModal';
+  mod.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+  mod.onclick = (e) => { if (e.target === mod) mod.remove(); };
+
+  const modeLabel = mode === 'mini' ? 'mini-kartę (zdjęcia + specyfikację)' : 'kartę katalogową (zdjęcia + parametry + opis)';
+  const brandsHtml = brandNames.map(b => `
+    <div style="border-top:1px solid #E2E8F0;padding:10px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <strong style="font-size:12px;color:#0A2647;">${escapeHtml(b)}${b === srcBrand ? ' <span style="font-size:10px;color:#059669;font-weight:600;padding:1px 6px;background:#D1FAE5;border-radius:3px;margin-left:4px;">ta sama marka</span>' : ''}</strong>
+        <div style="display:flex;gap:6px;">
+          <button type="button" data-brand-pick="${escapeHtml(b)}" data-pick-mode="all" style="padding:3px 8px;background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;border-radius:4px;font-size:10.5px;cursor:pointer;">Zaznacz wszystkie</button>
+          <button type="button" data-brand-pick="${escapeHtml(b)}" data-pick-mode="none" style="padding:3px 8px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:4px;font-size:10.5px;cursor:pointer;">Odznacz</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:4px;">
+        ${byBrand[b].map(p => `
+          <label style="display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:4px;cursor:pointer;font-size:11.5px;color:#334155;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+            <input type="checkbox" data-copy-sbid="${p.sbid}" data-copy-brand="${escapeHtml(b)}" style="margin:0;">
+            <span>${escapeHtml(p.model)}</span>
+            <span style="margin-left:auto;font-size:10px;color:#94A3B8;">${p.cat === 'multi_zew' ? 'MULTI ZEW' : p.cat === 'multi_wew' ? 'MULTI WEW' : 'SPLIT'}</span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  mod.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:720px;width:100%;max-height:88vh;display:flex;flex-direction:column;">
+      <div style="padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;background:#F0F9FF;color:#0369A1;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+          <i class="ti ti-copy" style="font-size:18px;"></i>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:14.5px;font-weight:700;color:#0A2647;">Zastosuj ${modeLabel} do innych pozycji</div>
+          <div style="font-size:11px;color:#64748B;margin-top:1px;">Źródło: <strong>${escapeHtml(src.marka || '')} ${escapeHtml(src.model || '')}</strong></div>
+        </div>
+        <button type="button" onclick="document.getElementById('copyDataModal').remove()" style="padding:6px 10px;background:transparent;border:1px solid #E2E8F0;border-radius:5px;font-size:12px;cursor:pointer;color:#64748B;">✕</button>
+      </div>
+
+      <div style="padding:10px 18px 6px;background:#F0F9FF;border-bottom:1px solid #E0F2FE;font-size:11.5px;color:#0C4A6E;">
+        <i class="ti ti-info-circle" style="font-size:12px;"></i> Zaznacz pozycje, do których chcesz skopiować te same dane. Istniejące dane w tych pozycjach zostaną nadpisane. Zdjęcia są współdzielone (ten sam URL).
+        <div style="margin-top:6px;display:flex;gap:10px;font-size:11px;">
+          <strong>Zaznaczonych: <span id="copySelectedCount">0</span></strong>
+        </div>
+      </div>
+
+      <div style="overflow:auto;flex:1;" id="copyBrandsList">
+        ${brandsHtml || '<div style="padding:40px;text-align:center;color:#94A3B8;">Brak innych produktów w bazie.</div>'}
+      </div>
+
+      <div style="padding:12px 18px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:#64748B;">Operacja jest nieodwracalna — zapisuje się od razu do bazy.</span>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="document.getElementById('copyDataModal').remove()" style="padding:9px 16px;background:transparent;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;">Anuluj</button>
+          <button type="button" id="copyApplyBtn" onclick="_applyCopyProductData('${mode}')" style="padding:9px 22px;background:#0369A1;color:#fff;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;">
+            <i class="ti ti-check" style="font-size:14px;"></i> Zastosuj do zaznaczonych
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(mod);
+
+  // Delegaty w modalu
+  mod.addEventListener('change', (e) => {
+    if (e.target.matches('input[type="checkbox"][data-copy-sbid]')) {
+      const n = mod.querySelectorAll('input[type="checkbox"][data-copy-sbid]:checked').length;
+      const el = document.getElementById('copySelectedCount');
+      if (el) el.textContent = n;
+    }
+  });
+  mod.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-brand-pick]');
+    if (!btn) return;
+    const brand = btn.getAttribute('data-brand-pick');
+    const mode = btn.getAttribute('data-pick-mode');
+    mod.querySelectorAll('input[type="checkbox"][data-copy-brand="' + CSS.escape(brand) + '"]').forEach(cb => {
+      cb.checked = (mode === 'all');
+    });
+    const n = mod.querySelectorAll('input[type="checkbox"][data-copy-sbid]:checked').length;
+    const el = document.getElementById('copySelectedCount');
+    if (el) el.textContent = n;
+  });
+}
+
+async function _applyCopyProductData(mode) {
+  const mod = document.getElementById('copyDataModal');
+  if (!mod) return;
+  const btn = document.getElementById('copyApplyBtn');
+  const checked = mod.querySelectorAll('input[type="checkbox"][data-copy-sbid]:checked');
+  if (checked.length === 0) { showToast('Zaznacz przynajmniej jedną pozycję'); return; }
+  if (!confirm('Zastosować dane do ' + checked.length + ' pozycji? Istniejące dane w tych pozycjach zostaną nadpisane.')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Zapisuję…'; }
+
+  const targetSbids = Array.from(checked).map(cb => {
+    const s = cb.getAttribute('data-copy-sbid');
+    return isNaN(s) ? s : parseInt(s, 10);
+  });
+
+  try {
+    if (mode === 'mini') {
+      if (!_miniCardEditing) throw new Error('Brak źródłowej mini-karty');
+      // Przygotuj payload identyczny jak w _miniCardSave
+      const cleanSpecs = {};
+      Object.keys(_miniCardEditing.specs).forEach(k => {
+        const v = (_miniCardEditing.specs[k] || '').toString().trim();
+        if (v) cleanSpecs[k] = v;
+      });
+      const payload = {
+        photo_indoor: _miniCardEditing.photo_indoor || '',
+        photo_outdoor: _miniCardEditing.photo_outdoor || '',
+        photo_set: _miniCardEditing.photo_set || '',
+        specs: cleanSpecs
+      };
+      // Nadpisz w PRODUCT_MINI_CARDS dla każdego targetu
+      targetSbids.forEach(sbid => {
+        PRODUCT_MINI_CARDS[sbid] = JSON.parse(JSON.stringify(payload));
+      });
+      const ok = await saveMiniCardsToSupabase();
+      if (!ok) throw new Error('Zapis mini-kart nie powiódł się');
+      showToast('Mini-kartę skopiowano do ' + targetSbids.length + ' pozycji');
+    } else if (mode === 'catalog') {
+      if (!_cardEditing) throw new Error('Brak źródłowej karty katalogowej');
+      const cleanSpecs = _cardEditing.specs.filter(s => (s.label || '').trim() && (s.value || '').trim());
+      const patch = {
+        card_photos: _cardEditing.photos,
+        card_specs: cleanSpecs,
+        card_description: (_cardEditing.description || '').trim() || null
+      };
+      let okCount = 0;
+      for (const sbid of targetSbids) {
+        const ok = await saveProductCard(sbid, patch);
+        if (ok) {
+          okCount++;
+          // Zaktualizuj lokalny DB
+          for (const cat of ['split','multi_zew','multi_wew']) {
+            const arr = DB[cat] || [];
+            const idx = arr.findIndex(x => x._sbid === sbid);
+            if (idx >= 0) {
+              arr[idx].card_photos = patch.card_photos;
+              arr[idx].card_specs = patch.card_specs;
+              arr[idx].card_description = patch.card_description;
+              break;
+            }
+          }
+        }
+      }
+      showToast('Kartę katalogową skopiowano do ' + okCount + ' z ' + targetSbids.length + ' pozycji');
+    }
+    mod.remove();
+    renderAcProductsList();
+  } catch(e) {
+    console.error('[copyProductData] błąd:', e);
+    showToast('Błąd: ' + (e.message || e));
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Zastosuj do zaznaczonych'; }
+  }
 }
 
 async function _miniCardUploadPhoto(role, input) {
