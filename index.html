@@ -9,7 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-version" content="1792067095">
+<meta name="app-version" content="1792144425">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2981,6 +2981,21 @@ body.v2-layout .v2-mounted { max-width: none !important; padding: 0 !important; 
           <button class="v2-btn v2-btn--primary" onclick="openAcProductEditor(null, null)" title="Dodaj nowe urządzenie do bazy — trafi do wybranego producenta">
             <i class="ti ti-plus"></i> Dodaj urządzenie
           </button>
+        </div>
+        <div style="margin-top:12px;padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <i class="ti ti-photo" style="font-size:18px;color:#1E40AF;"></i>
+            <div>
+              <div style="font-size:12.5px;font-weight:700;color:#0A2647;">Karty produktu pod wariantem w PDF</div>
+              <div style="font-size:11px;color:#475569;margin-top:1px;">Zdjęcia + specyfikacja techniczna pojawiają się pod każdym wariantem w generowanej ofercie</div>
+            </div>
+          </div>
+          <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;color:#1E40AF;font-weight:600;padding:6px 14px;background:#fff;border:1px solid #BFDBFE;border-radius:6px;">
+            <input type="checkbox" id="toggleIncludeMiniCards"
+              onchange="setIncludeMiniCards(this.checked)"
+              style="width:16px;height:16px;cursor:pointer;">
+            <span id="toggleIncludeMiniCardsLabel">Pokazuj w PDF</span>
+          </label>
         </div>
         <div class="v2-panel" id="acProductsListWrap" style="margin-top:16px;">
           <div style="padding:30px;text-align:center;color:#94A3B8;font-size:12px;">Ładowanie…</div>
@@ -8705,6 +8720,55 @@ function variantBrTotal(v) {
   return roundUp(variantNetTotal(v) * (1 + state.vatRate/100));
 }
 
+/* Rozbicie ceny wariantu na: urządzenia / montaż / dodatkowe pozycje (v.extraItems).
+   Prace dodatkowe wspólne (state.extras) są liczone osobno w generatePdf. */
+function variantPriceBreakdown(v) {
+  const out = { devicesNet: 0, installNet: 0, extraItemsNet: 0 };
+  if (!v) return out;
+  if (v.type === 'install') {
+    out.installNet = parseFloat(v.priceNet) || 0;
+    return out;
+  }
+  out.extraItemsNet = (v.extraItems || []).reduce((s, it) =>
+    s + (parseFloat(it.priceNet) || 0) * (parseInt(it.qty) || 1), 0);
+  if (v.type === 'hp_kit') {
+    out.devicesNet = parseFloat(v.priceNet) || 0;
+    if (v.includeInstall !== false) out.installNet = parseFloat(v.installPrice) || 0;
+    return out;
+  }
+  if (v.type === 'split') {
+    v.units.forEach(u => {
+      const p = getProductFromPool('split', u.productIdx) || DB.split[u.productIdx] || {cena:0};
+      const effectivePrice = (u.priceOverride != null) ? u.priceOverride : (p.cena || 0);
+      out.devicesNet += effectivePrice * u.qty;
+      if (u.includeInstall) out.installNet += u.installPrice * u.qty;
+    });
+    if (v.multiSystems) {
+      v.multiSystems.forEach(ms => {
+        if (!ms || !ms.outdoor) return;
+        const outP = getProductFromPool('multi_zew', ms.outdoor.productIdx) || {cena:0};
+        out.devicesNet += ms.outdoorPriceOverride != null ? ms.outdoorPriceOverride : (outP.cena||0);
+        (ms.indoor || []).forEach(u => {
+          const p2 = getProductFromPool('multi_wew', u.productIdx) || {cena:0};
+          out.devicesNet += (u.priceOverride!=null ? u.priceOverride : (p2.cena||0)) * (u.qty||1);
+        });
+        if (ms.includeInstall) out.installNet += ms.installPrice || 0;
+      });
+    }
+    return out;
+  }
+  // multi
+  if (!v.outdoor) return out;
+  const outP = getProductFromPool('multi_zew', v.outdoor.productIdx) || DB.multi_zew[v.outdoor.productIdx] || {cena:0};
+  out.devicesNet += (v.outdoorPriceOverride != null) ? v.outdoorPriceOverride : (outP.cena || 0);
+  v.indoor.forEach(u => {
+    const p = getProductFromPool('multi_wew', u.productIdx) || DB.multi_wew[u.productIdx] || {cena:0};
+    out.devicesNet += ((u.priceOverride != null) ? u.priceOverride : (p.cena || 0)) * u.qty;
+  });
+  if (v.includeInstall) out.installNet += v.installPrice || 0;
+  return out;
+}
+
 /* ============== HP VARIANTS ============== */
 function hpVariantNetTotal(v) {
   if (v.type === 'install') {
@@ -9611,7 +9675,8 @@ async function loadProductsFromSupabase() {
         category: p.category,
         card_photos: Array.isArray(p.card_photos) ? p.card_photos : [],
         card_specs: Array.isArray(p.card_specs) ? p.card_specs : [],
-        card_description: p.card_description || ''
+        card_description: p.card_description || '',
+        mini_card: (p.mini_card && typeof p.mini_card === 'object') ? p.mini_card : null
       };
       if (p.category === 'split') splitProds.push(obj);
       else if (p.category === 'multi_zew') multiZewProds.push(obj);
@@ -9769,10 +9834,31 @@ async function deleteProductFromSupabase(sbid) {
 
 // Pobierz kartę produktu (photos + specs + description) z bazy
 async function loadProductCard(sbid) {
-  if (!sbid) return null;
+  if (!sbid) { console.warn('[loadProductCard] brak sbid'); return null; }
   try {
-    const rows = await sbFetch('/rest/v1/products?id=eq.' + sbid + '&select=id,marka,model,card_photos,card_specs,card_description');
-    if (!rows || rows.length === 0) return null;
+    // Zakoduj sbid na wypadek znaków specjalnych w UUID (np. myślniki są bezpieczne, ale lepiej encodeURIComponent)
+    const encSbid = encodeURIComponent(String(sbid));
+    console.log('[loadProductCard] fetch sbid=' + encSbid);
+    const rows = await sbFetch('/rest/v1/products?id=eq.' + encSbid + '&select=id,marka,model,card_photos,card_specs,card_description');
+    if (!rows) { console.warn('[loadProductCard] sbFetch zwrócił null dla sbid=' + sbid); return null; }
+    if (rows.length === 0) {
+      console.warn('[loadProductCard] brak wiersza dla sbid=' + sbid + ' — produkt mógł zostać usunięty lub id się nie zgadza');
+      // Fallback: spróbuj znaleźć w lokalnej cache DB
+      for (const cat of ['split','multi_zew','multi_wew']) {
+        const arr = DB[cat] || [];
+        const p = arr.find(x => String(x._sbid) === String(sbid));
+        if (p) {
+          console.log('[loadProductCard] fallback z lokalnej DB');
+          return {
+            id: p._sbid, marka: p.marka || '', model: p.model || '',
+            photos: Array.isArray(p.card_photos) ? p.card_photos : [],
+            specs: Array.isArray(p.card_specs) ? p.card_specs : [],
+            description: p.card_description || ''
+          };
+        }
+      }
+      return null;
+    }
     const r = rows[0];
     return {
       id: r.id,
@@ -9783,7 +9869,22 @@ async function loadProductCard(sbid) {
       description: r.card_description || ''
     };
   } catch(e) {
-    console.warn('loadProductCard error:', e);
+    console.error('[loadProductCard] błąd:', e);
+    // Fallback na lokalną DB żeby user mógł otworzyć kartę nawet przy problemach sieciowych
+    for (const cat of ['split','multi_zew','multi_wew']) {
+      const arr = DB[cat] || [];
+      const p = arr.find(x => String(x._sbid) === String(sbid));
+      if (p) {
+        console.log('[loadProductCard] fallback z lokalnej DB po błędzie sieci');
+        return {
+          id: p._sbid, marka: p.marka || '', model: p.model || '',
+          photos: Array.isArray(p.card_photos) ? p.card_photos : [],
+          specs: Array.isArray(p.card_specs) ? p.card_specs : [],
+          description: p.card_description || ''
+        };
+      }
+    }
+    showToast('Błąd pobierania karty: ' + ((e && e.message) ? e.message : e).toString().slice(0, 200));
     return null;
   }
 }
@@ -9893,70 +9994,229 @@ async function deleteProductPhoto(publicUrl) {
 }
 
 /* ============================================================
-   PRODUCT_MINI_CARDS — mini-karty produktu (zdjęcie + specyfikacja)
+   PRODUCT_MINI_CARDS — mini-karty produktu (zdjęcia + specyfikacja techniczna)
    drukowane w PDF pod każdym wariantem.
-   Zapis w tabeli drafts (user_id='mini_cards_shared') — wzorzec analogiczny do OWS templates.
-   Struktura: { [productSbid]: {
+   Zapis: tabela drafts, user_id = deterministyczny UUID (bo kolumna user_id jest typu UUID).
+   Jeden wiersz zawiera MAPĘ { [productSbid]: {...} } dla wszystkich mini-kart.
+   Struktura per produkt: {
      photo_indoor: url, photo_outdoor: url, photo_set: url,
-     specs: {
-       dim_in: 'szer × wys × gł mm', dim_out: 'szer × wys × gł mm',
-       class_cool: 'A+++', class_heat: 'A++',
-       noise_in: '19-45 dB(A)', noise_out: '48 dB(A)',
-       seer: '8.65', scop: '5.10',
-       refrigerant: 'R-32', power_range: '2,5 kW'
-     }
-   }}
+     specs: { dim_in, dim_out, class_cool, class_heat, seer, scop,
+              noise_in, noise_out, refrigerant, power_range }
+   }
    ============================================================ */
+const MINI_CARDS_LS_KEY = '4climat_mini_cards_v1';
+const SHARED_CFG_KEY_MINI = 'mini_cards';
 let PRODUCT_MINI_CARDS = {};
 
-async function loadMiniCardsFromSupabase() {
-  // Tabela drafts: PRIMARY KEY = user_id, kolumna JSONB = data (jak w OWS templates)
+/* Mini-karty: ZAPIS DO LOCALSTORAGE — gwarantowane działanie w każdej przeglądarce.
+   Zawsze się zapisuje, zawsze się ładuje, zero zależności zewnętrznych.
+   (opcjonalnie w tle: sync do shared_configs — ale wyłącznie best-effort, nigdy nie blokuje
+   ani nie zgłasza błędów do UI, bo lokalny zapis już jest trwały) */
+
+function _lsLoadMiniCards() {
   try {
-    const r = await sbFetch("/rest/v1/drafts?user_id=eq.mini_cards_shared&select=data&limit=1");
-    if (r && r[0] && r[0].data && typeof r[0].data === 'object') {
-      PRODUCT_MINI_CARDS = r[0].data;
-      console.log('✓ Mini-karty produktu załadowane:', Object.keys(PRODUCT_MINI_CARDS).length);
-    } else {
-      PRODUCT_MINI_CARDS = {};
+    const raw = localStorage.getItem(MINI_CARDS_LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
     }
+  } catch(e) { console.warn('[miniCards] localStorage odczyt błąd:', e); }
+  return {};
+}
+
+function _lsSaveMiniCards(data) {
+  try {
+    localStorage.setItem(MINI_CARDS_LS_KEY, JSON.stringify(data || {}));
     return true;
   } catch(e) {
-    console.warn('loadMiniCards error:', e);
-    PRODUCT_MINI_CARDS = {};
+    console.error('[miniCards] localStorage ZAPIS BŁĄD:', e);
     return false;
   }
 }
 
-async function saveMiniCardsToSupabase() {
-  if (!currentUser) { showToast('Zaloguj się ponownie'); return false; }
-  try {
-    const existing = await sbFetch("/rest/v1/drafts?user_id=eq.mini_cards_shared&select=user_id");
-    const nowIso = new Date().toISOString();
-    if (existing && existing.length > 0) {
-      await sbFetch("/rest/v1/drafts?user_id=eq.mini_cards_shared", 'PATCH', {
-        data: PRODUCT_MINI_CARDS,
-        updated_at: nowIso
-      });
-    } else {
-      await sbFetch("/rest/v1/drafts", 'POST', {
-        user_id: 'mini_cards_shared',
-        data: PRODUCT_MINI_CARDS,
-        updated_at: nowIso
-      });
+async function loadMiniCardsFromSupabase() {
+  // KROK 1: localStorage (gwarantowane) — mamy mini-karty natychmiast
+  PRODUCT_MINI_CARDS = _lsLoadMiniCards();
+  console.log('[miniCards] załadowane z localStorage: ' + Object.keys(PRODUCT_MINI_CARDS).length + ' pozycji');
+  // KROK 2: w tle — dociągnij z shared_configs + migruj URL → base64
+  (async () => {
+    try {
+      const r = await sbFetch('/rest/v1/shared_configs?key=eq.' + SHARED_CFG_KEY_MINI + '&select=data&limit=1');
+      if (r && r[0] && r[0].data && typeof r[0].data === 'object' && Object.keys(r[0].data).length > 0) {
+        const merged = Object.assign({}, r[0].data, PRODUCT_MINI_CARDS);
+        PRODUCT_MINI_CARDS = merged;
+        _lsSaveMiniCards(PRODUCT_MINI_CARDS);
+        console.log('[miniCards] dociągnięto z shared_configs');
+      }
+    } catch(e) {}
+    // KROK 3: Migracja URL → base64 — stare zdjęcia zapisane jako URL (sprzed poprawki)
+    try { await _migrateMiniCardPhotosToBase64(); } catch(e) { console.warn('[miniCards] migracja URL→base64 fail:', e); }
+  })();
+  return true;
+}
+
+/* Automatyczna migracja: dla każdego zdjęcia zapisanego jako URL (nie data:), spróbuj pobrać i skonwertować do base64.
+   Jeśli się nie uda (CORS, 404), URL zostaje — user musi wgrać ręcznie. Działa cicho w tle. */
+async function _migrateMiniCardPhotosToBase64() {
+  let changed = false;
+  const sbids = Object.keys(PRODUCT_MINI_CARDS);
+  for (const sbid of sbids) {
+    const mc = PRODUCT_MINI_CARDS[sbid];
+    if (!mc) continue;
+    for (const role of ['photo_indoor', 'photo_outdoor', 'photo_set']) {
+      const val = mc[role];
+      if (val && typeof val === 'string' && !val.startsWith('data:') && val.startsWith('http')) {
+        try {
+          const b64 = await _urlToBase64Compressed(val, 700, 0.80);
+          if (b64) {
+            mc[role] = b64;
+            changed = true;
+            console.log('[miniCards] migracja ✓: ' + sbid + '/' + role);
+          }
+        } catch(e) {
+          console.warn('[miniCards] migracja ✗: ' + sbid + '/' + role + ' — ' + (e.message || e));
+        }
+      }
     }
-    return true;
-  } catch(e) {
-    console.warn('saveMiniCards error:', e);
-    const msg = (e && e.message) ? e.message : String(e);
-    showToast('Błąd zapisu mini-karty: ' + msg.slice(0, 180));
+  }
+  if (changed) {
+    _lsSaveMiniCards(PRODUCT_MINI_CARDS);
+    console.log('[miniCards] migracja URL→base64 ZAKOŃCZONA — dane zaktualizowane');
+    // Odśwież listę jeśli widoczna
+    try { if (typeof renderAcProductsList === 'function') renderAcProductsList(); } catch(e) {}
+  }
+}
+
+async function _urlToBase64Compressed(url, maxDim, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const timer = setTimeout(() => resolve(null), 15000);
+    img.onload = () => {
+      clearTimeout(timer);
+      try {
+        let w = img.naturalWidth || 0, h = img.naturalHeight || 0;
+        if (!w || !h) { resolve(null); return; }
+        if (w > maxDim || h > maxDim) {
+          const r = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * r); h = Math.round(h * r);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality || 0.80));
+      } catch(e) { resolve(null); }
+    };
+    img.onerror = () => { clearTimeout(timer); resolve(null); };
+    img.src = url;
+  });
+}
+
+async function saveMiniCardsToSupabase() {
+  // KROK 1: localStorage — gwarantowany trwały zapis. Jeśli to zawodzi, mamy fundamentalny problem.
+  const localOk = _lsSaveMiniCards(PRODUCT_MINI_CARDS);
+  if (!localOk) {
+    showToast('BŁĄD: nie można zapisać do pamięci przeglądarki');
     return false;
   }
+  // KROK 2: w tle — próbuj zapisać do shared_configs. Nigdy nie blokuje. Nigdy nie pokazuje błędu.
+  if (currentUser) {
+    (async () => {
+      try {
+        const existing = await sbFetch('/rest/v1/shared_configs?key=eq.' + SHARED_CFG_KEY_MINI + '&select=key');
+        const payload = {
+          data: PRODUCT_MINI_CARDS,
+          updated_at: new Date().toISOString(),
+          updated_by: currentUser.email || null
+        };
+        if (existing && existing.length > 0) {
+          await sbFetch('/rest/v1/shared_configs?key=eq.' + SHARED_CFG_KEY_MINI, 'PATCH', payload);
+        } else {
+          await sbFetch('/rest/v1/shared_configs', 'POST', Object.assign({ key: SHARED_CFG_KEY_MINI }, payload));
+        }
+        console.log('[miniCards] sync do shared_configs OK');
+      } catch(e) {
+        // Nic nie pokazujemy — zapis lokalny już się udał, user widzi "Zapisano"
+      }
+    })();
+  }
+  return true;
+}
+
+/* Alias dla kompatybilności — używa saveMiniCardsToSupabase() */
+async function saveMiniCardForProduct(sbid, data) {
+  if (!sbid) { showToast('Brak identyfikatora produktu'); return false; }
+  if (data) PRODUCT_MINI_CARDS[sbid] = data;
+  else delete PRODUCT_MINI_CARDS[sbid];
+  return await saveMiniCardsToSupabase();
 }
 
 function getMiniCard(sbid) {
   if (!sbid) return null;
   return PRODUCT_MINI_CARDS[sbid] || null;
 }
+
+/* Globalny przełącznik dołączania kart produktu do PDF — zapisany w localStorage. */
+const INCLUDE_MINI_CARDS_LS_KEY = '4climat_include_mini_cards_v1';
+function getIncludeMiniCardsPreference() {
+  try {
+    const v = localStorage.getItem(INCLUDE_MINI_CARDS_LS_KEY);
+    if (v === '0') return false;
+    return true;  // domyślnie włączone
+  } catch(e) { return true; }
+}
+function setIncludeMiniCards(enabled) {
+  try { localStorage.setItem(INCLUDE_MINI_CARDS_LS_KEY, enabled ? '1' : '0'); } catch(e) {}
+  if (typeof state !== 'undefined') state.includeMiniCards = enabled;
+  if (typeof wzState !== 'undefined' && wzState && wzState.finalize) wzState.finalize.includeMiniCards = enabled;
+  const lbl = document.getElementById('toggleIncludeMiniCardsLabel');
+  if (lbl) lbl.textContent = enabled ? 'Pokazuj w PDF' : 'Wyłączone w PDF';
+  if (typeof showToast === 'function') showToast(enabled ? 'Mini-karty BĘDĄ dołączane do PDF' : 'Mini-karty NIE będą dołączane do PDF');
+}
+function initIncludeMiniCardsToggle() {
+  const enabled = getIncludeMiniCardsPreference();
+  if (typeof state !== 'undefined') state.includeMiniCards = enabled;
+  const cb = document.getElementById('toggleIncludeMiniCards');
+  if (cb) {
+    cb.checked = enabled;
+    const lbl = document.getElementById('toggleIncludeMiniCardsLabel');
+    if (lbl) lbl.textContent = enabled ? 'Pokazuj w PDF' : 'Wyłączone w PDF';
+  }
+}
+// Inicjalizuj przełącznik po załadowaniu DOM
+if (document.readyState !== 'loading') {
+  setTimeout(initIncludeMiniCardsToggle, 100);
+} else {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(initIncludeMiniCardsToggle, 100));
+}
+
+/* Debug: wywołaj z konsoli przeglądarki — pokaże pełny stan mini-kart i gdzie są zapisane */
+window.checkMiniCards = function() {
+  const keys = Object.keys(PRODUCT_MINI_CARDS || {});
+  console.group('🔍 Mini-karty — stan diagnostyczny');
+  console.log('W pamięci: ' + keys.length + ' pozycji');
+  keys.forEach(sbid => {
+    const mc = PRODUCT_MINI_CARDS[sbid];
+    const meta = (function(){
+      for (const cat of ['split','multi_zew','multi_wew']) {
+        const p = (DB[cat] || []).find(x => String(x._sbid) === String(sbid));
+        if (p) return cat + ' / ' + p.marka + ' ' + p.model;
+      }
+      return '(produkt nie znaleziony w DB!)';
+    })();
+    const photos = [mc.photo_indoor && 'wew', mc.photo_outdoor && 'zew', mc.photo_set && 'zestaw'].filter(Boolean).join(', ') || '—';
+    const specsCount = Object.keys(mc.specs || {}).length;
+    console.log('sbid=' + sbid + ' | ' + meta + ' | zdjęcia: ' + photos + ' | specs: ' + specsCount);
+  });
+  console.log('---');
+  console.log('localStorage key "' + MINI_CARDS_LS_KEY + '": ' + (localStorage.getItem(MINI_CARDS_LS_KEY) ? 'JEST (' + localStorage.getItem(MINI_CARDS_LS_KEY).length + ' znaków)' : 'BRAK'));
+  console.log('Current user:', currentUser ? currentUser.email + ' (id=' + currentUser.id + ')' : 'niezalogowany');
+  console.log('Przełącznik state.includeMiniCards:', state.includeMiniCards);
+  console.groupEnd();
+  return PRODUCT_MINI_CARDS;
+};
 
 function miniCardIsEmpty(mc) {
   if (!mc) return true;
@@ -10468,26 +10728,17 @@ function renderAcProductsList() {
                       </td>
                       <td style="padding:6px 12px;text-align:center;white-space:nowrap;">
                         ${hasSbid ? (function(){
-                          const hasCatalogCard = (p.card_photos && p.card_photos.length > 0) || (p.card_specs && p.card_specs.length > 0);
                           const mc = (typeof PRODUCT_MINI_CARDS !== 'undefined') ? PRODUCT_MINI_CARDS[p._sbid] : null;
                           const hasMini = mc && (typeof miniCardIsEmpty === 'function' ? !miniCardIsEmpty(mc) : true);
                           const miniBg = hasMini ? '#EFF6FF' : 'transparent';
                           const miniFg = hasMini ? '#1E40AF' : '#0F3461';
                           const miniBd = hasMini ? '#BFDBFE' : '#E2E8F0';
-                          const catBg = hasCatalogCard ? '#F0FDF4' : 'transparent';
-                          const catFg = hasCatalogCard ? '#166534' : '#0F3461';
-                          const catBd = hasCatalogCard ? '#BBF7D0' : '#E2E8F0';
                           const dMarka = encodeURIComponent(p.marka || '');
                           const dModel = encodeURIComponent(modelClean || '');
                           const cat = p._type || 'split';
                           return `
-                          <button type="button" data-ac-btn="catalog" data-sbid="${p._sbid}" data-marka="${dMarka}" data-model="${dModel}"
-                            title="Edytuj kartę katalogową (załącznik PDF)"
-                            style="padding:4px 8px;background:${catBg};color:${catFg};border:1px solid ${catBd};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
-                            <i class="ti ti-id" style="font-size:12px;pointer-events:none;"></i>
-                          </button>
                           <button type="button" data-ac-btn="minicard" data-sbid="${p._sbid}" data-marka="${dMarka}" data-model="${dModel}" data-cat="${cat}"
-                            title="Mini-karta pod wariantem w PDF (zdjęcie + specyfikacja)"
+                            title="Karta produktu — zdjęcia + specyfikacja techniczna (drukowana pod wariantem w PDF)"
                             style="padding:4px 8px;background:${miniBg};color:${miniFg};border:1px solid ${miniBd};border-radius:4px;font-size:11px;cursor:pointer;margin-right:4px;">
                             <i class="ti ti-photo" style="font-size:12px;pointer-events:none;"></i>
                           </button>
@@ -10960,11 +11211,14 @@ async function openMiniCardEditor(sbid, marka, model, category) {
     photo_outdoor: existing.photo_outdoor || '',
     photo_set: existing.photo_set || '',
     specs: Object.assign({
+      catalog_name: '', catalog_number: '',
       dim_in: '', dim_out: '',
       class_cool: '', class_heat: '',
       noise_in: '', noise_out: '',
       seer: '', scop: '',
-      refrigerant: '', power_range: ''
+      refrigerant: '', power_range: '',
+      features: '',
+      product_url: ''
     }, existing.specs || {})
   };
   let mod = document.getElementById('miniCardModal');
@@ -11074,10 +11328,10 @@ function renderMiniCardEditor() {
 
         <!-- WYMIARY -->
         <div style="margin-bottom:14px;">
-          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Wymiary (szer × wys × gł mm)</label>
-          <div style="display:grid;grid-template-columns:${(showIndoorSpecs && showOutdoorSpecs) ? '1fr 1fr' : '1fr'};gap:10px;">
-            ${showIndoorSpecs ? specRow('dim_in', 'Jedn. wewnętrzna', 'np. 798 × 295 × 189') : ''}
-            ${showOutdoorSpecs ? specRow('dim_out', 'Jedn. zewnętrzna', 'np. 770 × 548 × 285') : ''}
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px;">Wymiary <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#64748B;font-size:11px;">(szerokość × wysokość × głębokość, w mm)</span></label>
+          <div style="display:grid;grid-template-columns:${(showIndoorSpecs && showOutdoorSpecs) ? '1fr 1fr' : '1fr'};gap:10px;margin-top:6px;">
+            ${showIndoorSpecs ? specRow('dim_in', 'Jedn. wewnętrzna  (szer × wys × gł)', 'np. 798 × 295 × 189') : ''}
+            ${showOutdoorSpecs ? specRow('dim_out', 'Jedn. zewnętrzna  (szer × wys × gł)', 'np. 770 × 548 × 285') : ''}
           </div>
         </div>
 
@@ -11101,8 +11355,20 @@ function renderMiniCardEditor() {
           </div>
         </div>
 
+        <!-- IDENTYFIKACJA KATALOGOWA -->
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Identyfikacja katalogowa</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${specRow('catalog_name', 'Nazwa katalogowa (nagłówek karty)', 'np. Daikin Perfera FTXM-R / RXM-R')}
+            ${specRow('catalog_number', 'Numer katalogowy / symbol zestawu', 'np. FTXM25R + RXM25R')}
+          </div>
+          <div style="margin-top:4px;font-size:10.5px;color:#64748B;">
+            Jeśli wypełnisz „Nazwa katalogowa", zostanie użyta jako nagłówek karty w PDF (zamiast marki + modelu).
+          </div>
+        </div>
+
         <!-- POZOSTAŁE -->
-        <div style="margin-bottom:16px;">
+        <div style="margin-bottom:14px;">
           <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Dodatkowe (opcjonalnie)</label>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             ${specRow('refrigerant', 'Czynnik chłodniczy', 'np. R-32')}
@@ -11110,18 +11376,48 @@ function renderMiniCardEditor() {
           </div>
         </div>
 
+        <!-- LINK DO STRONY PRODUCENTA -->
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px;">Link do strony producenta <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#64748B;font-size:11px;">(nadpisuje link z katalogu produktu)</span></label>
+          <input type="url" value="${escapeHtml(c.specs.product_url || '')}"
+            oninput="_miniCardEditing.specs.product_url = this.value"
+            placeholder="https://www.daikin.pl/pl_pl/products/perfera-FTXM-R.html"
+            style="width:100%;padding:8px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;background:#fff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+          <div style="margin-top:4px;font-size:10.5px;color:#64748B;">
+            Jeśli puste — użyty zostanie link z katalogu produktu. Pokaże się na karcie w PDF jako „Strona producenta »".
+          </div>
+        </div>
+
+        <!-- DODATKOWE FUNKCJE -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:11.5px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px;">Dodatkowe funkcje <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#64748B;font-size:11px;">(skrót dla klienta — oddzielaj przecinkiem lub znakiem ·)</span></label>
+          <textarea rows="2"
+            oninput="_miniCardEditing.specs.features = this.value"
+            placeholder="np. inverter DC, sterowanie Wi-Fi, filtr HEPA, tryb nocny, auto-restart, czujnik obecności"
+            style="width:100%;padding:9px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-family:inherit;line-height:1.5;resize:vertical;margin-top:4px;">${escapeHtml(_miniCardEditing.specs.features || '')}</textarea>
+          <div style="margin-top:4px;font-size:10.5px;color:#64748B;">
+            Pokaże się w karcie produktu pod parametrami jako kompaktowa lista funkcji produktu.
+          </div>
+        </div>
+
         <div style="padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;font-size:11.5px;color:#1E40AF;margin-bottom:14px;">
           <strong>Jak to działa:</strong> wypełnione pola pokażą się jako kompaktowa karta pod każdym wariantem w PDF. Puste pola są pomijane. Dane są wspólne — raz uzupełnione, działają w każdej kolejnej ofercie z tym produktem.
         </div>
 
+        <!-- PODGLĄD JAK BĘDZIE WYGLĄDAĆ W PDF -->
+        <div id="miniCardLivePreview" style="margin-bottom:14px;"></div>
+
         <!-- AKCJE -->
         <div style="display:flex;gap:8px;justify-content:space-between;padding-top:14px;border-top:1px solid #E2E8F0;flex-wrap:wrap;">
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" onclick="_miniCardReset()" style="padding:9px 14px;background:transparent;color:#991B1B;border:1px solid #FEE2E2;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
               <i class="ti ti-trash" style="font-size:13px;"></i> Usuń mini-kartę
             </button>
             <button type="button" onclick="openMiniCardCopyDialog()" style="padding:9px 14px;background:#F0F9FF;color:#0369A1;border:1px solid #BAE6FD;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
               <i class="ti ti-copy" style="font-size:13px;"></i> Zastosuj do innych pozycji…
+            </button>
+            <button type="button" onclick="_miniCardRenderPreview()" style="padding:9px 14px;background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              <i class="ti ti-eye" style="font-size:13px;"></i> Podgląd jak w PDF
             </button>
           </div>
           <div style="display:flex;gap:8px;">
@@ -11276,7 +11572,6 @@ async function _applyCopyProductData(mode) {
   try {
     if (mode === 'mini') {
       if (!_miniCardEditing) throw new Error('Brak źródłowej mini-karty');
-      // Przygotuj payload identyczny jak w _miniCardSave
       const cleanSpecs = {};
       Object.keys(_miniCardEditing.specs).forEach(k => {
         const v = (_miniCardEditing.specs[k] || '').toString().trim();
@@ -11288,7 +11583,6 @@ async function _applyCopyProductData(mode) {
         photo_set: _miniCardEditing.photo_set || '',
         specs: cleanSpecs
       };
-      // Nadpisz w PRODUCT_MINI_CARDS dla każdego targetu
       targetSbids.forEach(sbid => {
         PRODUCT_MINI_CARDS[sbid] = JSON.parse(JSON.stringify(payload));
       });
@@ -11332,33 +11626,65 @@ async function _applyCopyProductData(mode) {
   }
 }
 
+/* Skaluje obraz i zwraca base64 data URL (JPEG). Max wymiar 600 px, jakość 0.78. */
+async function _compressImageToBase64(file, maxDim, quality) {
+  maxDim = maxDim || 600;
+  quality = quality || 0.78;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (!w || !h) { reject(new Error('Nieprawidłowe wymiary zdjęcia')); return; }
+          if (w > maxDim || h > maxDim) {
+            const r = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * r);
+            h = Math.round(h * r);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          // Białe tło (dla przezroczystych PNG)
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch(err) { reject(err); }
+      };
+      img.onerror = () => reject(new Error('Nie można otworzyć zdjęcia (uszkodzony plik?)'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Nie można odczytać pliku'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/* Upload mini-karta: konwertuje PLIK → base64 w przeglądarce. BEZ wysyłania do Supabase.
+   Zdjęcie trafia bezpośrednio do PRODUCT_MINI_CARDS[sbid].photo_*. Zero CORS, zero sieci. */
 async function _miniCardUploadPhoto(role, input) {
   if (!input.files || !input.files[0] || !_miniCardEditing) return;
   const file = input.files[0];
   _miniCardEditing._lastError = null;
   _miniCardEditing._uploading = role;
   renderMiniCardEditor();
-  showToast('Wysyłam zdjęcie...');
-  // Nadpisz showToast tymczasowo żeby złapać też komunikat błędu do inline-banner
-  const _origToast = window.showToast;
-  let capturedErr = null;
-  window.showToast = (m) => { if (/nie powiod|błąd|błed|bład|HTTP|bucket|upraw|zbyt du|format|token/i.test(m)) capturedErr = m; _origToast(m); };
   try {
-    const url = await uploadProductPhoto(file, _miniCardEditing.sbid + '-' + role);
-    window.showToast = _origToast;
-    if (url) {
-      _miniCardEditing[role] = url;
-      _miniCardEditing._lastError = null;
-      _miniCardEditing._uploading = null;
-      renderMiniCardEditor();
-      showToast('Zdjęcie dodane');
-    } else {
-      _miniCardEditing._lastError = capturedErr || 'Nie udało się wgrać zdjęcia (nieznany błąd — sprawdź konsolę)';
-      _miniCardEditing._uploading = null;
-      renderMiniCardEditor();
+    if (file.size > 20 * 1024 * 1024) throw new Error('Oryginał za duży (max 20 MB — zostanie skompresowany)');
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!['jpg','jpeg','png','webp','gif','bmp'].includes(ext)) {
+      throw new Error('Dozwolone formaty: JPG, PNG, WEBP (otrzymano .' + ext + ')');
     }
+    const dataUrl = await _compressImageToBase64(file, 700, 0.80);
+    const kb = Math.round(dataUrl.length / 1024);
+    _miniCardEditing[role] = dataUrl;
+    _miniCardEditing._lastError = null;
+    _miniCardEditing._uploading = null;
+    renderMiniCardEditor();
+    showToast('Zdjęcie dodane (' + kb + ' KB po kompresji)');
   } catch(e) {
-    window.showToast = _origToast;
     _miniCardEditing._lastError = (e && e.message) ? e.message : String(e);
     _miniCardEditing._uploading = null;
     renderMiniCardEditor();
@@ -11368,18 +11694,89 @@ async function _miniCardUploadPhoto(role, input) {
 
 async function _miniCardRemovePhoto(role) {
   if (!_miniCardEditing) return;
-  const url = _miniCardEditing[role];
-  if (!url) return;
+  const data = _miniCardEditing[role];
+  if (!data) return;
   if (!confirm('Usunąć to zdjęcie?')) return;
-  await deleteProductPhoto(url);
+  // Legacy: jeśli to URL do Supabase Storage, posprzątaj
+  if (typeof data === 'string' && !data.startsWith('data:') && data.includes('/product-photos/')) {
+    try { await deleteProductPhoto(data); } catch(e) { console.warn('Legacy delete failed:', e); }
+  }
   _miniCardEditing[role] = '';
   renderMiniCardEditor();
+}
+
+/* Podgląd mini-karty w HTML (jak będzie wyglądać w PDF) — natychmiastowy, bez generowania PDF.
+   Pokazuje że dane są poprawnie zebrane niezależnie od tego czy PDF się wygeneruje. */
+function _miniCardRenderPreview() {
+  const el = document.getElementById('miniCardLivePreview');
+  if (!el || !_miniCardEditing) return;
+  const c = _miniCardEditing;
+  const SPEC_LABELS = {
+    catalog_number: 'Numer katalogowy',
+    dim_in: 'Wymiary wew. (szer × wys × gł mm)', dim_out: 'Wymiary zew. (szer × wys × gł mm)',
+    class_cool: 'Klasa en. (chłodzenie)', class_heat: 'Klasa en. (grzanie)',
+    seer: 'SEER', scop: 'SCOP',
+    noise_in: 'Hałas jedn. wew.', noise_out: 'Hałas jedn. zew.',
+    refrigerant: 'Czynnik chłodniczy', power_range: 'Zakres mocy'
+  };
+  const specRows = [];
+  Object.keys(SPEC_LABELS).forEach(k => {
+    const v = (c.specs[k] || '').toString().trim();
+    if (v) specRows.push({ k, label: SPEC_LABELS[k], value: v });
+  });
+  const catalogName = (c.specs.catalog_name || '').trim();
+  const photos = [];
+  if (c.photo_indoor)  photos.push({url: c.photo_indoor, label: 'wew.'});
+  if (c.photo_outdoor) photos.push({url: c.photo_outdoor, label: 'zew.'});
+  if (photos.length === 0 && c.photo_set) photos.push({url: c.photo_set, label: 'zestaw'});
+  const empty = specRows.length === 0 && photos.length === 0 && !catalogName;
+  const headerText = catalogName || ((c.marka || '') + ' ' + (c.model || '')).trim();
+
+  el.innerHTML = `
+    <div style="padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;margin-bottom:8px;font-size:11.5px;color:#1E40AF;display:flex;align-items:center;gap:8px;">
+      <i class="ti ti-eye" style="font-size:14px;"></i>
+      <strong>Tak będzie wyglądać karta pod wariantem w PDF.</strong> ${empty ? '<span style="color:#B91C1C;">UWAGA: wszystkie pola są puste — nic nie pojawi się w PDF.</span>' : 'Jeżeli widzisz ją tutaj, pojawi się też w PDF.'}
+    </div>
+    <div style="border:1px solid #DCE9F5;background:#F8FBFD;padding:14px;border-radius:8px;">
+      ${empty ? `
+        <div style="padding:30px;text-align:center;color:#94A3B8;font-size:13px;">Wypełnij przynajmniej jedno pole (zdjęcie lub parametr), zapisz i generuj PDF.</div>
+      ` : `
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+          ${photos.length > 0 ? `
+            <div style="display:flex;gap:8px;flex-shrink:0;">
+              ${photos.map(p => `
+                <div style="width:100px;height:100px;background:#fff;border:1px solid #E2E8F0;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;">
+                  <img src="${escapeHtml(p.url)}" style="max-width:100%;max-height:100%;object-fit:contain;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                  <div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#DC2626;font-size:10px;text-align:center;padding:4px;">Zdjęcie nie wczytuje się (CORS?)</div>
+                  <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;text-align:center;padding:1px 0;">${p.label}</div>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+          <div style="flex:1;min-width:240px;">
+            ${headerText ? `<div style="font-size:12px;font-weight:700;color:#1B4F8C;margin-bottom:6px;">${escapeHtml(headerText)}</div>` : ''}
+            ${specRows.length > 0 ? `
+              <table style="width:100%;border-collapse:collapse;">
+                ${specRows.map((r, i) => `
+                  <tr style="${i > 0 ? 'border-top:1px solid #DCE9F5;' : ''}">
+                    <td style="padding:3px 6px;font-size:11px;color:#64748B;">${escapeHtml(r.label)}</td>
+                    <td style="padding:3px 6px;font-size:11.5px;font-weight:700;color:#1A2332;text-align:right;">${escapeHtml(r.value)}</td>
+                  </tr>
+                `).join('')}
+              </table>
+            ` : '<div style="color:#94A3B8;font-size:11px;font-style:italic;">(brak wypełnionych parametrów)</div>'}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+  // Scroll do podglądu
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function _miniCardSave() {
   if (!_miniCardEditing) return;
   const sbid = _miniCardEditing.sbid;
-  // Przytnij puste wartości ze specs
   const cleanSpecs = {};
   Object.keys(_miniCardEditing.specs).forEach(k => {
     const v = (_miniCardEditing.specs[k] || '').toString().trim();
@@ -11414,7 +11811,8 @@ async function _miniCardReset() {
     if (prev.photo_set) await deleteProductPhoto(prev.photo_set);
   }
   delete PRODUCT_MINI_CARDS[sbid];
-  await saveMiniCardsToSupabase();
+  const ok = await saveMiniCardsToSupabase();
+  if (!ok) return;
   showToast('Mini-karta usunięta');
   closeMiniCardEditor();
   renderAcProductsList();
@@ -15453,9 +15851,14 @@ function buildProductCardPdfBlock(card) {
   };
 }
 
-function generatePdf() {
+async function generatePdf() {
   const clientName = document.getElementById('clientName').value.trim();
   if (!clientName) { showToast('Podaj dane klienta'); return; }
+
+  // Prefetch zdjęć mini-kart (do base64 wymagane przez pdfMake) — każda ścieżka generatePdf
+  if (typeof wzAttachMiniCardImages === 'function') {
+    try { await wzAttachMiniCardImages(); } catch(e) { console.warn('mini-card prefetch (generatePdf):', e); }
+  }
 
   const includeAc     = state.scope === 'ac' || state.scope === 'both';
   const includeHp     = state.scope === 'hp' || state.scope === 'both';
@@ -15671,38 +16074,164 @@ function generatePdf() {
     };
   }
 
+  /* === Zielony blok "Prace dodatkowe wliczone w cenę" — kompaktowy akcent z ikonką haczyka
+         narysowaną przez canvas (nie polega na czcionce — gwarantuje że ikona się wyrenderuje). === */
+  function _extrasCheckIcon(sz) {
+    sz = sz || 8;
+    // Haczyk 2-liniowy, zielony, grubość 1.3
+    return {
+      canvas: [
+        { type: 'polyline', lineColor: '#166534', lineWidth: 1.3,
+          points: [{x:0, y:sz*0.55}, {x:sz*0.38, y:sz*0.95}, {x:sz, y:0}] }
+      ],
+      margin: [0, 4, 0, 0]
+    };
+  }
+
+  function _buildExtrasAccentBlockGeneric(items, title) {
+    if (!items || items.length === 0) return null;
+    // Zagęszczanie dla dużej ilości pozycji
+    const n = items.length;
+    const cols = (n >= 8) ? 3 : (n >= 2 ? 2 : 1);
+    const fontMain = (n >= 7) ? 8.5 : 9.5;
+    const fontQty = (n >= 7) ? 7.5 : 8.5;
+    const rowVPad = (n >= 7) ? 1.2 : 2;
+
+    const buildItemRow = (it) => ({
+      columns: [
+        { width: 10, stack: [_extrasCheckIcon(8)] },
+        { width: '*', text: [
+          { text: it.name, fontSize: fontMain, color: '#1A2332' },
+          it.qtyLabel ? { text: '  ' + it.qtyLabel, fontSize: fontQty, color: '#64748B', italics: true } : ''
+        ]}
+      ],
+      columnGap: 4,
+      margin: [0, rowVPad, 0, rowVPad]
+    });
+
+    let itemsNode;
+    if (cols === 1) {
+      itemsNode = { stack: items.map(buildItemRow) };
+    } else {
+      // Podziel items na `cols` kolumn — po wierszach (col 0: 0,cols,2cols, …)
+      const perCol = Math.ceil(items.length / cols);
+      const colsArr = [];
+      for (let c = 0; c < cols; c++) {
+        colsArr.push({ width: '*', stack: items.slice(c * perCol, (c + 1) * perCol).map(buildItemRow) });
+      }
+      itemsNode = { columns: colsArr, columnGap: 18 };
+    }
+
+    return {
+      unbreakable: true,
+      margin: [0, 10, 0, 0],
+      table: {
+        widths: [3, '*'],
+        body: [[
+          { text: '', fillColor: '#166534', border: [false, false, false, false] },
+          {
+            stack: [
+              { text: title || 'PRACE DODATKOWE WLICZONE W CENĘ', fontSize: 7.5, color: '#166534', bold: true, characterSpacing: 1.2, margin: [10, 7, 10, 5] },
+              { ...itemsNode, margin: [10, 0, 10, 7] }
+            ],
+            fillColor: '#F0FDF4',
+            border: [false, false, false, false]
+          }
+        ]]
+      },
+      layout: {
+        hLineWidth: () => 0, vLineWidth: () => 0,
+        paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0
+      }
+    };
+  }
+
+  function buildExtrasAccentBlock(extras) {
+    if (!Array.isArray(extras) || extras.length === 0) return null;
+    const items = extras.map(e => {
+      const name = (e.name || 'Praca dodatkowa').trim();
+      const qty = parseFloat(e.qty) || 1;
+      const unit = (e.jednostka || e.unit || '').trim();
+      const showQty = (qty > 1) || (unit && !/^(szt|kpl)\.?$/i.test(unit));
+      const qtyLabel = showQty ? (qty + (unit ? ' ' + unit : '')) : '';
+      return { name, qtyLabel };
+    });
+    return _buildExtrasAccentBlockGeneric(items);
+  }
+
   /* === MINI-KARTA PRODUKTU — zdjęcia + specyfikacja drukowana pod wariantem === */
+  /* Zwraca listę unikalnych sbids produktów użytych w wariancie.
+     Legacy API: zwraca Array<string>. Nowe API `getVariantProductItems(v)` zwraca Array<{sbid, label}>. */
   function getVariantProductSbids(v) {
-    const sbids = [];
+    return getVariantProductItems(v).map(x => x.sbid);
+  }
+
+  /* Zwraca listę unikalnych produktów wariantu z etykietami ("Jednostka zewnętrzna" / "Jednostka wewnętrzna N" / "" ).
+     Kolejność dla multi: j.zew → j.wew (I, II, III…). Deduplikacja po sbid. */
+  function getVariantProductItems(v) {
+    const items = [];
     const seen = new Set();
-    const add = (s) => { if (s && !seen.has(s)) { seen.add(s); sbids.push(s); } };
-    if (!v) return sbids;
+    const add = (sbid, label) => {
+      if (!sbid || seen.has(sbid)) return;
+      seen.add(sbid);
+      items.push({ sbid, label: label || '' });
+    };
+    if (!v) return items;
     const t = v.type;
     if ((t === 'split' || t === 'custom_kit') && Array.isArray(v.units)) {
       v.units.forEach(u => {
         const p = (typeof getProductFromPool === 'function' ? getProductFromPool('split', u.productIdx) : null)
                 || (DB.split && DB.split[u.productIdx]);
-        if (p && p._sbid) add(p._sbid);
+        if (p && p._sbid) add(p._sbid, ''); // dla splita bez etykiety
       });
     } else if (t === 'multi') {
       if (v.outdoor) {
         const po = (typeof getProductFromPool === 'function' ? getProductFromPool('multi_zew', v.outdoor.productIdx) : null)
                  || (DB.multi_zew && DB.multi_zew[v.outdoor.productIdx]);
-        if (po && po._sbid) add(po._sbid);
+        if (po && po._sbid) add(po._sbid, 'Jednostka zewnętrzna');
       }
       if (Array.isArray(v.indoor)) {
+        // Zlicz łączną qty dla każdego unikalnego sbid oraz TOTAL (do decyzji o numerowaniu)
+        // Kolejność: zachowujemy wg pierwszego wystąpienia w v.indoor
+        const perSbid = new Map(); // sbid → { count }
+        let totalCount = 0;
         v.indoor.forEach(u => {
           const p = (typeof getProductFromPool === 'function' ? getProductFromPool('multi_wew', u.productIdx) : null)
                   || (DB.multi_wew && DB.multi_wew[u.productIdx]);
-          if (p && p._sbid) add(p._sbid);
+          if (!p || !p._sbid) return;
+          const q = parseInt(u.qty) || 1;
+          totalCount += q;
+          const ex = perSbid.get(p._sbid);
+          if (ex) ex.count += q;
+          else perSbid.set(p._sbid, { count: q });
+        });
+        const roman = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+        const num = (n) => roman[n-1] || String(n);
+        let running = 0;
+        perSbid.forEach((info, sbid) => {
+          const start = running + 1;
+          const end = running + info.count;
+          let label;
+          if (totalCount === 1) {
+            label = 'Jednostka wewnętrzna';
+          } else if (info.count === 1) {
+            label = 'Jednostka wewnętrzna ' + num(start);
+          } else if (info.count === 2) {
+            label = 'Jednostka wewnętrzna ' + num(start) + ' i ' + num(end);
+          } else {
+            // 3+ identycznych pod rząd: "I–III" lub "II–IV" itd.
+            label = 'Jednostka wewnętrzna ' + num(start) + '–' + num(end);
+          }
+          add(sbid, label);
+          running += info.count;
         });
       }
     } else if (t === 'hp_kit' && Array.isArray(v.hpItems)) {
-      v.hpItems.forEach(it => { if (it && (it._sbid || it.sbid)) add(it._sbid || it.sbid); });
+      v.hpItems.forEach(it => { if (it && (it._sbid || it.sbid)) add(it._sbid || it.sbid, ''); });
     } else if (t === 'custom' && Array.isArray(v.customItems)) {
-      v.customItems.forEach(it => { if (it && (it._sbid || it.sbid)) add(it._sbid || it.sbid); });
+      v.customItems.forEach(it => { if (it && (it._sbid || it.sbid)) add(it._sbid || it.sbid, ''); });
     }
-    return sbids;
+    return items;
   }
 
   function _miniCardSpecRows(specs) {
@@ -15710,12 +16239,14 @@ function generatePdf() {
     const push = (lbl, val) => {
       if (!val) return;
       rows.push([
-        { text: lbl, fontSize: 8, color: '#64748B', margin: [0, 2, 0, 2] },
-        { text: String(val), fontSize: 8.5, bold: true, color: '#1A2332', alignment: 'right', margin: [0, 2, 0, 2] }
+        { text: lbl, fontSize: 7.5, color: '#64748B', margin: [0, 1.3, 0, 1.3] },
+        { text: String(val), fontSize: 8, bold: true, color: '#1A2332', alignment: 'right', margin: [0, 1.3, 0, 1.3] }
       ]);
     };
-    push('Wymiary wew. (mm)', specs.dim_in);
-    push('Wymiary zew. (mm)', specs.dim_out);
+    push('Numer katalogowy', specs.catalog_number);
+    // Wymiary z sufiksem — klient widzi od razu kolejność (szer × wys × gł) obok wartości
+    push('Wymiary jedn. wew.', specs.dim_in ? specs.dim_in + ' mm  (szer × wys × gł)' : '');
+    push('Wymiary jedn. zew.', specs.dim_out ? specs.dim_out + ' mm  (szer × wys × gł)' : '');
     push('Klasa en. (chłodzenie)', specs.class_cool);
     push('Klasa en. (grzanie)', specs.class_heat);
     push('SEER', specs.seer);
@@ -15727,20 +16258,44 @@ function generatePdf() {
     return rows;
   }
 
-  function buildSingleMiniCardPdfBlock(mc, productMeta) {
+  function buildSingleMiniCardPdfBlock(mc, productMeta, roleLabel) {
     if (!mc) return null;
     const specs = mc.specs || {};
     const specRows = _miniCardSpecRows(specs);
+    // Zdjęcia: najpierw wprost mc.photo_* (gdy to data:base64), potem _base64_* (legacy po preloadzie URL)
+    const pickImg = (direct, cached) => {
+      if (direct && typeof direct === 'string' && direct.startsWith('data:')) return direct;
+      return cached || null;
+    };
+    const indoorImg  = pickImg(mc.photo_indoor,  mc._base64_indoor);
+    const outdoorImg = pickImg(mc.photo_outdoor, mc._base64_outdoor);
+    const setImg     = pickImg(mc.photo_set,     mc._base64_set);
     const imgs = [];
-    if (mc._base64_indoor)  imgs.push({ image: mc._base64_indoor,  fit: [95, 95], alignment: 'center' });
-    if (mc._base64_outdoor) imgs.push({ image: mc._base64_outdoor, fit: [95, 95], alignment: 'center' });
-    if (imgs.length === 0 && mc._base64_set) imgs.push({ image: mc._base64_set, fit: [100, 100], alignment: 'center' });
+    if (indoorImg)  imgs.push({ image: indoorImg,  fit: [95, 95], alignment: 'center' });
+    if (outdoorImg) imgs.push({ image: outdoorImg, fit: [95, 95], alignment: 'center' });
+    if (imgs.length === 0 && setImg) imgs.push({ image: setImg, fit: [120, 120], alignment: 'center' });
     if (specRows.length === 0 && imgs.length === 0) return null;
 
-    const headerText = ((productMeta.marka || '') + ' ' + (productMeta.model || '')).trim();
+    // Priorytet: nazwa katalogowa > marka + model
+    const catalogName = (specs.catalog_name || '').trim();
+    const headerText = catalogName || ((productMeta.marka || '') + ' ' + (productMeta.model || '')).trim();
+    const link = (specs.product_url || '').trim() || productMeta.link || '';
     const rightStack = [];
+    if (roleLabel) {
+      rightStack.push({ text: roleLabel.toUpperCase(), fontSize: 7.5, color: '#64748B', bold: true, characterSpacing: 1.2, margin: [0, 0, 0, 2] });
+    }
     if (headerText) {
-      rightStack.push({ text: headerText, fontSize: 9, bold: true, color: '#1B4F8C', margin: [0, 0, 0, 5] });
+      if (link) {
+        rightStack.push({
+          columns: [
+            { width: '*', text: headerText, fontSize: 10, bold: true, color: '#1B4F8C' },
+            { width: 'auto', text: 'Strona producenta »', link: link, fontSize: 8, color: '#1B4F8C', decoration: 'underline', bold: true, margin: [0, 1, 0, 0] }
+          ],
+          columnGap: 8, margin: [0, 0, 0, 5]
+        });
+      } else {
+        rightStack.push({ text: headerText, fontSize: 10, bold: true, color: '#1B4F8C', margin: [0, 0, 0, 5] });
+      }
     }
     if (specRows.length > 0) {
       rightStack.push({
@@ -15755,56 +16310,331 @@ function generatePdf() {
       });
     }
 
+    // Dodatkowe funkcje — pod tabelą parametrów. Haczyk rysowany jako canvas (bez znaku ✓,
+    // którego Roboto nie obsługuje — pokazywałby się jako kwadrat).
+    const features = (specs.features || '').trim();
+    if (features) {
+      const items = features.split(/[,;·\n]/).map(s => s.trim()).filter(Boolean);
+      if (items.length > 0) {
+        rightStack.push({ text: 'Funkcje', fontSize: 7.5, color: '#64748B', bold: true, characterSpacing: 1.1, margin: [0, 6, 0, 3] });
+        // Rozkład w 2 kolumnach, każda pozycja = [canvas haczyka] + [tekst]
+        const cols = 2;
+        const perCol = Math.ceil(items.length / cols);
+        const makeItem = (f) => ({
+          columns: [
+            { width: 10, stack: [_extrasCheckIcon(7)] },
+            { width: '*', text: f, fontSize: 7.5, color: '#1A2332' }
+          ],
+          columnGap: 3,
+          margin: [0, 1, 0, 1]
+        });
+        const colsArr = [];
+        for (let c = 0; c < cols; c++) {
+          colsArr.push({ width: '*', stack: items.slice(c * perCol, (c + 1) * perCol).map(makeItem) });
+        }
+        rightStack.push({ columns: colsArr, columnGap: 10, margin: [0, 0, 0, 0] });
+      }
+    }
+
     const hasImgs = imgs.length > 0;
     let inner;
     if (hasImgs) {
-      // Zdjęcia poziomo
-      const imgCols = imgs.map(i => ({ width: 100, stack: [i] }));
-      const leftWidth = Math.min(220, 10 + 100 * imgs.length);
-      const leftStack = { columns: imgCols, columnGap: 6, alignment: 'center' };
-      inner = { columns: [{ width: leftWidth, stack: [leftStack] }, { width: '*', stack: rightStack }], columnGap: 14 };
+      // Lewa kolumna: zdjęcie(a) — zmniejszone żeby ściślej mieścić się na stronie
+      const PHOTO_COL_WIDTH = 120;
+      let leftContent;
+      if (imgs.length === 1) {
+        imgs[0].fit = [110, 110];
+        leftContent = { stack: [imgs[0]], alignment: 'center' };
+      } else {
+        imgs.forEach(i => { i.fit = [95, 95]; });
+        leftContent = { stack: imgs.map(i => ({ ...i, margin: [0, 0, 0, 4] })), alignment: 'center' };
+      }
+      inner = {
+        columns: [
+          { width: PHOTO_COL_WIDTH, stack: [leftContent] },
+          { width: '*', stack: rightStack }
+        ],
+        columnGap: 14
+      };
     } else {
       inner = { stack: rightStack };
     }
 
     return {
       unbreakable: true,
-      margin: [0, 6, 0, 0],
+      margin: [0, 5, 0, 0],
       table: { widths: ['*'], body: [[{
         stack: [inner],
         fillColor: '#F8FBFD',
         border: [false, false, false, false],
-        margin: [10, 10, 10, 10]
+        margin: [10, 8, 10, 8]
       }]]}
     };
   }
 
+  /* === MICRO komórka mini-karty — siatka 2-kolumnowa, zawiera 5 parametrów + link do producenta.
+         Układ: zdjęcie 42×42 + nazwa + 2 linie parametrów (moc+wymiary / klasa+hałas+kolor). === */
+  function buildMicroMiniCardCell(mc, productMeta, roleLabel) {
+    if (!mc) return null;
+    const specs = mc.specs || {};
+    const catalogName = (specs.catalog_name || '').trim();
+    const headerText = catalogName || ((productMeta.marka || '') + ' ' + (productMeta.model || '')).trim();
+    const pickImg = (direct, cached) => {
+      if (direct && typeof direct === 'string' && direct.startsWith('data:')) return direct;
+      return cached || null;
+    };
+    const img = pickImg(mc.photo_indoor, mc._base64_indoor)
+             || pickImg(mc.photo_outdoor, mc._base64_outdoor)
+             || pickImg(mc.photo_set, mc._base64_set);
+    const isOutdoor = (roleLabel || '').toLowerCase().includes('zewnętrzna');
+
+    // Linia 1: moc + wymiary (z sufiksem "szer×wys×gł" żeby klient wiedział kolejność)
+    const line1Parts = [];
+    if (specs.power_range) line1Parts.push(specs.power_range);
+    const dim = isOutdoor ? (specs.dim_out || specs.dim_in) : (specs.dim_in || specs.dim_out);
+    if (dim) line1Parts.push(dim + ' mm (szer×wys×gł)');
+    const line1 = line1Parts.join('  ·  ');
+
+    // Linia 2: klasa energ. (chł/grz) + hałas + kolor
+    const line2Parts = [];
+    const kCool = (specs.class_cool || '').trim();
+    const kHeat = (specs.class_heat || '').trim();
+    if (kCool && kHeat) line2Parts.push('chł. ' + kCool + ' / grz. ' + kHeat);
+    else if (kCool) line2Parts.push('chł. ' + kCool);
+    else if (kHeat) line2Parts.push('grz. ' + kHeat);
+    const noise = isOutdoor ? (specs.noise_out || specs.noise_in) : (specs.noise_in || specs.noise_out);
+    if (noise) line2Parts.push(noise + (/dB/i.test(noise) ? '' : ' dB(A)'));
+    if (productMeta.color) line2Parts.push(productMeta.color);
+    const line2 = line2Parts.join('  ·  ');
+
+    // Link
+    const link = (specs.product_url || '').trim() || productMeta.link || '';
+
+    const nameRow = link
+      ? { columns: [
+          { width: '*', text: headerText, fontSize: 8, bold: true, color: '#1B4F8C' },
+          { width: 'auto', text: 'Link »', link: link, fontSize: 7, color: '#1B4F8C', decoration: 'underline', bold: true }
+        ], columnGap: 4, margin: [0, 0, 0, 1] }
+      : { text: headerText, fontSize: 8, bold: true, color: '#1B4F8C', margin: [0, 0, 0, 1] };
+
+    const rightStack = [];
+    if (roleLabel) rightStack.push({ text: roleLabel.toUpperCase(), fontSize: 6, color: '#64748B', bold: true, characterSpacing: 1.0, margin: [0, 0, 0, 0] });
+    if (headerText) rightStack.push(nameRow);
+    if (line1) rightStack.push({ text: line1, fontSize: 7, color: '#1A2332', margin: [0, 1, 0, 0] });
+    if (line2) rightStack.push({ text: line2, fontSize: 7, color: '#1A2332', margin: [0, 0, 0, 0] });
+
+    const cols = [];
+    if (img) {
+      cols.push({ width: 46, stack: [{ image: img, fit: [42, 42], alignment: 'left' }] });
+    } else {
+      cols.push({ width: 46, stack: [{
+        canvas: [{ type: 'rect', x: 0, y: 0, w: 42, h: 42, color: '#EEF5FB', lineColor: '#DCE9F5', lineWidth: 0.5 }]
+      }] });
+    }
+    cols.push({ width: '*', stack: rightStack });
+
+    return {
+      table: { widths: ['*'], body: [[{
+        stack: [{ columns: cols, columnGap: 7 }],
+        fillColor: '#F8FBFD',
+        border: [false, false, false, false],
+        margin: [6, 4, 6, 4]
+      }]]},
+      layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 }
+    };
+  }
+
+  /* === Kompaktowy wiersz mini-karty — zdjęcie 48×48 + nazwa + 3-4 param w linii
+         Zoptymalizowany pod maksymalnie 3 wiersze na stronie A4 wraz z resztą wariantu. === */
+  function buildCompactMiniCardRow(mc, productMeta, roleLabel) {
+    if (!mc) return null;
+    const specs = mc.specs || {};
+    const catalogName = (specs.catalog_name || '').trim();
+    const headerText = catalogName || ((productMeta.marka || '') + ' ' + (productMeta.model || '')).trim();
+    const pickImg = (direct, cached) => {
+      if (direct && typeof direct === 'string' && direct.startsWith('data:')) return direct;
+      return cached || null;
+    };
+    // Dla kompaktu bierzemy pierwsze dostępne zdjęcie — czy to wew, zew, czy set
+    const img = pickImg(mc.photo_indoor, mc._base64_indoor)
+             || pickImg(mc.photo_outdoor, mc._base64_outdoor)
+             || pickImg(mc.photo_set, mc._base64_set);
+    // Linia parametrów — maks 4 najważniejsze. Wymiary preferuj z role (zew → dim_out)
+    const isOutdoor = (roleLabel || '').toLowerCase().includes('zewnętrzna');
+    const parts = [];
+    if (specs.power_range) parts.push(specs.power_range);
+    const dim = isOutdoor ? (specs.dim_out || specs.dim_in) : (specs.dim_in || specs.dim_out);
+    if (dim) parts.push(dim + ' mm');
+    const noise = isOutdoor ? (specs.noise_out || specs.noise_in) : (specs.noise_in || specs.noise_out);
+    if (noise) parts.push(noise + (/dB/i.test(noise) ? '' : ' dB(A)'));
+    if (specs.class_cool) parts.push('klasa ' + specs.class_cool);
+    else if (specs.scop) parts.push('SCOP ' + specs.scop);
+    else if (specs.seer) parts.push('SEER ' + specs.seer);
+    const paramLine = parts.slice(0, 4).join('  ·  ');
+    const catalogNumber = (specs.catalog_number || '').trim();
+
+    if (!img && !headerText && parts.length === 0) return null;
+
+    // Dodatkowe funkcje — w kompakcie jako skrót (max 3 pierwsze pozycje, oddzielone ·)
+    const featuresRaw = (specs.features || '').trim();
+    let featuresLine = '';
+    if (featuresRaw) {
+      const items = featuresRaw.split(/[,;·\n]/).map(s => s.trim()).filter(Boolean).slice(0, 4);
+      featuresLine = items.join(' · ');
+    }
+
+    // Zbuduj paramLine z sufiksem "(szer×wys×gł)" przy wymiarach + klasa chł./grz.
+    const partsCompact = [];
+    if (specs.power_range) partsCompact.push(specs.power_range);
+    const dimCompact = isOutdoor ? (specs.dim_out || specs.dim_in) : (specs.dim_in || specs.dim_out);
+    if (dimCompact) partsCompact.push(dimCompact + ' mm (szer×wys×gł)');
+    const noiseCompact = isOutdoor ? (specs.noise_out || specs.noise_in) : (specs.noise_in || specs.noise_out);
+    if (noiseCompact) partsCompact.push(noiseCompact + (/dB/i.test(noiseCompact) ? '' : ' dB(A)'));
+    const kCool = (specs.class_cool || '').trim();
+    const kHeat = (specs.class_heat || '').trim();
+    let kText = '';
+    if (kCool && kHeat) kText = 'chł. ' + kCool + ' / grz. ' + kHeat;
+    else if (kCool) kText = 'chł. ' + kCool;
+    else if (kHeat) kText = 'grz. ' + kHeat;
+    if (kText) partsCompact.push(kText);
+    const paramLineExt = partsCompact.slice(0, 4).join('  ·  ');
+
+    // Link do strony producenta (jeśli jest w DB.products.link)
+    const link = (specs.product_url || '').trim() || productMeta.link || '';
+
+    // Prawa kolumna — ściśnięta
+    const rightStack = [];
+    if (roleLabel) rightStack.push({ text: roleLabel.toUpperCase(), fontSize: 6.5, color: '#64748B', bold: true, characterSpacing: 1.1, margin: [0, 0, 0, 0] });
+    if (headerText) {
+      if (link) {
+        rightStack.push({
+          columns: [
+            { width: '*', text: headerText, fontSize: 9, bold: true, color: '#1B4F8C' },
+            { width: 'auto', text: 'Strona producenta »', link: link, fontSize: 8, color: '#1B4F8C', decoration: 'underline', bold: true }
+          ],
+          columnGap: 6, margin: [0, 1, 0, 1]
+        });
+      } else {
+        rightStack.push({ text: headerText, fontSize: 9, bold: true, color: '#1B4F8C', margin: [0, 1, 0, 1] });
+      }
+    }
+    if (paramLineExt) rightStack.push({ text: paramLineExt, fontSize: 8, color: '#1A2332', margin: [0, 0, 0, 0] });
+    // Funkcje w kompakcie — haczyk z canvas obok tekstu (jako wiersz 2-kolumnowy: ikona + tekst)
+    if (featuresLine) {
+      rightStack.push({
+        columns: [
+          { width: 10, stack: [_extrasCheckIcon(7)] },
+          { width: '*', text: featuresLine, fontSize: 7.3, color: '#475569' }
+        ],
+        columnGap: 3, margin: [0, 1, 0, 0]
+      });
+    }
+    if (catalogNumber) rightStack.push({ text: 'Nr kat.: ' + catalogNumber, fontSize: 7, color: '#64748B', italics: true, margin: [0, 1, 0, 0] });
+
+    const cols = [];
+    if (img) {
+      cols.push({ width: 52, stack: [{ image: img, fit: [48, 48], alignment: 'left' }] });
+    } else {
+      cols.push({ width: 52, stack: [{
+        canvas: [{ type: 'rect', x: 0, y: 0, w: 48, h: 48, color: '#EEF5FB', lineColor: '#DCE9F5', lineWidth: 0.5 }]
+      }] });
+    }
+    cols.push({ width: '*', stack: rightStack });
+
+    return {
+      unbreakable: true,
+      margin: [0, 3, 0, 0],
+      table: { widths: ['*'], body: [[{
+        stack: [{ columns: cols, columnGap: 10 }],
+        fillColor: '#F8FBFD',
+        border: [false, false, false, false],
+        margin: [8, 5, 8, 5]
+      }]]}
+    };
+  }
+
+  /* === buildVariantMiniCardsBlock — OPCJA C auto-skalowanie:
+         • 1 produkt (split, HP) → 1 pełna karta
+         • 2 produkty (multi 1 zew + 1 wew) → 2 pełne karty
+         • 3+ produktów (multi 1 zew + 2+ wew) → zew pełna, pozostałe kompaktowe wiersze === */
   function buildVariantMiniCardsBlock(v) {
-    if (!v || v.type === 'install') return null;
-    // Globalny switch — można wyłączyć z finalize
-    if (state && state.includeMiniCards === false) return null;
-    const sbids = getVariantProductSbids(v);
-    if (sbids.length === 0) return null;
-    // Mapa sbid → {marka, model}
+    const log = (msg, obj) => { try { console.log('[miniCard-PDF] ' + msg, obj !== undefined ? obj : ''); } catch(e){} };
+    if (!v) { log('null wariant'); return null; }
+    if (v.type === 'install') { log('wariant install → pomijam'); return null; }
+    if (state && state.includeMiniCards === false) { log('WYŁĄCZONE przez przełącznik'); return null; }
+    const items = getVariantProductItems(v);
+    log('wariant typ=' + v.type + ', items=', items.map(x => x.sbid + ' (' + (x.label || '-') + ')').join(', '));
+    if (items.length === 0) { log('brak produktów w wariancie'); return null; }
+
+    // Mapa sbid → pełne metadane (marka, model, link do strony producenta)
     const meta = {};
     ['split','multi_zew','multi_wew'].forEach(cat => {
-      (DB[cat] || []).forEach(p => { if (p._sbid) meta[p._sbid] = { marka: p.marka, model: p.model }; });
+      (DB[cat] || []).forEach(p => {
+        if (p._sbid) meta[p._sbid] = { marka: p.marka, model: p.model, link: p.link || '' };
+      });
     });
-    // Max 3 mini-karty per wariant (żeby mieściło się na stronie A4)
-    const blocks = [];
-    for (let i = 0; i < sbids.length && blocks.length < 3; i++) {
-      const sbid = sbids[i];
-      const mc = PRODUCT_MINI_CARDS[sbid];
-      if (!mc || miniCardIsEmpty(mc)) continue;
-      const pm = meta[sbid] || { marka: '', model: '' };
-      const blk = buildSingleMiniCardPdfBlock(mc, pm);
-      if (blk) blocks.push(blk);
+
+    // Zbierz tylko te produkty które mają wypełnioną mini-kartę
+    const toRender = [];
+    for (const it of items) {
+      const mc = PRODUCT_MINI_CARDS[it.sbid];
+      if (!mc) { log('pomijam ' + it.sbid + ' — brak mini-karty w pamięci'); continue; }
+      if (miniCardIsEmpty(mc)) { log('pomijam ' + it.sbid + ' — mini-karta pusta'); continue; }
+      const pm = meta[it.sbid] || { marka: '', model: '', link: '' };
+      toRender.push({ mc, pm, label: it.label });
     }
-    if (blocks.length === 0) return null;
+    if (toRender.length === 0) { log('żadna z mini-kart nie ma danych do renderu'); return null; }
+
+    // Opcja C (auto-skalowanie):
+    //   ≤2 produkty → pełne karty (zdjęcie 110×110 + tabela)
+    //   3  produkty → wszystkie kompaktowe wiersze (jeden pod drugim)
+    //   4+ produkty (multi 1+3 i więcej jedn. wew.) → zew jako kompakt + jedn. wew. w DWÓCH KOLUMNACH
+    //                 (micro-wiersze, zdjęcie 40×40 + 2 kluczowe parametry) — zmieści się 1+5
+    const n = toRender.length;
+    const blocks = [];
+    if (n <= 2) {
+      // Pełne karty
+      toRender.forEach(item => {
+        const blk = buildSingleMiniCardPdfBlock(item.mc, item.pm, item.label);
+        if (blk) blocks.push(blk);
+      });
+    } else if (n === 3) {
+      // Wszystkie kompaktowe wiersze (jedna kolumna)
+      toRender.forEach(item => {
+        const blk = buildCompactMiniCardRow(item.mc, item.pm, item.label);
+        if (blk) blocks.push(blk);
+      });
+    } else {
+      // n >= 4 — dla multi: pierwszy (zew) jako kompakt, pozostałe (wew) w 2 kolumnach
+      const first = toRender[0];
+      const rest = toRender.slice(1);
+      const firstBlk = buildCompactMiniCardRow(first.mc, first.pm, first.label);
+      if (firstBlk) blocks.push(firstBlk);
+      // Rest w parach — po 2 obok siebie
+      for (let i = 0; i < rest.length; i += 2) {
+        const left = rest[i];
+        const right = rest[i + 1];
+        const leftBlk = buildMicroMiniCardCell(left.mc, left.pm, left.label);
+        const rightBlk = right ? buildMicroMiniCardCell(right.mc, right.pm, right.label) : { text: '' };
+        blocks.push({
+          unbreakable: true,
+          margin: [0, 3, 0, 0],
+          columns: [
+            { width: '*', stack: [leftBlk] },
+            { width: '*', stack: [rightBlk] }
+          ],
+          columnGap: 6
+        });
+      }
+    }
+    if (blocks.length === 0) { log('żaden blok nie powstał'); return null; }
+    log('OK — renderuję ' + blocks.length + ' bloków (' + (n <= 2 ? 'pełne' : (n === 3 ? 'kompakt' : 'zew kompakt + wew grid 2kol')) + ')');
+
+    const headerText = v.type === 'multi' ? 'KARTA ZESTAWU' : 'KARTA PRODUKTU';
     return {
       margin: [0, 10, 0, 0],
       stack: [
-        { text: 'KARTA PRODUKTU', fontSize: 8.5, color: '#64748B', bold: true, characterSpacing: 1.6, margin: [0, 0, 0, 2] },
+        { text: headerText, fontSize: 8.5, color: '#64748B', bold: true, characterSpacing: 1.6, margin: [0, 0, 0, 2] },
         { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.4, lineColor: '#DCE9F5' }] },
         ...blocks
       ]
@@ -16182,31 +17012,15 @@ function generatePdf() {
       });
     }
 
-    // Prace dodatkowe AC — jako kolejne wiersze
-    if (v.extras && v.extras.length > 0) {
-      v.extras.forEach(e => {
-        const eRow = [
-          { text: (lp++) + '.', fontSize: 10, color: '#64748B', margin: [6, 5, 6, 5] },
-          { text: '—', fontSize: 10, color: '#94A3B8', margin: [6, 5, 6, 5] },
-          { text: e.name || 'Praca dodatkowa', fontSize: 10, color: '#1A2332', margin: [6, 5, 6, 5] },
-          { text: '—', fontSize: 10, color: '#94A3B8', margin: [6, 5, 6, 5] },
-          { text: String(e.qty || 1), fontSize: 10, color: '#1A2332', alignment: 'center', margin: [6, 5, 6, 5] },
-          { text: '—', fontSize: 10, color: '#94A3B8', alignment: 'center', margin: [6, 5, 6, 5] }
-        ];
-        if (hasSplit) {
-          const extraTotalNet = getExtraTotalNet(e);
-          const extraTotalBr = roundUp(extraTotalNet * vatMultLocal);
-          eRow.push({ text: fmtPLN(extraTotalBr), fontSize: 10, bold: true, color: '#0F3461', alignment: 'right', margin: [6, 5, 6, 5] });
-        }
-        tBody.push(eRow);
-      });
-    }
+    // Prace dodatkowe AC — nie dodajemy ich już do tabeli produktów, pójdą jako osobny zielony blok
+    // (buildExtrasAccentBlock), poniżej tabeli i przed ceną.
 
     const tableBlock = { table: { headerRows: 1, widths: COLS, body: tBody }, layout: acLayout };
     // Jeśli są prace dodatkowe (i to nie tryb "final"), pomijamy linię ceny pod wariantem —
     // finalna cena łączna z pracami dodatkowymi zostanie pokazana po tabeli prac dodatkowych.
     const hasSharedExtras = (state.extras && state.extras.length > 0) && state.offerType !== 'final';
-    const priceBlock = hasSharedExtras ? null : buildPriceLineBlock(variantNet, variantBr, variantHeaderText);
+    const _bd = (typeof variantPriceBreakdown === 'function') ? variantPriceBreakdown(v) : null;
+    const priceBlock = hasSharedExtras ? null : buildPriceLineBlock(variantNet, variantBr, variantHeaderText, _bd ? { devicesNet: _bd.devicesNet, installNet: _bd.installNet, extrasNet: _bd.extraItemsNet } : null);
 
     // Zbierz wszystkie zdjęcia — poziom wariantu + poziom unitów
     const allImages = [];
@@ -16220,34 +17034,74 @@ function generatePdf() {
     const uniqueImages = [...new Set(allImages)];
     const productCard = buildProductCard(uniqueImages, v.description || '');
 
+    // Zielony blok "Prace dodatkowe wliczone w cenę" — nowy format
+    const extrasBlock = buildExtrasAccentBlock(v.extras);
+
     const variantStack = [headerBlock, tableBlock];
+    if (extrasBlock) variantStack.push(extrasBlock);
     if (priceBlock) variantStack.push(priceBlock);
     if (productCard) variantStack.push(productCard);
 
-    const miniCardsBlock = buildVariantMiniCardsBlock(v);
-    const outerStack = [{ unbreakable: true, stack: variantStack }];
-    if (miniCardsBlock) outerStack.push(miniCardsBlock);
-
+    // Mini-karta zestawu NIE jest tu dołączana — generatePdf doda ją osobno PO shared extras i final price
     return {
       margin: [0, vIdx > 0 ? 18 : 0, 0, 0],
-      stack: outerStack
+      stack: [{ unbreakable: true, stack: variantStack }]
     };
   }
   /* ---- Blok ceny „Koszt urządzeń wraz z materiałami i montażem" ---- */
-  function buildPriceLineBlock(netVal, brVal, variantName) {
-    const nm = (variantName || '').trim();
+  /* buildPriceLineBlock(net, br, label, breakdown?)
+     breakdown (opcjonalnie): { devicesNet, installNet, extrasNet }
+     Jeśli breakdown jest podany ORAZ state.showPriceBreakdown === true,
+     renderujemy rozbicie na urządzenia / montaż / prace dodatkowe. */
+  function buildPriceLineBlock(netVal, brVal, variantName, breakdown) {
+    const vatVal = (brVal || 0) - (netVal || 0);
+    const vatRate = state.vatRate || 8;
+    const vatMult = 1 + vatRate / 100;
+    const showBD = !!(state.showPriceBreakdown && breakdown);
+    const rows = [];
+
+    const subRow = (label, net) => [
+      { text: label, fontSize: 9.5, color: '#64748B', border: [false, false, false, false], margin: [0, 1.5, 8, 1.5] },
+      { text: fmtPLN(net || 0), fontSize: 10, color: '#1A2332', alignment: 'right', border: [false, false, false, false], margin: [0, 1.5, 0, 1.5] }
+    ];
+    if (showBD) {
+      if ((breakdown.devicesNet || 0) > 0) rows.push(subRow('Urządzenia', breakdown.devicesNet));
+      if ((breakdown.installNet || 0) > 0) rows.push(subRow('Montaż i uruchomienie', breakdown.installNet));
+      if ((breakdown.extrasNet || 0) > 0) rows.push(subRow('Prace dodatkowe', breakdown.extrasNet));
+      // Separator wizualny — linia nad "Cena netto"
+      rows.push([
+        { text: 'Cena netto (razem)', fontSize: 10, color: '#334155', bold: true, border: [false, true, false, false], borderColor: ['','#DCE9F5','',''], margin: [0, 4, 8, 2] },
+        { text: fmtPLN(netVal), fontSize: 11, color: '#1A2332', bold: true, alignment: 'right', border: [false, true, false, false], borderColor: ['','#DCE9F5','',''], margin: [0, 4, 0, 2] }
+      ]);
+    } else {
+      rows.push([
+        { text: 'Cena netto', fontSize: 10, color: '#64748B', border: [false, false, false, false], margin: [0, 2, 8, 2] },
+        { text: fmtPLN(netVal), fontSize: 11, color: '#1A2332', alignment: 'right', border: [false, false, false, false], margin: [0, 2, 0, 2] }
+      ]);
+    }
+    rows.push([
+      { text: 'Stawka VAT (' + vatRate + '%)', fontSize: 10, color: '#64748B', border: [false, false, false, true], borderColor: ['','','','#DCE9F5'], margin: [0, 2, 8, 4] },
+      { text: fmtPLN(vatVal), fontSize: 11, color: '#1A2332', alignment: 'right', border: [false, false, false, true], borderColor: ['','','','#DCE9F5'], margin: [0, 2, 0, 4] }
+    ]);
+    rows.push([
+      { text: 'Cena brutto', fontSize: 11, bold: true, color: '#0F3461', border: [false, false, false, false], margin: [0, 5, 8, 2] },
+      { text: fmtPLN(brVal), fontSize: 14, bold: true, color: '#0F3461', alignment: 'right', border: [false, false, false, false], margin: [0, 4, 0, 2] }
+    ]);
+
     return {
       unbreakable: true,
       margin: [0, 12, 0, 0],
       stack: [
         { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#C7D8E8' }] },
-        { text: 'Koszt urządzeń wraz z materiałami i montażem' + (nm ? ' „' + nm + '"' : ''),
-          fontSize: 10, bold: true, color: '#1B4F8C', margin: [0, 8, 0, 0] },
-        { text: [
-            { text: fmtPLN(netVal) + ' netto', fontSize: 11, color: '#1A2332' },
-            { text: '  +  ' + state.vatRate + '% VAT  =  ', fontSize: 9, color: '#64748B' },
-            { text: fmtPLN(brVal) + ' brutto', fontSize: 13, bold: true, color: '#0F3461' }
-          ], margin: [0, 3, 0, 0] }
+        { text: 'Cena zestawu', fontSize: 10, bold: true, color: '#1B4F8C', margin: [0, 8, 0, 6] },
+        {
+          table: { widths: ['*', 'auto'], body: rows },
+          layout: {
+            hLineColor: () => '#DCE9F5', vLineColor: () => '#DCE9F5',
+            hLineWidth: () => 0, vLineWidth: () => 0,
+            paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0
+          }
+        }
       ]
     };
   }
@@ -16265,7 +17119,23 @@ function generatePdf() {
     paddingRight: () => 0
   };
 
-  /* ---- Sekcja prac dodatkowych (unbreakable, styl jak tabela wariantu) ---- */
+  /* Zielony blok dla SHARED extras (state.extras z kalkulatora) — używa tego samego helpera. */
+  function buildSharedExtrasAccentBlock(extras) {
+    if (!extras || extras.length === 0) return null;
+    const items = extras.map(e => {
+      const d = getExtraDetails(e);
+      if (!d) return null;
+      const name = d.nazwa || 'Praca dodatkowa';
+      const qty = parseFloat(e.qty) || 1;
+      const unit = (d.jednostka || '').trim();
+      const showQty = (qty > 1) || (unit && !/^(szt|kpl)\.?$/i.test(unit));
+      const qtyLabel = showQty ? (qty + (unit ? ' ' + unit : '')) : '';
+      return { name, qtyLabel };
+    }).filter(Boolean);
+    return _buildExtrasAccentBlockGeneric(items);
+  }
+
+  /* ---- Sekcja prac dodatkowych (stary styl — zostawione dla kompatybilności z trybem "final" i HP) ---- */
   function buildExtrasBlock(extras, vatMult, sectionTitle) {
     if (!extras || extras.length === 0) return null;
     const showPrice = state.extrasShowPrice !== false;
@@ -16467,15 +17337,7 @@ function generatePdf() {
         : (includeHp
             ? 'rozwiązania w zakresie pomp ciepła dopasowane do Państwa potrzeb i specyfiki obiektu'
             : 'rozwiązania klimatyzacyjne dopasowane do Państwa potrzeb i specyfiki obiektu'));
-  content.push({
-    margin: [0, 0, 0, 18],
-    stack: [
-      { text: 'Dzień dobry,', fontSize: 11, bold: true, color: '#0F3461', margin: [0, 0, 0, 5] },
-      { text: 'dziękujemy za zainteresowanie usługami firmy 4Climat. Poniżej przedstawiamy ' + introSubject +
-              '. Każdy z zaproponowanych zestawów obejmuje urządzenia renomowanych producentów wraz z profesjonalnym montażem i uruchomieniem przez nasz zespół. W razie pytań lub chęci omówienia szczegółów pozostajemy do Państwa dyspozycji.',
-        fontSize: 10, color: '#1A2332', lineHeight: 1.45, alignment: 'justify' }
-    ]
-  });
+  // Wstęp usunięty — oferta zaczyna się od razu od wariantów (user: "Nie wiem czy on tam pasuje")
 
   // Uwagi - unbreakable, przed OWS (wstawiane przed buildOwsBlock w każdej sekcji)
   // Załączniki do pobrania (mode=link) — jako data URI w PDF
@@ -16769,12 +17631,13 @@ function generatePdf() {
     if (state.offerType === 'final') {
       // Tryb "final" — wszystkie warianty + jedna tabela prac dod. + jedna suma końcowa
       sortedVariants.forEach((v, vIdx) => {
-        // Każdy wariant od drugiego — na nowej stronie, żeby nie rozjechał się między stronami
         if (vIdx > 0) content.push({ text: '', pageBreak: 'before' });
-        // Grupujemy całą zawartość wariantu w jeden stack
         const variantStack = [ buildAcVariant(v, vIdx) ];
         const extraBlock = buildVariantExtraItemsBlock(v);
         if (extraBlock) variantStack.push(extraBlock);
+        // Karta zestawu/produktu na końcu wariantu
+        const miniCardsBlock = buildVariantMiniCardsBlock(v);
+        if (miniCardsBlock) variantStack.push(miniCardsBlock);
         content.push({ stack: variantStack });
       });
       const extrasBlock = buildExtrasBlock(state.extras, vatMult, includeHp ? 'PRACE DODATKOWE (KLIMATYZACJA)' : 'PRACE DODATKOWE');
@@ -16785,29 +17648,35 @@ function generatePdf() {
       content.push(buildSumBlock(finalNet, vatMult, '#1B4F8C'));
     } else {
       // Tryb wariantowy — każdy wariant od drugiego na nowej stronie.
-      // Zawartość wariantu (urządzenie + dodatkowe pozycje + prace dod. + cena końcowa) trzymamy razem.
+      // Kolejność: nagłówek+tabela → PRACE DODATKOWE (zielony blok) → CENA → KARTA ZESTAWU
       sortedVariants.forEach((v, vIdx) => {
         if (vIdx > 0) content.push({ text: '', pageBreak: 'before' });
         const variantStack = [ buildAcVariant(v, vIdx) ];
         const extraBlock = buildVariantExtraItemsBlock(v);
         if (extraBlock) variantStack.push(extraBlock);
         if (hasSharedExtras) {
-          const extrasBlockPerVariant = buildExtrasBlock(state.extras, vatMult, includeHp ? 'PRACE DODATKOWE (KLIMATYZACJA)' : 'PRACE DODATKOWE');
-          if (extrasBlockPerVariant) variantStack.push(extrasBlockPerVariant);
+          const extrasAccentBlock = buildSharedExtrasAccentBlock(state.extras);
+          if (extrasAccentBlock) variantStack.push(extrasAccentBlock);
           const varNet = variantNetTotal(v);
           const finalNet = varNet + extrasNet;
           const finalBr = roundUp(finalNet * vatMult);
-          const label = v.name || `Wariant ${vIdx+1}`;
-          // Jeśli wariant bez montażu — zmień etykietę na "cena urządzeń"
-          const sumSuffix = v.excludeInstall ? ' — cena urządzeń' : ' — łącznie z pracami dodatkowymi';
-          variantStack.push(buildPriceLineBlock(finalNet, finalBr, label + sumSuffix));
+          const bd = variantPriceBreakdown(v);
+          variantStack.push(buildPriceLineBlock(finalNet, finalBr, '', {
+            devicesNet: bd.devicesNet,
+            installNet: bd.installNet,
+            extrasNet: extrasNet + bd.extraItemsNet
+          }));
         } else if (v.excludeInstall) {
-          // Wariant bez montażu i bez wspólnych prac dodatkowych — pokaż "cena urządzeń"
           const varNet = variantNetTotal(v);
           const varBr = roundUp(varNet * vatMult);
-          const label = v.name || `Wariant ${vIdx+1}`;
-          variantStack.push(buildPriceLineBlock(varNet, varBr, label + ' — cena urządzeń'));
+          const bd = variantPriceBreakdown(v);
+          variantStack.push(buildPriceLineBlock(varNet, varBr, '', {
+            devicesNet: bd.devicesNet, installNet: bd.installNet, extrasNet: bd.extraItemsNet
+          }));
         }
+        // KARTA ZESTAWU/PRODUKTU — na końcu, po cenie
+        const miniCardsBlock = buildVariantMiniCardsBlock(v);
+        if (miniCardsBlock) variantStack.push(miniCardsBlock);
         content.push({ stack: variantStack });
       });
     }
@@ -17925,31 +18794,29 @@ async function refreshPdfPreview() {
 
 /* Zwraca docDefinition (bez pobierania i bez skutków ubocznych typu zapis klienta czy toast).
    Trick: monkey-patch pdfMake.createPdf → rzuca specjalny wyjątek zaraz po przechwyceniu docDef,
-   dzięki czemu reszta generatePdf() (recordOfferForClient, showToast) nie wykonuje się. */
+   dzięki czemu reszta generatePdf() (recordOfferForClient, showToast) nie wykonuje się.
+   generatePdf jest ASYNC (preload zdjęć mini-kart), więc musimy await — inaczej captured=null. */
 const PDF_PREVIEW_ABORT = Symbol('PDF_PREVIEW_ABORT');
 async function getOfferDocDefinition() {
-  return new Promise((resolve, reject) => {
-    const origCreate = pdfMake.createPdf.bind(pdfMake);
-    let captured = null;
-    pdfMake.createPdf = (def) => {
-      captured = def;
-      pdfMake.createPdf = origCreate;
-      const err = new Error('preview-abort');
-      err.__preview_abort = PDF_PREVIEW_ABORT;
-      throw err;
-    };
-    try {
-      generatePdf();
-      // Nie powinno tu dotrzeć — ale gdyby (np. walidacja się nie powiodła i return przed pdfMake) —
-      // zwracamy null.
-      pdfMake.createPdf = origCreate;
-      resolve(captured);
-    } catch(e) {
-      pdfMake.createPdf = origCreate;
-      if (e && e.__preview_abort === PDF_PREVIEW_ABORT) resolve(captured);
-      else reject(e);
-    }
-  });
+  const origCreate = pdfMake.createPdf.bind(pdfMake);
+  let captured = null;
+  pdfMake.createPdf = (def) => {
+    captured = def;
+    pdfMake.createPdf = origCreate;
+    const err = new Error('preview-abort');
+    err.__preview_abort = PDF_PREVIEW_ABORT;
+    throw err;
+  };
+  try {
+    await generatePdf();
+    // Jeśli dotarliśmy tu — generatePdf zwrócił przez walidację albo przed pdfMake.createPdf
+    pdfMake.createPdf = origCreate;
+    return captured;
+  } catch(e) {
+    pdfMake.createPdf = origCreate;
+    if (e && e.__preview_abort === PDF_PREVIEW_ABORT) return captured;
+    throw e;
+  }
 }
 
 async function generatePdfWithAttachments() {
@@ -29961,24 +30828,53 @@ function wzToggleProductCard(vid, checked) {
 
 /* Pobierz obraz z URL jako base64 (dla pdfMake) */
 async function _wzFetchImageAsBase64(url) {
+  if (!url) return null;
+  // 1) Spróbuj fetch (szybciej, działa gdy CORS jest OK)
   try {
-    const response = await fetch(url, { mode: 'cors' });
-    if (!response.ok) throw new Error(response.status);
-    const blob = await response.blob();
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    const response = await fetch(url, { mode: 'cors', cache: 'no-cache' });
+    if (response.ok) {
+      const blob = await response.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
   } catch(e) {
-    console.warn('fetchImage error:', url, e);
-    return null;
+    console.warn('[fetchImage] fetch nie zadziałał, próbuję Image+canvas:', url);
   }
+  // 2) Fallback: Image → canvas → toDataURL. Działa gdy fetch jest blokowane przez CORS/file://
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const timer = setTimeout(() => { console.warn('[fetchImage] timeout:', url); resolve(null); }, 10000);
+    img.onload = () => {
+      clearTimeout(timer);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 400;
+        canvas.height = img.naturalHeight || 400;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        resolve(dataUrl);
+      } catch(e) {
+        console.warn('[fetchImage] canvas conversion failed (CORS taint?):', url, e);
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      console.warn('[fetchImage] Image load failed:', url);
+      resolve(null);
+    };
+    img.src = url;
+  });
 }
 
-/* Prefetchuje zdjęcia mini-kart produktów (dla wszystkich produktów użytych w wariantach)
-   do base64 i zapisuje w PRODUCT_MINI_CARDS[sbid]._base64_*. Wywołane raz przed PDF. */
+/* Prefetchuje zdjęcia mini-kart (photo_indoor/outdoor/set → base64).
+   Wywołane raz przed generacją PDF. */
 async function wzAttachMiniCardImages() {
   try {
     const sbids = new Set();
@@ -29993,13 +30889,13 @@ async function wzAttachMiniCardImages() {
     sbids.forEach(sbid => {
       const mc = PRODUCT_MINI_CARDS[sbid];
       if (!mc) return;
-      // wyczyść poprzedni cache
       mc._base64_indoor = null; mc._base64_outdoor = null; mc._base64_set = null;
       if (mc.photo_indoor)  tasks.push(_wzFetchImageAsBase64(mc.photo_indoor).then(b => mc._base64_indoor = b));
       if (mc.photo_outdoor) tasks.push(_wzFetchImageAsBase64(mc.photo_outdoor).then(b => mc._base64_outdoor = b));
       if (mc.photo_set)     tasks.push(_wzFetchImageAsBase64(mc.photo_set).then(b => mc._base64_set = b));
     });
     await Promise.all(tasks);
+    console.log('✓ Prefetched zdjęcia mini-kart dla', sbids.size, 'produktów');
   } catch(e) {
     console.warn('wzAttachMiniCardImages error:', e);
   }
@@ -30993,6 +31889,10 @@ function wzRenderStepFinalize() {
         <input type="checkbox" ${(f.includeMiniCards !== false) ? 'checked' : ''} onchange="wzSetFinalize('includeMiniCards', this.checked)">
         <span>Dołącz mini-kartę produktu pod każdym wariantem (zdjęcie + specyfikacja)</span>
       </label>
+      <label class="wzn-check">
+        <input type="checkbox" ${(f.showPriceBreakdown === true) ? 'checked' : ''} onchange="wzSetFinalize('showPriceBreakdown', this.checked)">
+        <span>Pokaż rozbicie ceny w PDF (urządzenia / montaż / prace dodatkowe)</span>
+      </label>
     </div>
 
     <div class="wzn-section-h">
@@ -31240,6 +32140,8 @@ async function wzGeneratePdf() {
     state.linkedClientId = wzState.client.linkedId || null;
     // Flaga mini-kart produktu — pod każdym wariantem w PDF
     state.includeMiniCards = wzState.finalize?.includeMiniCards !== false;
+    // Flaga rozbicia cen (urządzenia / montaż / prace dodatkowe) w PDF
+    state.showPriceBreakdown = wzState.finalize?.showPriceBreakdown === true;
 
     // 3) Zmapuj warianty (split lub multi)
     if (wzState.basics.scope === 'ac' && wzState.basics.mode === 'split') {
